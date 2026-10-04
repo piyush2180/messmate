@@ -1,0 +1,10 @@
+{
+  "description": "A mobile-first food ordering platform for college students, offering authentic homemade pickles and customizable fruit bowls, designed for quick and easy access to fresh meals.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
