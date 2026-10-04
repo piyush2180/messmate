@@ -1,34 +1,70 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, useEffect, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
 
-type Screen = "home" | "pickles" | "pickle-detail" | "fruit-builder" | "cart" | "checkout" | "fulfilment" | "payment" | "confirmation"
+type Screen =
+  | "home"
+  | "pickles"
+  | "pickle-detail"
+  | "fruit-builder"
+  | "cart"
+  | "checkout"
+  | "fulfilment"
+  | "payment"
+  | "confirmation"
+  | "orders"
 
 type CartItem = {
   id: string
-
   name: string
-
   detail: string
-
   price: number
-
   quantity: number
-
   kind: "pickle" | "fruit"
 }
 
 type CustomerDetails = {
   name: string
-
   phone: string
-
   hostel: string
-
   room: string
 }
 
-type IconName = "arrow-left" | "arrow-right" | "bag" | "check" | "clock" | "close" | "edit" | "heart" | "leaf" | "location" | "minus" | "plus" | "shield" | "sparkle"
+type OrderRecord = {
+  id: string
+  order_number: number
+  customer_name: string
+  customer_phone: string
+  hostel: string
+  room: string
+  fulfilment: "pickup" | "delivery"
+  slot: string
+  items: CartItem[]
+  subtotal: number
+  delivery_fee: number
+  total: number
+  payment_method: string
+  status: "placed" | "preparing" | "ready" | "delivered" | "cancelled"
+  created_at: string
+}
+
+type IconName =
+  | "arrow-left"
+  | "arrow-right"
+  | "bag"
+  | "check"
+  | "clock"
+  | "close"
+  | "edit"
+  | "heart"
+  | "leaf"
+  | "location"
+  | "minus"
+  | "plus"
+  | "shield"
+  | "sparkle"
+  | "receipt"
+  | "refresh"
 
 const pickleImage =
   "https://images.unsplash.com/photo-1601702538934-efffab67ab65?auto=format&fit=crop&w=1200&q=88"
@@ -193,6 +229,22 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
         <path d="M12 3c.5 4 2.5 6 6 7-3.5 1-5.5 3-6 7-.5-4-2.5-6-6-7 3.5-1 5.5-3 6-7Z" />
       </>
     ),
+
+    receipt: (
+      <>
+        <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+        <path d="M16 8h-8M16 12h-8M11 16h-3" />
+      </>
+    ),
+
+    refresh: (
+      <>
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+        <path d="M16 21h5v-5" />
+      </>
+    ),
   }
 
   return (
@@ -232,11 +284,17 @@ function Header({
   onBack,
   cartCount = 0,
   onCart,
+  onOrders,
+  hasOrders = false,
+  activeScreen,
 }: {
   title?: string
   onBack?: () => void
   cartCount?: number
   onCart?: () => void
+  onOrders?: () => void
+  hasOrders?: boolean
+  activeScreen?: Screen
 }) {
   return (
     <header className="header">
@@ -253,16 +311,29 @@ function Header({
           <div className="header-title">{title}</div>
         </div>
       )}
-      {onCart && (
-        <button
-          className="bag-button"
-          onClick={onCart}
-          aria-label={`Cart with ${cartCount} items`}
-        >
-          <Icon name="bag" />
-          {cartCount > 0 && <span>{cartCount}</span>}
-        </button>
-      )}
+      <div className="header-actions">
+        {onOrders && (
+          <button
+            className={`orders-button ${activeScreen === "orders" ? "active" : ""}`}
+            onClick={onOrders}
+            aria-label="My Orders & Tracking"
+            title="My Orders & Tracking"
+          >
+            <Icon name="receipt" />
+            {hasOrders && <span className="orders-dot" />}
+          </button>
+        )}
+        {onCart && (
+          <button
+            className="bag-button"
+            onClick={onCart}
+            aria-label={`Cart with ${cartCount} items`}
+          >
+            <Icon name="bag" />
+            {cartCount > 0 && <span>{cartCount}</span>}
+          </button>
+        )}
+      </div>
     </header>
   )
 }
@@ -396,7 +467,8 @@ function Home({
     <>
       <Header
         cartCount={cartCount}
-        onCart={cartCount ? () => go("cart") : undefined}
+        onCart={() => go("cart")}
+        onOrders={() => go("orders")}
       />
       <main>
         <section className="hero">
@@ -475,7 +547,8 @@ function PickleList({
         title="Homemade Pickles"
         onBack={() => go("home")}
         cartCount={cartCount}
-        onCart={cartCount ? () => go("cart") : undefined}
+        onCart={() => go("cart")}
+        onOrders={() => go("orders")}
       />
       <main className="screen-content">
         <section className="screen-intro pickle-intro">
@@ -664,6 +737,7 @@ function FruitBuilder({
         onBack={() => go("home")}
         cartCount={cartCount}
         onCart={cartCount ? () => go("cart") : undefined}
+        onOrders={() => go("orders")}
       />
       <main className="screen-content builder-page">
         <section className="builder-hero">
@@ -810,7 +884,11 @@ function Cart({
 
   return (
     <>
-      <Header title="Your Cart" onBack={() => go("home")} />
+      <Header
+        title="Your Cart"
+        onBack={() => go("home")}
+        onOrders={() => go("orders")}
+      />
       <main className="screen-content cart-page">
         <section className="screen-intro compact">
           <div className="eyebrow">Almost there</div>
@@ -1333,12 +1411,349 @@ function Confirmation({
       </div>
       <div className="confirm-actions">
         <PrimaryButton onClick={() => go("home")}>Back to home</PrimaryButton>
-        <button className="secondary-button">View order details</button>
+        <button className="secondary-button" onClick={() => go("orders")}>
+          Track your order
+        </button>
       </div>
       <p className="thank-you">
         Made fresh on campus. Thanks for supporting small.
       </p>
     </main>
+  )
+}
+
+function OrdersPage({
+  go,
+  phone,
+  setPhone,
+  cartCount,
+}: {
+  go: (screen: Screen) => void
+  phone: string
+  setPhone: (phone: string) => void
+  cartCount: number
+}) {
+  const [searchInput, setSearchInput] = useState(() => {
+    return phone || localStorage.getItem("messmate_phone") || ""
+  })
+  const [orders, setOrders] = useState<OrderRecord[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const loadOrders = async (targetPhone?: string) => {
+    if (!supabase) return
+    setIsLoading(true)
+    setMessage(null)
+    try {
+      const q = (targetPhone !== undefined ? targetPhone : searchInput).trim()
+      let query = supabase.from("orders").select("*")
+
+      if (q && q.toLowerCase() !== "all") {
+        if (/^\d{1,4}$/.test(q)) {
+          query = query.or(`order_number.eq.${parseInt(q)},customer_phone.eq.${q}`)
+        } else {
+          query = query.eq("customer_phone", q)
+        }
+      }
+
+      const { data, error } = await query.order("order_number", {
+        ascending: false,
+      })
+
+      if (error) {
+        setMessage(error.message)
+      } else {
+        setOrders(data as OrderRecord[])
+        if (q && q.toLowerCase() !== "all") {
+          localStorage.setItem("messmate_phone", q)
+          setPhone(q)
+        }
+      }
+    } catch {
+      setMessage("Could not retrieve orders at this time.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadOrders()
+
+    if (!supabase) return
+    const channel = supabase
+      .channel("public:orders_tracker")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === payload.new.id ? { ...o, ...payload.new } : o
+              )
+            )
+          } else if (payload.eventType === "INSERT") {
+            setOrders((prev) => [payload.new as OrderRecord, ...prev])
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(channel)
+    }
+  }, [])
+
+  const getStepProgress = (status: OrderRecord["status"]) => {
+    switch (status) {
+      case "placed":
+        return 0
+      case "preparing":
+        return 1
+      case "ready":
+        return 2
+      case "delivered":
+        return 3
+      default:
+        return 0
+    }
+  }
+
+  return (
+    <>
+      <Header
+        title="My Orders & Tracking"
+        onBack={() => go("home")}
+        cartCount={cartCount}
+        onCart={() => go("cart")}
+        onOrders={() => go("orders")}
+        activeScreen="orders"
+      />
+      <main className="screen-content orders-page">
+        <section className="screen-intro compact">
+          <div className="eyebrow">Zero-login live tracking</div>
+          <h1>
+            Your orders.
+            <br />
+            <em>Track live status.</em>
+          </h1>
+          <p>
+            Real-time status of your homemade pickles and freshly made bowls.
+          </p>
+        </section>
+
+        <section className="orders-search-card">
+          <div className="eyebrow">Look up by phone</div>
+          <div className="orders-search-row">
+            <input
+              type="tel"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="e.g. 9876543210 (or 'all')"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") loadOrders(searchInput)
+              }}
+            />
+            <button onClick={() => loadOrders(searchInput)}>
+              <Icon name="refresh" size={16} /> Find
+            </button>
+          </div>
+          <div className="orders-search-note">
+            <Icon name="shield" size={14} />
+            <span>
+              Zero login needed · Enter phone number or type "all" to view campus orders
+            </span>
+          </div>
+        </section>
+
+        {isLoading ? (
+          <div className="empty-state" style={{ marginTop: 24 }}>
+            <span>
+              <Icon name="clock" size={28} />
+            </span>
+            <h2>Checking orders...</h2>
+            <p>Connecting to campus database in real time.</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="empty-state" style={{ marginTop: 24 }}>
+            <span>
+              <Icon name="receipt" size={28} />
+            </span>
+            <h2>No orders found</h2>
+            <p>
+              {searchInput
+                ? `No orders found for "${searchInput}". Try another phone number or search "all".`
+                : "Enter your phone number above to see active deliveries and past orders."}
+            </p>
+            <PrimaryButton onClick={() => go("home")}>Browse the menu</PrimaryButton>
+          </div>
+        ) : (
+          <div className="orders-list">
+            {orders.map((order) => {
+              const currentStep = getStepProgress(order.status)
+              const steps = [
+                { label: "Placed", desc: "Kitchen received" },
+                { label: "Prepping", desc: "Fresh batch prep" },
+                {
+                  label:
+                    order.fulfilment === "delivery"
+                      ? "Out for Delivery"
+                      : "Ready for Pickup",
+                  desc:
+                    order.fulfilment === "delivery"
+                      ? "Coming to room"
+                      : "At pickup point",
+                },
+                { label: "Delivered", desc: "Enjoy your food" },
+              ]
+
+              return (
+                <article className="order-ticket" key={order.id}>
+                  <div className="order-ticket-top">
+                    <div className="order-ticket-id">
+                      <small>Order #{order.order_number}</small>
+                      <strong>₹{order.total}</strong>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          color: "var(--muted)",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {new Date(order.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        ·{" "}
+                        {new Date(order.created_at).toLocaleDateString([], {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <span className={`order-status-badge ${order.status}`}>
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "currentColor",
+                        }}
+                      />
+                      {order.status === "placed" && "Order Placed"}
+                      {order.status === "preparing" && "Kitchen Preparing"}
+                      {order.status === "ready" &&
+                        (order.fulfilment === "delivery"
+                          ? "Out for Delivery"
+                          : "Ready for Pickup")}
+                      {order.status === "delivered" && "Delivered"}
+                    </span>
+                  </div>
+
+                  {/* Live Tracker Stepper */}
+                  <div className="tracker-timeline">
+                    <div className="tracker-steps">
+                      {steps.map((step, idx) => {
+                        const isDone = idx < currentStep
+                        const isActive = idx === currentStep
+                        return (
+                          <div
+                            key={step.label}
+                            className={`tracker-step-item ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}
+                          >
+                            <div className="tracker-step-node">
+                              {isDone ? (
+                                <Icon name="check" size={16} />
+                              ) : (
+                                idx + 1
+                              )}
+                            </div>
+                            <span className="tracker-step-title">
+                              {step.label}
+                            </span>
+                            <span className="tracker-step-time">
+                              {step.desc}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="tracker-banner">
+                      <div className="tracker-banner-icon">
+                        <Icon
+                          name={
+                            order.fulfilment === "pickup" ? "location" : "bag"
+                          }
+                          size={16}
+                        />
+                      </div>
+                      <div>
+                        <strong>
+                          {order.fulfilment === "pickup"
+                            ? "Hostel 3 Entrance Pickup Point"
+                            : `${order.hostel}, Room ${order.room}`}
+                        </strong>
+                        <div
+                          style={{
+                            color: "var(--muted)",
+                            fontSize: "8px",
+                            marginTop: "2px",
+                          }}
+                        >
+                          Slot: {order.slot} · Contact: {order.customer_name} (
+                          {order.customer_phone})
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order items */}
+                  <div className="order-ticket-details">
+                    <div className="order-ticket-section-title">
+                      Items Ordered
+                    </div>
+                    {Array.isArray(order.items) &&
+                      order.items.map((item, idx) => (
+                        <div className="order-line" key={idx}>
+                          <span className="order-qty">{item.quantity}×</span>
+                          <span>
+                            <strong>{item.name}</strong>
+                            <small>{item.detail}</small>
+                          </span>
+                          <strong>₹{item.price * item.quantity}</strong>
+                        </div>
+                      ))}
+                    <div className="totals">
+                      <div>
+                        <span>Subtotal</span>
+                        <strong>₹{order.subtotal}</strong>
+                      </div>
+                      <div>
+                        <span>Delivery</span>
+                        <strong>
+                          {order.delivery_fee ? `₹${order.delivery_fee}` : "Free"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Payment</span>
+                        <strong style={{ textTransform: "uppercase" }}>
+                          {order.payment_method}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Total Paid</span>
+                        <strong>₹{order.total}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </main>
+    </>
   )
 }
 
@@ -1349,12 +1764,12 @@ export default function App() {
 
   const [cart, setCart] = useState<CartItem[]>([])
 
-  const [details, setDetails] = useState<CustomerDetails>({
+  const [details, setDetails] = useState<CustomerDetails>(() => ({
     name: "",
-    phone: "",
+    phone: localStorage.getItem("messmate_phone") || "",
     hostel: "",
     room: "",
-  })
+  }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
 
@@ -1456,6 +1871,9 @@ export default function App() {
           console.error("Supabase insert error:", error)
         } else if (data?.order_number) {
           setOrderNumber(data.order_number)
+          if (details.phone) {
+            localStorage.setItem("messmate_phone", details.phone)
+          }
         }
       }
     } catch (err) {
@@ -1536,6 +1954,14 @@ export default function App() {
             orderNumber={orderNumber}
           />
         )}
+        {screen === "orders" && (
+          <OrdersPage
+            go={go}
+            phone={details.phone}
+            setPhone={(phone) => setDetails((prev) => ({ ...prev, phone }))}
+            cartCount={cartCount}
+          />
+        )}
         {cartCount > 0 &&
           ![
             "home",
@@ -1546,6 +1972,7 @@ export default function App() {
             "fulfilment",
             "payment",
             "confirmation",
+            "orders",
           ].includes(screen) && (
             <CartFloat
               count={cartCount}
@@ -1557,3 +1984,4 @@ export default function App() {
     </div>
   )
 }
+

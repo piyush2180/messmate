@@ -42,9 +42,14 @@ h1, h2, h3, p { margin: 0; }
 .header-heading { display: grid; justify-items: center; gap: 1px; white-space: nowrap; }
 .header-heading > span { color: var(--olive); font-size: 7px; line-height: 1; font-weight: 800; letter-spacing: .14em; }
 .header-title { font-size: 14px; font-weight: 800; white-space: nowrap; }
-.icon-button, .bag-button { border: 1px solid var(--line); background: var(--white); width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-soft); }
+.icon-button, .bag-button, .orders-button { border: 1px solid var(--line); background: var(--white); width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-soft); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
 .icon-button { justify-self: start; }
-.bag-button { justify-self: end; position: relative; }
+.header-actions { display: flex; align-items: center; gap: 8px; justify-self: end; }
+.orders-button { position: relative; color: var(--charcoal); }
+.orders-button:hover, .bag-button:hover, .icon-button:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--olive); }
+.orders-button.active { background: var(--olive); color: white; border-color: var(--olive); }
+.orders-button .orders-dot { position: absolute; top: -1px; right: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); border: 2px solid var(--cream); }
+.bag-button { position: relative; }
 .bag-button span { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--terracotta); color: white; font-size: 10px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--cream); }
 .hero { padding: 54px 24px 40px; position: relative; }
 .hero::after { content: ""; position: absolute; width: 170px; height: 170px; border: 1px solid rgba(83,107,58,.12); border-radius: 50%; right: -100px; top: 10px; box-shadow: 0 0 0 28px rgba(83,107,58,.035), 0 0 0 56px rgba(83,107,58,.025); }
@@ -279,6 +284,45 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .confirm-actions { width: 100%; display: grid; gap: 8px; margin-top: 22px; }
 .secondary-button { min-height: 48px; border: 0; background: none; color: var(--olive); font-size: 10px; font-weight: 800; cursor: pointer; }
 .thank-you { margin-top: 15px; font-size: 8px !important; }
+
+/* Orders & Live Tracking Screen */
+.orders-page { padding-bottom: 40px; }
+.orders-search-card { background: var(--white); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-soft); margin-bottom: 22px; }
+.orders-search-row { display: flex; gap: 8px; margin-top: 10px; }
+.orders-search-row input { flex: 1; height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--white); padding: 0 14px; font-size: 11px; color: var(--charcoal); }
+.orders-search-row input:focus { border-color: var(--olive); outline: 3px solid rgba(83,107,58,.14); outline-offset: 1px; }
+.orders-search-row button { height: 48px; padding: 0 16px; border-radius: 14px; border: 0; background: var(--olive); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: background .18s ease; flex-shrink: 0; }
+.orders-search-row button:hover { background: var(--olive-dark); }
+.orders-search-note { color: var(--muted); font-size: 8px; margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+
+.orders-list { display: grid; gap: 18px; }
+.order-ticket { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); position: relative; }
+.order-ticket-top { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.order-ticket-id { display: grid; gap: 2px; }
+.order-ticket-id small { color: var(--muted); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.order-ticket-id strong { font-size: 18px; font-weight: 800; color: var(--charcoal); }
+.order-status-badge { padding: 5px 11px; border-radius: 99px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; display: inline-flex; align-items: center; gap: 5px; }
+.order-status-badge.placed { background: #fef8eb; color: #a17015; border: 1px solid rgba(217,164,65,.25); }
+.order-status-badge.preparing { background: var(--olive-pale); color: var(--olive-dark); border: 1px solid rgba(83,107,58,.25); }
+.order-status-badge.ready { background: var(--green-pale); color: var(--green-dark); border: 1px solid rgba(79,138,91,.25); }
+.order-status-badge.delivered { background: #f1f4ed; color: #2e603a; border: 1px solid rgba(79,138,91,.2); }
+
+.tracker-timeline { margin: 18px 0; background: #faf8f5; border-radius: 18px; padding: 18px 12px; border: 1px solid var(--line); }
+.tracker-steps { display: grid; grid-template-columns: repeat(4, 1fr); position: relative; gap: 4px; }
+.tracker-step-item { display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; }
+.tracker-step-node { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; margin-bottom: 7px; background: var(--line); color: var(--muted); transition: all .3s ease; }
+.tracker-step-item.done .tracker-step-node { background: var(--olive); color: white; }
+.tracker-step-item.active .tracker-step-node { background: var(--green); color: white; box-shadow: 0 0 0 4px rgba(79,138,91,.2); }
+.tracker-step-title { font-size: 8px; font-weight: 700; line-height: 1.25; color: var(--muted); }
+.tracker-step-item.active .tracker-step-title, .tracker-step-item.done .tracker-step-title { color: var(--charcoal); font-weight: 800; }
+.tracker-step-time { font-size: 7px; color: var(--muted); margin-top: 2px; }
+
+.tracker-banner { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: white; border: 1px solid var(--line); font-size: 9px; line-height: 1.4; color: var(--charcoal); }
+.tracker-banner-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--olive-pale); color: var(--olive); flex-shrink: 0; }
+
+.order-ticket-details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.order-ticket-section-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--olive); margin-bottom: 8px; }
+
 
 @media (min-width: 700px) {
   body { padding: 28px 0; }
