@@ -2981,18 +2981,18 @@ function SupportChatWidget({
       })
 
       // 2. Also try inserting into database table
-      supabase
-        .from("support_messages")
-        .insert({
-          phone: activePhone,
-          customer_name: name.trim(),
-          sender: "customer",
-          message: issueText,
-        })
-        .then(() => {})
-        .catch((err) => {
-          console.warn("DB notice (table might not exist yet):", err)
-        })
+      try {
+        await supabase
+          .from("support_messages")
+          .insert({
+            phone: activePhone,
+            customer_name: name.trim(),
+            sender: "customer",
+            message: issueText,
+          })
+      } catch (err) {
+        console.warn("DB notice (table might not exist yet):", err)
+      }
     }
     setIsSubmitting(false)
   }
@@ -3414,12 +3414,13 @@ export default function App() {
 
   // Live listener for Ready-for-pickup alert
   useEffect(() => {
-    if (!supabase) return
+    const client = supabase
+    if (!client) return
     const phone = details.phone || localStorage.getItem("messmate_phone")
     if (!phone) return
 
     const checkReadyOrders = async () => {
-      const { data } = await supabase
+      const { data } = await client
         .from("orders")
         .select("*")
         .eq("customer_phone", phone)
@@ -3439,7 +3440,7 @@ export default function App() {
 
     checkReadyOrders()
 
-    const ordersChannel = supabase
+    const ordersChannel = client
       .channel("student_ready_alerts")
       .on(
         "postgres_changes",
@@ -3458,7 +3459,7 @@ export default function App() {
       .subscribe()
 
     return () => {
-      supabase?.removeChannel(ordersChannel)
+      client.removeChannel(ordersChannel)
     }
   }, [details.phone, dismissedReadyIds])
 
