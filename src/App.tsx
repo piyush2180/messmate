@@ -2709,10 +2709,30 @@ function SupportChatWidget({
   const [faqInput, setFaqInput] = useState("")
 
   // Live chat messages
-  const [liveMessages, setLiveMessages] = useState<SupportMsg[]>([])
+  const [liveMessages, setLiveMessages] = useState<SupportMsg[]>(() => {
+    try {
+      const p = customerPhone || localStorage.getItem("messmate_phone")
+      if (p) {
+        const clean = p.replace(/\D/g, "").slice(-10)
+        const saved = localStorage.getItem(`messmate_chat_${clean}`)
+        if (saved) return JSON.parse(saved)
+      }
+    } catch {}
+    return []
+  })
   const [liveInput, setLiveInput] = useState("")
 
   const chatBottomRef = useRef<HTMLDivElement>(null)
+  const liveMessagesRef = useRef<SupportMsg[]>(liveMessages)
+  liveMessagesRef.current = liveMessages
+  const phoneRef = useRef<string>(phone)
+  phoneRef.current = phone
+
+  const saveChatToLocal = (cleanP: string, msgs: SupportMsg[]) => {
+    try {
+      localStorage.setItem(`messmate_chat_${cleanP}`, JSON.stringify(msgs))
+    } catch {}
+  }
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -2723,36 +2743,99 @@ function SupportChatWidget({
     if (customerName && !name) setName(customerName)
   }, [customerPhone, customerName])
 
-  // Realtime subscription for live chat
+  // Realtime Broadcast Channel & History Sync
   useEffect(() => {
-    if (!phone || view !== "live" || !supabase) return
+    if (!supabase) return
+
+    const broadcastChannel = supabase.channel("messmate_support_broadcast")
+
+    broadcastChannel
+      .on("broadcast", { event: "support_msg" }, ({ payload }) => {
+        if (!payload || !payload.phone) return
+        const incoming = payload as SupportMsg
+        const currentPhone = (phoneRef.current || "").replace(/\D/g, "").slice(-10)
+        const incomingPhone = (incoming.phone || "").replace(/\D/g, "").slice(-10)
+
+        if (incomingPhone && currentPhone && incomingPhone === currentPhone) {
+          setLiveMessages((prev) => {
+            if (
+              prev.some(
+                (m) =>
+                  m.id === incoming.id ||
+                  (m.created_at === incoming.created_at && m.message === incoming.message)
+              )
+            ) {
+              return prev
+            }
+            const next = [...prev, incoming]
+            saveChatToLocal(currentPhone, next)
+            return next
+          })
+          if (incoming.sender === "support") {
+            setView("live")
+          }
+        }
+      })
+      .on("broadcast", { event: "request_history" }, () => {
+        const currentPhone = (phoneRef.current || "").replace(/\D/g, "").slice(-10)
+        if (currentPhone && liveMessagesRef.current.length > 0) {
+          broadcastChannel.send({
+            type: "broadcast",
+            event: "sync_history",
+            payload: liveMessagesRef.current,
+          })
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(broadcastChannel)
+    }
+  }, [])
+
+  // Database fetch & Postgres changes when student phone is available
+  useEffect(() => {
+    const clean = phone?.replace(/\D/g, "").slice(-10)
+    if (!clean || !supabase) return
 
     supabase
       .from("support_messages")
       .select("*")
-      .eq("phone", phone)
+      .eq("phone", clean)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
-          setLiveMessages(data as SupportMsg[])
+          setLiveMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id))
+            const incoming = (data as SupportMsg[]).filter((m) => !existingIds.has(m.id))
+            if (incoming.length === 0) return prev
+            const next = [...prev, ...incoming].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+            saveChatToLocal(clean, next)
+            return next
+          })
         }
       })
 
-    const channel = supabase
-      .channel(`support_chat_${phone}`)
+    const pgChannel = supabase
+      .channel(`support_pg_${clean}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "support_messages",
+          filter: `phone=eq.${clean}`,
         },
         (payload) => {
           const newMsg = payload.new as SupportMsg
-          if (newMsg.phone === phone) {
+          if (newMsg.phone === clean) {
             setLiveMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev
-              return [...prev, newMsg]
+              const next = [...prev, newMsg]
+              saveChatToLocal(clean, next)
+              return next
             })
           }
         }
@@ -2760,9 +2843,9 @@ function SupportChatWidget({
       .subscribe()
 
     return () => {
-      supabase?.removeChannel(channel)
+      supabase?.removeChannel(pgChannel)
     }
-  }, [phone, view])
+  }, [phone])
 
   const handleSelectFaq = (faq: (typeof FAQ_ITEMS)[0]) => {
     const userMsg = {
@@ -2822,7 +2905,7 @@ function SupportChatWidget({
     const issueText = issue.trim() || "Requested campus team callback."
 
     const initialCustomerMsg: SupportMsg = {
-      id: `local-${Date.now()}`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       phone: activePhone,
       customer_name: name.trim(),
       sender: "customer",
@@ -2831,7 +2914,7 @@ function SupportChatWidget({
     }
 
     const acknowledgmentMsg: SupportMsg = {
-      id: `local-ack-${Date.now() + 1}`,
+      id: `ack-${Date.now() + 1}-${Math.random().toString(36).slice(2, 6)}`,
       phone: activePhone,
       customer_name: "MessMate Support",
       sender: "support",
@@ -2839,29 +2922,35 @@ function SupportChatWidget({
       created_at: new Date().toISOString(),
     }
 
-    setLiveMessages([initialCustomerMsg, acknowledgmentMsg])
+    const nextMsgs = [initialCustomerMsg, acknowledgmentMsg]
+    setLiveMessages(nextMsgs)
+    saveChatToLocal(activePhone, nextMsgs)
     setView("live")
 
-    try {
-      if (supabase) {
-        supabase
-          .from("support_messages")
-          .insert({
-            phone: activePhone,
-            customer_name: name.trim(),
-            sender: "customer",
-            message: issueText,
-          })
-          .then(() => {})
-          .catch((err) =>
-            console.error("Failed to submit support request to Supabase:", err)
-          )
-      }
-    } catch (err) {
-      console.error("Failed to submit support request to Supabase:", err)
-    } finally {
-      setIsSubmitting(false)
+    if (supabase) {
+      // 1. Broadcast immediately across Supabase Realtime channel so Admin receives it without delay
+      const bc = supabase.channel("messmate_support_broadcast")
+      bc.send({
+        type: "broadcast",
+        event: "support_msg",
+        payload: initialCustomerMsg,
+      })
+
+      // 2. Also try inserting into database table
+      supabase
+        .from("support_messages")
+        .insert({
+          phone: activePhone,
+          customer_name: name.trim(),
+          sender: "customer",
+          message: issueText,
+        })
+        .then(() => {})
+        .catch((err) => {
+          console.warn("DB notice (table might not exist yet):", err)
+        })
     }
+    setIsSubmitting(false)
   }
 
   const handleSendLiveMessage = async (e?: React.FormEvent) => {
@@ -2870,26 +2959,37 @@ function SupportChatWidget({
     const text = liveInput.trim()
     setLiveInput("")
 
+    const cleanPhone = (phone || localStorage.getItem("messmate_phone") || "").replace(/\D/g, "").slice(-10)
+
     const optimistic: SupportMsg = {
-      id: `local-${Date.now()}`,
-      phone,
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      phone: cleanPhone,
       customer_name: name || "Student",
       sender: "customer",
       message: text,
       created_at: new Date().toISOString(),
     }
-    setLiveMessages((prev) => [...prev, optimistic])
+    const next = [...liveMessages, optimistic]
+    setLiveMessages(next)
+    saveChatToLocal(cleanPhone, next)
 
     if (supabase) {
+      const bc = supabase.channel("messmate_support_broadcast")
+      bc.send({
+        type: "broadcast",
+        event: "support_msg",
+        payload: optimistic,
+      })
+
       try {
         await supabase.from("support_messages").insert({
-          phone,
+          phone: cleanPhone,
           customer_name: name || "Student",
           sender: "customer",
           message: text,
         })
       } catch (err) {
-        console.error("Failed to send live message:", err)
+        console.warn("DB notice:", err)
       }
     }
   }

@@ -39,8 +39,22 @@ function get10DigitPhone(raw: string | null | undefined): string {
 export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
-  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([])
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem("messmate_admin_support_messages")
+      if (saved) return JSON.parse(saved)
+    } catch (e) {
+      console.warn("Could not read local support cache", e)
+    }
+    return []
+  })
   const [soundEnabled, setSoundEnabled] = useState(true)
+
+  const saveAdminSupportToLocal = (msgs: SupportMessage[]) => {
+    try {
+      localStorage.setItem("messmate_admin_support_messages", JSON.stringify(msgs))
+    } catch {}
+  }
 
   // Menu Inventory State
   const [inventory, setInventory] = useState<MenuItemStock[]>(() => {
@@ -111,18 +125,81 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return
 
+    // 1. Fetch from database if table exists
     supabase
       .from("support_messages")
       .select("*")
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data) {
-          setSupportMessages(data as SupportMessage[])
+        if (!error && data && data.length > 0) {
+          setSupportMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id))
+            const added = (data as SupportMessage[]).filter((m) => !existingIds.has(m.id))
+            if (added.length === 0) return prev
+            const next = [...prev, ...added].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+            saveAdminSupportToLocal(next)
+            return next
+          })
         }
       })
 
-    const supportChannel = supabase
-      .channel("admin_support_channel")
+    // 2. Realtime Broadcast Channel (zero table needed, works instantly across web)
+    const broadcastChannel = supabase.channel("messmate_support_broadcast")
+
+    broadcastChannel
+      .on("broadcast", { event: "support_msg" }, ({ payload }) => {
+        if (!payload || !payload.phone) return
+        const newMsg = payload as SupportMessage
+        setSupportMessages((prev) => {
+          if (
+            prev.some(
+              (m) =>
+                m.id === newMsg.id ||
+                (m.created_at === newMsg.created_at &&
+                  m.phone === newMsg.phone &&
+                  m.message === newMsg.message)
+            )
+          ) {
+            return prev
+          }
+          const next = [...prev, newMsg]
+          saveAdminSupportToLocal(next)
+          return next
+        })
+        if (soundEnabled && newMsg.sender === "customer") {
+          playOrderChime()
+        }
+      })
+      .on("broadcast", { event: "sync_history" }, ({ payload }) => {
+        if (Array.isArray(payload) && payload.length > 0) {
+          setSupportMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id))
+            const added = (payload as SupportMessage[]).filter((m) => !existingIds.has(m.id))
+            if (added.length === 0) return prev
+            const next = [...prev, ...added].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+            saveAdminSupportToLocal(next)
+            return next
+          })
+        }
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Ask any active student window to sync their active messages
+          broadcastChannel.send({
+            type: "broadcast",
+            event: "request_history",
+            payload: {},
+          })
+        }
+      })
+
+    // 3. Postgres changes if table exists
+    const pgChannel = supabase
+      .channel("admin_support_pg_channel")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "support_messages" },
@@ -130,15 +207,20 @@ export default function App() {
           const newMsg = payload.new as SupportMessage
           setSupportMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
-            return [...prev, newMsg]
+            const next = [...prev, newMsg]
+            saveAdminSupportToLocal(next)
+            return next
           })
-          if (soundEnabled && newMsg.sender === "customer") playOrderChime()
+          if (soundEnabled && newMsg.sender === "customer") {
+            playOrderChime()
+          }
         }
       )
       .subscribe()
 
     return () => {
-      supabase?.removeChannel(supportChannel)
+      supabase?.removeChannel(broadcastChannel)
+      supabase?.removeChannel(pgChannel)
     }
   }, [soundEnabled])
 
@@ -423,16 +505,27 @@ export default function App() {
     setAdminReplyText("")
 
     const optimistic: SupportMessage = {
-      id: `local-admin-${Date.now()}`,
+      id: `admin-reply-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       phone: selectedPhone,
       customer_name: activeThread?.customerName || "Student",
       sender: "support",
       message: reply,
       created_at: new Date().toISOString(),
     }
-    setSupportMessages((prev) => [...prev, optimistic])
+    const next = [...supportMessages, optimistic]
+    setSupportMessages(next)
+    saveAdminSupportToLocal(next)
 
     if (supabase) {
+      // 1. Broadcast to student screen in real-time
+      const bc = supabase.channel("messmate_support_broadcast")
+      bc.send({
+        type: "broadcast",
+        event: "support_msg",
+        payload: optimistic,
+      })
+
+      // 2. Attempt saving to DB table
       try {
         await supabase.from("support_messages").insert({
           phone: selectedPhone,
@@ -441,7 +534,7 @@ export default function App() {
           message: reply,
         })
       } catch (err) {
-        console.error("Failed to send admin reply:", err)
+        console.warn("DB notice (table might not exist yet):", err)
       }
     }
   }
