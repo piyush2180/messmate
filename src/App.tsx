@@ -1759,14 +1759,41 @@ function Payment({
   const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=MessMate&am=${total}&cu=INR&tn=MessMate%20Food%20Order`
 
   const handleCopyUpi = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(merchantUpiId)
+    const copySuccessful = () => {
       setCopiedUpi(true)
       setTimeout(() => setCopiedUpi(false), 2200)
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard
+        .writeText(merchantUpiId)
+        .then(copySuccessful)
+        .catch(() => fallbackCopy())
+    } else {
+      fallbackCopy()
+    }
+
+    function fallbackCopy() {
+      try {
+        const textArea = document.createElement("textarea")
+        textArea.value = merchantUpiId
+        textArea.style.position = "fixed"
+        textArea.style.left = "-9999px"
+        textArea.style.top = "-9999px"
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        const ok = document.execCommand("copy")
+        document.body.removeChild(textArea)
+        if (ok) copySuccessful()
+      } catch (err) {
+        console.warn("Clipboard copy fallback warning:", err)
+      }
     }
   }
 
   const handleSubmit = () => {
+    if (isSubmitting || items.length === 0) return
     onPay(method, utr)
   }
 
@@ -1882,16 +1909,23 @@ function Payment({
                 <div className="utr-section">
                   <label htmlFor="utr-field" className="utr-label">
                     <span>12-Digit UPI Reference / UTR Number</span>
-                    <span className="optional-badge">Recommended</span>
+                    <span className="optional-badge">
+                      {utr.length === 12
+                        ? "✓ 12/12 digits"
+                        : utr.length > 0
+                        ? `${utr.length}/12 digits`
+                        : "Recommended"}
+                    </span>
                   </label>
                   <input
                     id="utr-field"
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
                     className="utr-input"
-                    maxLength={16}
+                    maxLength={12}
                     placeholder="e.g. 409128381920 (from PhonePe receipt)"
                     value={utr}
-                    onChange={(e) => setUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ""))}
+                    onChange={(e) => setUtr(e.target.value.replace(/\D/g, "").slice(0, 12))}
                   />
                   <p className="utr-hint">
                     Found under payment details in PhonePe/GPay to speed up kitchen verification.
@@ -1945,7 +1979,7 @@ function Payment({
                 </div>
               </div>
               <div className="desktop-payment-cta">
-                <PrimaryButton disabled={isSubmitting} onClick={handleSubmit}>
+                <PrimaryButton disabled={isSubmitting || items.length === 0} onClick={handleSubmit}>
                   {isSubmitting
                     ? "Placing order..."
                     : method === "upi"
@@ -1962,7 +1996,7 @@ function Payment({
           <small>Total</small>
           <strong>₹{total}</strong>
         </div>
-        <PrimaryButton disabled={isSubmitting} onClick={handleSubmit}>
+        <PrimaryButton disabled={isSubmitting || items.length === 0} onClick={handleSubmit}>
           {isSubmitting
             ? "Placing order..."
             : method === "upi"
@@ -2291,8 +2325,15 @@ function OrdersPage({
       }
       let query = supabase.from("orders").select("*")
 
+      const cleanDigits = q.replace(/\D/g, "")
+      const normalizedPhone = cleanDigits.slice(-10)
+
       if (/^\d{1,4}$/.test(q)) {
         query = query.or(`order_number.eq.${parseInt(q)},customer_phone.eq.${q}`)
+      } else if (normalizedPhone.length === 10) {
+        query = query.or(
+          `customer_phone.eq.${normalizedPhone},customer_phone.eq.${cleanDigits},customer_phone.eq.${q}`
+        )
       } else {
         query = query.eq("customer_phone", q)
       }
@@ -3802,6 +3843,12 @@ export default function App() {
   }
 
   const handlePay = async (method: "upi" | "counter", utr?: string) => {
+    if (isSubmitting) return
+    if (!cart || cart.length === 0) {
+      alert("Your cart is empty! Please add items before checking out.")
+      go("home")
+      return
+    }
     setIsSubmitting(true)
 
     try {

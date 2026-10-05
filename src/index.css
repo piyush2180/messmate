@@ -2245,3 +2245,18 @@ h1 em { color: var(--olive); font-weight: inherit; }
   font-weight: 800;
 }
 
+/* Prevent iOS Safari automatic zoom on inputs */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .field input,
+  .orders-search-row input,
+  .utr-input,
+  .support-input-bar input,
+  .support-field input,
+  .support-field textarea {
+    font-size: 16px !important;
+  }
+}
+

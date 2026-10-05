@@ -318,3 +318,72 @@ test("FAQ Bot - falls back gracefully with official Support Team branding", () =
   assert.equal(reply.includes("MessMate Support Team"), true)
   assert.equal(reply.includes("Campus Support Team"), false)
 })
+
+// ============================================================================
+// TEST SUITE 7: UTR Validation, Empty Cart & Order Tracking Queries
+// ============================================================================
+test("UTR Validation - validates strict 12-digit Indian UPI reference format", () => {
+  const validateUtr = (raw: string) => {
+    const clean = raw.replace(/\D/g, "").slice(0, 12)
+    return { clean, isValid: clean.length === 12 }
+  }
+
+  assert.equal(validateUtr("409128381920").isValid, true)
+  assert.equal(validateUtr("409128381920").clean, "409128381920")
+
+  // Too short
+  assert.equal(validateUtr("123").isValid, false)
+  // Strips alphabetic characters and spaces
+  assert.equal(validateUtr("UTR-4091 2838 1920").clean, "409128381920")
+  assert.equal(validateUtr("UTR-4091 2838 1920").isValid, true)
+  // Over length clamped to 12
+  assert.equal(validateUtr("4091283819209999").clean.length, 12)
+})
+
+test("Order Tracking Query - normalizes phone variations to find orders", () => {
+  const buildTrackingFilter = (q: string) => {
+    const trimmed = q.trim()
+    const cleanDigits = trimmed.replace(/\D/g, "")
+    const normalizedPhone = cleanDigits.slice(-10)
+
+    if (/^\d{1,4}$/.test(trimmed)) {
+      return { type: "order_or_short", orderNum: parseInt(trimmed), query: trimmed }
+    } else if (normalizedPhone.length === 10) {
+      return {
+        type: "phone_or",
+        candidates: [normalizedPhone, cleanDigits, trimmed],
+      }
+    } else {
+      return { type: "exact", query: trimmed }
+    }
+  }
+
+  // Searching by 1-4 digit order number
+  const orderSearch = buildTrackingFilter("14")
+  assert.equal(orderSearch.type, "order_or_short")
+  assert.equal((orderSearch as any).orderNum, 14)
+
+  // Searching by 10-digit number
+  const directPhone = buildTrackingFilter("9876543210")
+  assert.equal(directPhone.type, "phone_or")
+  assert.equal((directPhone as any).candidates.includes("9876543210"), true)
+
+  // Searching with +91 country prefix
+  const countryPrefix = buildTrackingFilter("+91 98765 43210")
+  assert.equal(countryPrefix.type, "phone_or")
+  assert.equal((countryPrefix as any).candidates.includes("9876543210"), true)
+
+  // Searching with dashes
+  const dashed = buildTrackingFilter("98765-43210")
+  assert.equal(dashed.type, "phone_or")
+  assert.equal((dashed as any).candidates.includes("9876543210"), true)
+})
+
+test("Empty Cart Guard - detects and prevents 0-item order submission", () => {
+  const canSubmitOrder = (cartItems: any[]) => {
+    return Boolean(cartItems && cartItems.length > 0)
+  }
+
+  assert.equal(canSubmitOrder([]), false)
+  assert.equal(canSubmitOrder([{ id: "mango", price: 40, quantity: 1 }]), true)
+})
