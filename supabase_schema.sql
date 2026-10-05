@@ -67,3 +67,32 @@ create policy "Anyone can view support messages"
 
 -- 11. Enable Realtime on the support_messages table
 alter publication supabase_realtime add table public.support_messages;
+
+-- 12. Add columns for Payment Verification, Pickup PIN, and Order Ratings
+alter table public.orders add column if not exists pickup_code text;
+alter table public.orders add column if not exists payment_status text default 'pending';
+alter table public.orders add column if not exists rating integer;
+alter table public.orders add column if not exists rating_feedback text;
+
+-- 13. Create menu_inventory table for real-time item stock management
+create table if not exists public.menu_inventory (
+  id text primary key,
+  name text not null,
+  category text not null,
+  is_available boolean not null default true,
+  updated_at timestamptz default now()
+);
+
+-- 14. Enable RLS and policies for menu_inventory
+alter table public.menu_inventory enable row level security;
+
+create policy "Anyone can view menu inventory"
+  on public.menu_inventory for select
+  using (true);
+
+create policy "Anyone can update menu inventory"
+  on public.menu_inventory for all
+  using (true)
+  with check (true);
+
+alter publication supabase_realtime add table public.menu_inventory;

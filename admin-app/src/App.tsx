@@ -1,11 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { supabase } from "./lib/supabase"
 import type {
   OrderRecord,
   OrderStatus,
+  PaymentStatus,
   SupportMessage,
   DashboardTab,
+  MenuItemStock,
 } from "./types"
+import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
 
 // Web Audio API Ding chime for incoming orders
 function playOrderChime() {
@@ -31,10 +34,20 @@ export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([])
-  const [isLoadingOrders, setIsLoadingOrders] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
-  // Filters
+  // Menu Inventory State
+  const [inventory, setInventory] = useState<MenuItemStock[]>(() => {
+    try {
+      const saved = localStorage.getItem("messmate_menu_inventory")
+      if (saved) return JSON.parse(saved)
+    } catch (e) {
+      console.warn("Could not read local inventory cache", e)
+    }
+    return DEFAULT_MENU_ITEMS
+  })
+  const [inventoryCategory, setInventoryCategory] = useState<string>("all")
+
   // Filters
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -49,7 +62,6 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return
 
-    setIsLoadingOrders(true)
     supabase
       .from("orders")
       .select("*")
@@ -58,7 +70,6 @@ export default function App() {
         if (!error && data) {
           setOrders(data as OrderRecord[])
         }
-        setIsLoadingOrders(false)
       })
 
     const ordersChannel = supabase
@@ -124,6 +135,91 @@ export default function App() {
     }
   }, [soundEnabled])
 
+  // Realtime & Sync for Menu Inventory
+  useEffect(() => {
+    if (!supabase) return
+
+    // Try fetching from menu_inventory table if it exists
+    supabase
+      .from("menu_inventory")
+      .select("*")
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          const map = new Map(data.map((item: any) => [item.id, item.is_available]))
+          setInventory((prev) =>
+            prev.map((item) => ({
+              ...item,
+              is_available: map.has(item.id) ? Boolean(map.get(item.id)) : item.is_available,
+            }))
+          )
+        }
+      })
+
+    // Subscribe to stock broadcast channel
+    const stockChannel = supabase
+      .channel("menu_stock_updates")
+      .on("broadcast", { event: "stock_update" }, ({ payload }) => {
+        if (payload?.id) {
+          setInventory((prev) => {
+            const updated = prev.map((item) =>
+              item.id === payload.id ? { ...item, is_available: payload.is_available } : item
+            )
+            localStorage.setItem("messmate_menu_inventory", JSON.stringify(updated))
+            return updated
+          })
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(stockChannel)
+    }
+  }, [])
+
+  // Toggle Item Stock (Sold Out / In Stock)
+  const handleToggleStock = async (itemId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus
+    const updatedInventory = inventory.map((item) =>
+      item.id === itemId ? { ...item, is_available: newStatus } : item
+    )
+    setInventory(updatedInventory)
+    localStorage.setItem("messmate_menu_inventory", JSON.stringify(updatedInventory))
+
+    if (supabase) {
+      // 1. Broadcast to all active student screens instantly
+      try {
+        const stockChannel = supabase.channel("menu_stock_updates")
+        stockChannel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            stockChannel.send({
+              type: "broadcast",
+              event: "stock_update",
+              payload: { id: itemId, is_available: newStatus },
+            })
+          }
+        })
+      } catch (err) {
+        console.warn("Stock broadcast notice:", err)
+      }
+
+      // 2. Persist to table if table exists
+      try {
+        const itemObj = updatedInventory.find((i) => i.id === itemId)
+        if (itemObj) {
+          await supabase.from("menu_inventory").upsert({
+            id: itemObj.id,
+            name: itemObj.name,
+            category: itemObj.category,
+            is_available: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+        }
+      } catch (err) {
+        // Table might not exist yet; broadcast and localStorage already succeeded
+      }
+    }
+  }
+
   // Update Order Status
   const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
     setOrders((prev) =>
@@ -142,6 +238,41 @@ export default function App() {
     }
   }
 
+  // Verify or Flag Payment Status
+  const handleVerifyPayment = async (orderId: string, verified: boolean) => {
+    const targetStatus: PaymentStatus = verified ? "verified" : "failed"
+    const orderToUpdate = orders.find((o) => o.id === orderId)
+    if (!orderToUpdate) return
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, payment_status: targetStatus } : o
+      )
+    )
+
+    if (supabase) {
+      try {
+        // Try updating payment_status column
+        const { error } = await supabase
+          .from("orders")
+          .update({ payment_status: targetStatus })
+          .eq("id", orderId)
+
+        // Fallback: If column doesn't exist yet, annotate payment_method
+        if (error && error.code === "42703") {
+          const cleanMethod = (orderToUpdate.payment_method || "").replace(/\s*\[(VERIFIED|FAILED)\]/g, "")
+          const updatedMethod = `${cleanMethod} [${verified ? "VERIFIED" : "FAILED"}]`
+          await supabase
+            .from("orders")
+            .update({ payment_method: updatedMethod })
+            .eq("id", orderId)
+        }
+      } catch (err) {
+        console.error("Failed to update payment verification:", err)
+      }
+    }
+  }
+
   // Filtered Orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -152,19 +283,21 @@ export default function App() {
       if (search.trim()) {
         const q = search.toLowerCase()
         const orderNumStr = `#${order.order_number}`
+        const pin = getPickupPin(order)
         const matchNum = orderNumStr.includes(q)
+        const matchPin = pin.includes(q)
         const matchName = (order.customer_name || "").toLowerCase().includes(q)
         const matchPhone = (order.customer_phone || "").toLowerCase().includes(q)
         const matchHostel = (order.hostel || "").toLowerCase().includes(q)
         const matchRoom = (order.room || "").toLowerCase().includes(q)
-        return matchNum || matchName || matchPhone || matchHostel || matchRoom
+        return matchNum || matchPin || matchName || matchPhone || matchHostel || matchRoom
       }
 
       return true
     })
   }, [orders, statusFilter, fulfilmentFilter, slotFilter, search])
 
-  // KPI Calculations
+  // KPI Calculations & Analytics Breakdown
   const stats = useMemo(() => {
     const today = new Date().toISOString().split("T")[0]
     const todayOrders = orders.filter((o) => (o.created_at || "").startsWith(today))
@@ -178,8 +311,47 @@ export default function App() {
       supportMessages.filter((m) => m.sender === "customer").map((m) => m.phone)
     ).size
 
-    return { revenue, active, deliveries, pickups, pendingCallbacks }
-  }, [orders, supportMessages])
+    // Financial Breakdown
+    const upiOrders = nonCancelledToday.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
+    const upiRevenue = upiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const cashOrders = nonCancelledToday.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
+    const cashRevenue = cashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const deliveryFees = nonCancelledToday.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
+
+    const pendingUtrs = orders.filter(
+      (o) =>
+        (o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi")) &&
+        o.payment_status !== "verified" &&
+        !o.payment_method?.includes("[VERIFIED]") &&
+        o.status !== "cancelled"
+    ).length
+
+    // Ratings
+    const ratedOrders = orders.filter((o) => typeof o.rating === "number" && o.rating > 0)
+    const avgRating =
+      ratedOrders.length > 0
+        ? (ratedOrders.reduce((acc, o) => acc + (o.rating || 0), 0) / ratedOrders.length).toFixed(1)
+        : "5.0"
+
+    const soldOutCount = inventory.filter((i) => !i.is_available).length
+
+    return {
+      revenue,
+      active,
+      deliveries,
+      pickups,
+      pendingCallbacks,
+      upiRevenue,
+      upiCount: upiOrders.length,
+      cashRevenue,
+      cashCount: cashOrders.length,
+      deliveryFees,
+      pendingUtrs,
+      ratedCount: ratedOrders.length,
+      avgRating,
+      soldOutCount,
+    }
+  }, [orders, supportMessages, inventory])
 
   // Support Threads grouped by phone
   const supportThreads = useMemo(() => {
@@ -250,6 +422,12 @@ export default function App() {
     }
   }
 
+  // Filtered inventory list
+  const filteredInventory = useMemo(() => {
+    if (inventoryCategory === "all") return inventory
+    return inventory.filter((item) => item.category.toLowerCase() === inventoryCategory.toLowerCase())
+  }, [inventory, inventoryCategory])
+
   return (
     <div className="admin-shell">
       {/* Header */}
@@ -280,6 +458,20 @@ export default function App() {
               <span>Live Orders</span>
               <span className="nav-counter">{orders.length}</span>
             </button>
+
+            <button
+              type="button"
+              className={`nav-tab-btn ${tab === "inventory" ? "active" : ""}`}
+              onClick={() => setTab("inventory")}
+            >
+              <span>Menu & Stock</span>
+              {stats.soldOutCount > 0 && (
+                <span className="nav-counter" style={{ background: "#d90429", color: "#fff" }}>
+                  {stats.soldOutCount} Sold
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               className={`nav-tab-btn ${tab === "support" ? "active" : ""}`}
@@ -292,6 +484,7 @@ export default function App() {
                 </span>
               )}
             </button>
+
             <button
               type="button"
               className={`nav-tab-btn ${tab === "analytics" ? "active" : ""}`}
@@ -313,7 +506,7 @@ export default function App() {
               <div className="kpi-icon-wrap olive">₹</div>
             </div>
             <div className="kpi-value">₹{stats.revenue.toLocaleString()}</div>
-            <span className="kpi-subtext">From confirmed campus orders</span>
+            <span className="kpi-subtext">₹{stats.upiRevenue} UPI · ₹{stats.cashRevenue} Cash</span>
           </div>
 
           <div className="kpi-card">
@@ -327,20 +520,20 @@ export default function App() {
 
           <div className="kpi-card">
             <div className="kpi-header">
-              <span>Hostel Deliveries</span>
-              <div className="kpi-icon-wrap blue">🚪</div>
+              <span>Pending UTRs</span>
+              <div className="kpi-icon-wrap amber">⏳</div>
             </div>
-            <div className="kpi-value">{stats.deliveries}</div>
-            <span className="kpi-subtext">Room drop orders today</span>
+            <div className="kpi-value">{stats.pendingUtrs}</div>
+            <span className="kpi-subtext">Awaiting payment verification</span>
           </div>
 
           <div className="kpi-card">
             <div className="kpi-header">
-              <span>Campus Pickups</span>
-              <div className="kpi-icon-wrap green">📍</div>
+              <span>Customer Rating</span>
+              <div className="kpi-icon-wrap green">⭐</div>
             </div>
-            <div className="kpi-value">{stats.pickups}</div>
-            <span className="kpi-subtext">Hostel 3 station pickups</span>
+            <div className="kpi-value">{stats.avgRating} <small style={{ fontSize: 13, color: "var(--muted)" }}>/ 5.0</small></div>
+            <span className="kpi-subtext">{stats.ratedCount} delivered reviews</span>
           </div>
         </section>
 
@@ -375,7 +568,7 @@ export default function App() {
                 <span className="search-icon">🔍</span>
                 <input
                   type="text"
-                  placeholder="Search by order #, phone, student, hostel, room..."
+                  placeholder="Search by order #, PIN (e.g. 4821), phone, student..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="search-input"
@@ -440,6 +633,7 @@ export default function App() {
                     key={order.id}
                     order={order}
                     onUpdateStatus={handleUpdateStatus}
+                    onVerifyPayment={handleVerifyPayment}
                   />
                 ))}
               </div>
@@ -447,7 +641,59 @@ export default function App() {
           </>
         )}
 
-        {/* Tab 2: Support & Callback Inbox */}
+        {/* Tab 2: Menu & Stock Inventory Management */}
+        {tab === "inventory" && (
+          <div className="inventory-section">
+            <div className="inventory-header-bar">
+              <div>
+                <h3 style={{ fontSize: 18, color: "var(--olive)", fontWeight: 800 }}>Campus Menu & Stock Management</h3>
+                <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                  Toggle items here. Sold out items instantly grey out on the student app in real-time.
+                </p>
+              </div>
+              <div className="inventory-category-pills">
+                {["all", "pickles", "fruits", "bowls"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`inventory-cat-btn ${inventoryCategory === cat ? "active" : ""}`}
+                    onClick={() => setInventoryCategory(cat)}
+                  >
+                    {cat.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="inventory-grid">
+              {filteredInventory.map((item) => (
+                <div key={item.id} className={`inventory-item-card ${item.is_available ? "in-stock" : "sold-out"}`}>
+                  <div className="inventory-item-top">
+                    <div>
+                      <span className="inventory-item-cat">{item.category}</span>
+                      <strong className="inventory-item-name">{item.name}</strong>
+                    </div>
+                    <span className={`inventory-stock-pill ${item.is_available ? "available" : "out"}`}>
+                      {item.is_available ? "✓ In Stock" : "✕ Sold Out"}
+                    </span>
+                  </div>
+
+                  <div className="inventory-item-actions">
+                    <button
+                      type="button"
+                      className={`inventory-toggle-btn ${item.is_available ? "to-sold" : "to-stock"}`}
+                      onClick={() => handleToggleStock(item.id, item.is_available)}
+                    >
+                      {item.is_available ? "Mark as Sold Out" : "Mark as In Stock ✓"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Support & Callback Inbox */}
         {tab === "support" && (
           <div className="support-inbox-grid">
             {/* Left Column: Thread list */}
@@ -545,9 +791,39 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Analytics */}
+        {/* Tab 4: Analytics */}
         {tab === "analytics" && (
           <div className="analytics-grid">
+            {/* Financial Settlement Breakdown */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <span>Daily Financial Settlement & Cash Flow</span>
+                <span className="brand-pill">Verified vs Cash</span>
+              </div>
+              <div className="analytics-financial-grid">
+                <div className="fin-metric-box">
+                  <small>PhonePe UPI Collections</small>
+                  <strong>₹{stats.upiRevenue.toLocaleString()}</strong>
+                  <span>{stats.upiCount} orders</span>
+                </div>
+                <div className="fin-metric-box">
+                  <small>Counter Cash Collections</small>
+                  <strong>₹{stats.cashRevenue.toLocaleString()}</strong>
+                  <span>{stats.cashCount} orders</span>
+                </div>
+                <div className="fin-metric-box">
+                  <small>Delivery Fees (₹7/drop)</small>
+                  <strong>₹{stats.deliveryFees.toLocaleString()}</strong>
+                  <span>{stats.deliveries} room deliveries</span>
+                </div>
+                <div className="fin-metric-box highlight">
+                  <small>Total Gross Revenue</small>
+                  <strong>₹{stats.revenue.toLocaleString()}</strong>
+                  <span>{stats.upiCount + stats.cashCount} total orders today</span>
+                </div>
+              </div>
+            </div>
+
             <div className="analytics-card">
               <div className="analytics-card-title">
                 <span>Fulfilment Ratio</span>
@@ -569,7 +845,7 @@ export default function App() {
               </div>
               <div className="analytics-bar-row">
                 <div className="analytics-bar-header">
-                  <span>Campus Pickup (Hostel 3)</span>
+                  <span>Campus Pickup (Station)</span>
                   <span>{stats.pickups} orders</span>
                 </div>
                 <div className="analytics-progress-track">
@@ -611,17 +887,25 @@ export default function App() {
   )
 }
 
-// Responsive Touch-Optimized Order Card
+// Responsive Touch-Optimized Order Card with Payment Verification & PIN
 function OrderCard({
   order,
   onUpdateStatus,
+  onVerifyPayment,
 }: {
   order: OrderRecord
   onUpdateStatus: (id: string, next: OrderStatus) => void
+  onVerifyPayment: (id: string, verified: boolean) => void
 }) {
   const [copiedUtr, setCopiedUtr] = useState(false)
   const utrMatch = order.payment_method?.match(/UTR:\s*([A-Za-z0-9]+)/i)
   const utrCode = utrMatch ? utrMatch[1] : null
+
+  const isUpi = order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi")
+  const isVerified = order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]")
+  const isFailed = order.payment_status === "failed" || order.payment_method?.includes("[FAILED]")
+
+  const pin = getPickupPin(order)
 
   const handleCopyUtr = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -651,6 +935,9 @@ function OrderCard({
             <span>{st.label}</span>
           </span>
           <span className="order-number-pill">#{order.order_number}</span>
+          <span className="pickup-pin-pill" title="Student must show this 4-digit code to collect">
+            🔑 PIN: {pin}
+          </span>
         </div>
         <div className="order-time-slot">
           <span className="order-time-text">
@@ -668,7 +955,7 @@ function OrderCard({
             {order.fulfilment === "delivery" ? (
               <>🚪 {order.hostel || "Hostel"}, Room {order.room || "—"}</>
             ) : (
-              <>📍 Hostel 3 Pickup Point</>
+              <>📍 {order.hostel || "Campus Pickup Table"}</>
             )}
           </span>
         </div>
@@ -683,7 +970,7 @@ function OrderCard({
       </div>
 
       <div className={`fulfilment-pill-row ${order.fulfilment}`}>
-        <span>{order.fulfilment === "delivery" ? "🚀 Hostel Room Delivery (₹7)" : "🛍️ Campus Pickup (Hostel 3)"}</span>
+        <span>{order.fulfilment === "delivery" ? "🚀 Hostel Room Delivery (₹7)" : `🛍️ ${order.hostel || "Campus Pickup"}`}</span>
       </div>
 
       {/* Items List */}
@@ -700,10 +987,10 @@ function OrderCard({
         ))}
       </div>
 
-      {/* Payment & Amount Row */}
+      {/* Payment & Amount Row with Anti-Fraud Verification */}
       <div className="card-payment-amount-row">
         <div className="payment-badge-wrap">
-          {order.payment_method?.includes("PhonePe") ? (
+          {isUpi ? (
             <div className="phonepe-status-pill">
               <span className="pe-bolt">⚡</span>
               <span className="pe-brand">PhonePe UPI</span>
@@ -720,14 +1007,68 @@ function OrderCard({
               )}
             </div>
           ) : (
-            <span className="counter-status-pill">{order.payment_method || "Pay at Counter"}</span>
+            <span className="counter-status-pill">💵 Pay at Counter</span>
+          )}
+
+          {/* Payment Verification Status Badge */}
+          {isUpi && (
+            <div className="payment-verification-status">
+              {isVerified ? (
+                <span className="verify-badge success">✓ UTR Verified</span>
+              ) : isFailed ? (
+                <span className="verify-badge danger">⚠️ Unverified / Fraud</span>
+              ) : (
+                <span className="verify-badge pending">⏳ Pending Verification</span>
+              )}
+            </div>
           )}
         </div>
+
         <div className="amount-display-box">
           <small>Total Amount</small>
           <strong>₹{order.total}</strong>
         </div>
       </div>
+
+      {/* UPI Payment Verification Buttons */}
+      {isUpi && order.status !== "cancelled" && (
+        <div className="payment-verify-actions">
+          {!isVerified && (
+            <button
+              type="button"
+              className="action-btn-small verify-btn"
+              onClick={() => onVerifyPayment(order.id, true)}
+              title="Click after checking soundbox/merchant app"
+            >
+              ✓ Verify Payment
+            </button>
+          )}
+          {!isFailed && (
+            <button
+              type="button"
+              className="action-btn-small flag-btn"
+              onClick={() => onVerifyPayment(order.id, false)}
+              title="Flag if UTR is fake or payment was not received"
+            >
+              ✕ Flag Unpaid
+            </button>
+          )}
+          {isVerified && (
+            <span className="verified-confirm-text">✓ Payment confirmed by kitchen staff</span>
+          )}
+        </div>
+      )}
+
+      {/* Student Feedback & Star Rating (if present) */}
+      {typeof order.rating === "number" && order.rating > 0 && (
+        <div className="order-rating-box">
+          <span className="rating-stars">{"⭐".repeat(order.rating)}</span>
+          <span className="rating-val">{order.rating}/5.0</span>
+          {order.rating_feedback && (
+            <p className="rating-comment">"{order.rating_feedback}"</p>
+          )}
+        </div>
+      )}
 
       {/* Touch-Friendly Action Buttons */}
       <div className="card-action-buttons">

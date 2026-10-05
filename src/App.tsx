@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
+import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
 
 type Screen =
   | "home"
@@ -46,6 +47,10 @@ type OrderRecord = {
   payment_method: string
   status: "placed" | "preparing" | "ready" | "delivered" | "cancelled"
   created_at: string
+  pickup_code?: string
+  payment_status?: "pending" | "verified" | "failed"
+  rating?: number
+  rating_feedback?: string
 }
 
 type IconName =
@@ -687,10 +692,12 @@ function PickleList({
   go,
   selectProduct,
   cartCount,
+  soldOutItems,
 }: {
   go: (screen: Screen) => void
   selectProduct: (name: string) => void
   cartCount: number
+  soldOutItems?: Set<string>
 }) {
   return (
     <>
@@ -714,32 +721,42 @@ function PickleList({
           <p>Authentic South Indian flavours, homemade with care.</p>
         </section>
         <div className="product-grid">
-          {pickleProducts.map((product) => (
-            <article
-              className="product-card"
-              key={product.name}
-              onClick={() => selectProduct(product.name)}
-            >
-              <img src={product.image} alt={product.name} />
-              <div className="product-info">
-                <div className="spice">
-                  <span></span>
-                  {product.spice} spice
+          {pickleProducts.map((product) => {
+            const isSoldOut = soldOutItems?.has(product.name)
+            return (
+              <article
+                className={`product-card ${isSoldOut ? "sold-out" : ""}`}
+                key={product.name}
+                onClick={() => {
+                  if (!isSoldOut) selectProduct(product.name)
+                }}
+              >
+                <div className="product-image-wrap">
+                  <img src={product.image} alt={product.name} />
+                  {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
                 </div>
-                <h3>{product.name}</h3>
-                <p>{product.desc}</p>
-                <div className="product-bottom">
-                  <div>
-                    <small>Starts at</small>
-                    <strong>₹{product.price}</strong>
+                <div className="product-info">
+                  <div className="spice">
+                    <span></span>
+                    {product.spice} spice
                   </div>
-                  <button aria-label={`View ${product.name}`}>
-                    <Icon name="arrow-right" size={17} />
-                  </button>
+                  <h3>{product.name}</h3>
+                  <p>{product.desc}</p>
+                  <div className="product-bottom">
+                    <div>
+                      <small>{isSoldOut ? "Status" : "Starts at"}</small>
+                      <strong style={isSoldOut ? { color: "#d90429", fontSize: "11px" } : {}}>
+                        {isSoldOut ? "Sold Out" : `₹${product.price}`}
+                      </strong>
+                    </div>
+                    <button disabled={isSoldOut} aria-label={`View ${product.name}`}>
+                      {isSoldOut ? "✕" : <Icon name="arrow-right" size={17} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            )
+          })}
         </div>
       </main>
     </>
@@ -751,17 +768,20 @@ function PickleDetail({
   productName,
   add,
   cartCount = 0,
+  isSoldOut = false,
 }: {
   go: (screen: Screen) => void
   productName: string
   add: (item: CartItem) => void
   cartCount?: number
+  isSoldOut?: boolean
 }) {
   const [selected, setSelected] = useState(0)
 
   const pack = packOptions[selected]
 
   const handleAdd = () => {
+    if (isSoldOut) return
     add({
       id: `pickle-${pack.label}`,
       name: productName,
@@ -866,10 +886,15 @@ function PickleDetail({
                   <small>Selected pack</small>
                   <strong>{pack.label} (₹{pack.price})</strong>
                 </div>
-                <div className="desktop-pack-tag">In stock today</div>
+                <div
+                  className="desktop-pack-tag"
+                  style={isSoldOut ? { color: "#d90429", background: "#fee2e2" } : {}}
+                >
+                  {isSoldOut ? "Temporarily Sold Out" : "In stock today"}
+                </div>
               </div>
-              <PrimaryButton tone="pickle" onClick={handleAdd}>
-                Add to cart
+              <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
+                {isSoldOut ? "Currently Sold Out" : "Add to cart"}
               </PrimaryButton>
             </div>
           </section>
@@ -880,8 +905,8 @@ function PickleDetail({
           <small>Selected pack</small>
           <strong>₹{pack.price}</strong>
         </div>
-        <PrimaryButton tone="pickle" onClick={handleAdd}>
-          Add to cart
+        <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
+          {isSoldOut ? "Currently Sold Out" : "Add to cart"}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -892,10 +917,12 @@ function FruitBuilder({
   go,
   add,
   cartCount,
+  soldOutItems,
 }: {
   go: (screen: Screen) => void
   add: (item: CartItem) => void
   cartCount: number
+  soldOutItems?: Set<string>
 }) {
   const [counts, setCounts] = useState<Record<string, number>>({
     Apple: 1,
@@ -965,10 +992,22 @@ function FruitBuilder({
             <div className="fruit-grid">
               {fruits.map((fruit) => {
                 const count = counts[fruit.name] || 0
+                const isSoldOut =
+                  soldOutItems?.has(fruit.name) ||
+                  soldOutItems?.has(`Fresh ${fruit.name}`) ||
+                  soldOutItems?.has(`Sweet ${fruit.name}`) ||
+                  soldOutItems?.has(`Crisp ${fruit.name}`) ||
+                  soldOutItems?.has(`Robusta ${fruit.name}`) ||
+                  (fruit.name === "Pomegranate" && soldOutItems?.has("Pomegranate Pearls")) ||
+                  (fruit.name === "Orange" && soldOutItems?.has("Nagpur Orange")) ||
+                  (fruit.name === "Guava" && soldOutItems?.has("Pink Guava")) ||
+                  (fruit.name === "Grapes" && soldOutItems?.has("Black Grapes")) ||
+                  (fruit.name === "Pineapple" && soldOutItems?.has("Queen Pineapple")) ||
+                  (fruit.name === "Seasonal" && soldOutItems?.has("Seasonal Special"))
 
                 return (
                   <article
-                    className={`fruit-card ${count ? "selected" : ""}`}
+                    className={`fruit-card ${isSoldOut ? "sold-out" : ""} ${count ? "selected" : ""}`}
                     key={fruit.name}
                   >
                     <div
@@ -979,17 +1018,23 @@ function FruitBuilder({
                     </div>
                     <div className="fruit-meta">
                       <strong>{fruit.name}</strong>
-                      <small>
-                        {count
-                          ? `${count} portion${count > 1 ? "s" : ""}`
-                          : "Tap + to add"}
+                      <small className={isSoldOut ? "sold-out-text" : ""}>
+                        {isSoldOut
+                          ? "Sold out"
+                          : count
+                            ? `${count} portion${count > 1 ? "s" : ""}`
+                            : "Tap + to add"}
                       </small>
                     </div>
-                    <Quantity
-                      value={count}
-                      onChange={(value) => update(fruit.name, value)}
-                      small
-                    />
+                    {!isSoldOut ? (
+                      <Quantity
+                        value={count}
+                        onChange={(value) => update(fruit.name, value)}
+                        small
+                      />
+                    ) : (
+                      <span style={{ fontSize: "10px", color: "#d90429", fontWeight: 700 }}>✕ Out</span>
+                    )}
                   </article>
                 )
               })}
@@ -1816,6 +1861,7 @@ function Confirmation({
   orderNumber,
   paymentMethod,
   pickupPoint,
+  pickupPin,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
@@ -1825,7 +1871,10 @@ function Confirmation({
   orderNumber: number | string
   paymentMethod?: string
   pickupPoint: string
+  pickupPin?: string
 }) {
+  const displayPin = pickupPin || getPickupPin({ order_number: orderNumber })
+
   return (
     <main className="confirmation">
       <div className="confirmation-inner">
@@ -1883,6 +1932,20 @@ function Confirmation({
               <strong>{paymentMethod || "PhonePe UPI Verified"}</strong>
             </span>
           </div>
+
+          {/* Prominent Counter Pickup PIN Code */}
+          <div className="pickup-pin-confirmation-card">
+            <div className="pin-card-icon">🔑</div>
+            <div className="pin-card-copy">
+              <small>YOUR 4-DIGIT PICKUP PIN</small>
+              <strong className="pin-digit-display">{displayPin}</strong>
+              <span>
+                {fulfilment === "pickup"
+                  ? "Recite this PIN at the campus pickup table to collect your meal securely."
+                  : "Share this PIN with your delivery runner upon room handover."}
+              </span>
+            </div>
+          </div>
         </section>
         <div className="sms-note">
           <Icon name="shield" size={18} />
@@ -1905,16 +1968,106 @@ function Confirmation({
   )
 }
 
+function OrderRatingWidget({
+  orderId,
+  initialRating,
+  initialFeedback,
+}: {
+  orderId: string
+  initialRating?: number
+  initialFeedback?: string
+}) {
+  const [rating, setRating] = useState(initialRating || 0)
+  const [hovered, setHovered] = useState(0)
+  const [feedback, setFeedback] = useState(initialFeedback || "")
+  const [submitted, setSubmitted] = useState(Boolean(initialRating))
+  const [isSending, setIsSending] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rating) return
+    setIsSending(true)
+    try {
+      if (supabase) {
+        await supabase
+          .from("orders")
+          .update({ rating, rating_feedback: feedback.trim() })
+          .eq("id", orderId)
+      }
+    } catch (err) {
+      console.warn("Rating save notice:", err)
+    } finally {
+      setIsSending(false)
+      setSubmitted(true)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="order-rating-widget">
+        <div className="rating-done-badge">
+          <span>{"⭐".repeat(rating)}</span> {rating}/5.0 · Thank you for your review!
+        </div>
+        {feedback && (
+          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px", fontStyle: "italic" }}>
+            "{feedback}"
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <form className="order-rating-widget" onSubmit={handleSubmit}>
+      <div className="rating-widget-title">
+        <span>How was your food?</span>
+        <small style={{ color: "var(--muted)", fontSize: "10px" }}>Rate your experience</small>
+      </div>
+      <div className="stars-selector">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className="star-btn"
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}
+            onClick={() => setRating(star)}
+            title={`${star} Star${star > 1 ? "s" : ""}`}
+          >
+            {(hovered || rating) >= star ? "⭐" : "☆"}
+          </button>
+        ))}
+      </div>
+      {rating > 0 && (
+        <>
+          <input
+            type="text"
+            placeholder="Optional: How was the taste, packaging, or delivery?"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            className="rating-feedback-input"
+          />
+          <button type="submit" className="submit-rating-btn" disabled={isSending}>
+            {isSending ? "Submitting..." : "Submit Review ✓"}
+          </button>
+        </>
+      )}
+    </form>
+  )
+}
+
 function OrdersPage({
   go,
   phone,
   setPhone,
   cartCount,
+  onReorder,
 }: {
   go: (screen: Screen) => void
   phone: string
   setPhone: (phone: string) => void
   cartCount: number
+  onReorder: (items: CartItem[]) => void
 }) {
   const [searchInput, setSearchInput] = useState(() => {
     return phone || localStorage.getItem("messmate_phone") || ""
@@ -2110,7 +2263,10 @@ function OrdersPage({
                 <article className="order-ticket" key={order.id}>
                   <div className="order-ticket-top">
                     <div className="order-ticket-id">
-                      <small>Order #{order.order_number}</small>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <small>Order #{order.order_number}</small>
+                        <span className="order-ticket-pin-pill">🔑 PIN: {getPickupPin(order)}</span>
+                      </div>
                       <strong>₹{order.total}</strong>
                       <span
                         style={{
@@ -2236,15 +2392,47 @@ function OrdersPage({
                       </div>
                       <div>
                         <span>Payment</span>
-                        <strong style={{ textTransform: "uppercase" }}>
-                          {order.payment_method}
-                        </strong>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
+                          <strong style={{ textTransform: "uppercase" }}>
+                            {order.payment_method}
+                          </strong>
+                          {order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]") ? (
+                            <span className="pay-verify-badge success">✓ Payment Verified</span>
+                          ) : order.payment_status === "failed" || order.payment_method?.includes("[FAILED]") ? (
+                            <span className="pay-verify-badge danger">⚠️ Verification Issue</span>
+                          ) : order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi") ? (
+                            <span className="pay-verify-badge pending">⏳ UTR Under Verification</span>
+                          ) : (
+                            <span className="pay-verify-badge neutral">💵 Pay at Counter</span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span>Total Paid</span>
                         <strong>₹{order.total}</strong>
                       </div>
                     </div>
+
+                    {/* 1-Click Reorder Button */}
+                    {Array.isArray(order.items) && order.items.length > 0 && (
+                      <button
+                        type="button"
+                        className="reorder-button"
+                        onClick={() => onReorder(order.items)}
+                      >
+                        <span>🔁</span>
+                        <span>Reorder This Meal (1-Click)</span>
+                      </button>
+                    )}
+
+                    {/* Order Rating & Feedback (for Delivered Orders) */}
+                    {order.status === "delivered" && (
+                      <OrderRatingWidget
+                        orderId={order.id}
+                        initialRating={order.rating}
+                        initialFeedback={order.rating_feedback}
+                      />
+                    )}
                   </div>
                 </article>
               )
@@ -2269,25 +2457,60 @@ type SupportMsg = {
 
 const FAQ_ITEMS = [
   {
+    id: "pickup_pin",
+    label: "Where is my 4-digit PIN?",
+    question: "Where do I find my 4-digit Pickup PIN?",
+    answer:
+      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Recite this PIN at the campus pickup counter to verify and collect your food!",
+  },
+  {
+    id: "payment_verify",
+    label: "How is UPI / UTR verified?",
+    question: "How does UPI and UTR verification work?",
+    answer:
+      "When you pay via PhonePe / UPI QR, simply copy and paste the 12-digit UTR from your UPI app. The kitchen team verifies this on their merchant terminal and marks your order 'Verified' in real-time.",
+  },
+  {
+    id: "reorder",
+    label: "1-Click Reorder",
+    question: "How do I reorder a past meal?",
+    answer:
+      "Open 'Track Orders' from the top menu, find your previous order, and tap '🔁 Reorder This Meal'. Your cart will immediately be filled with the exact same items ready for checkout!",
+  },
+  {
+    id: "rating",
+    label: "Rate & review food",
+    question: "How do I rate or review my delivered food?",
+    answer:
+      "Once your order is delivered, go to 'Track Orders' and tap the 5-star rating widget to submit your review. Your ratings help our campus kitchen maintain top-notch freshness!",
+  },
+  {
     id: "delivery",
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance is free, and room delivery right to your door is ₹7.",
+      "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance (or your selected counter) is free, and room delivery is ₹7.",
   },
   {
     id: "pickup",
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      "Our campus pickup point is at Hostel 3 Entrance, right beside the main security desk. Orders are securely packaged and labeled with your order number and name.",
+      "Our primary campus pickup point is at Hostel 3 Entrance beside the security desk. We also offer pickup at APJ Abdul Kalam Block (Room 341) and Asima Hostel Ground Floor!",
+  },
+  {
+    id: "sold_out",
+    label: "Sold out items",
+    question: "What if an item is marked Sold Out?",
+    answer:
+      "To ensure maximum freshness, our kitchen marks items 'Sold Out' as soon as daily batches run out. They are replenished every morning for the next evening dinner slot!",
   },
   {
     id: "fruit",
     label: "Fruit bowl customization",
     question: "How does the fruit bowl builder work?",
     answer:
-      "Start with a fresh base bowl for ₹35, then choose any combination from 10 fruits for ₹7 per portion! You get a generous, fresh-cut bowl made right before evening delivery.",
+      "Start with a fresh base bowl for ₹35, then choose any combination from 10 fruits for ₹7 per portion! Generous, fresh-cut fruit bowls made right before evening pickup.",
   },
   {
     id: "pickle",
@@ -2296,17 +2519,25 @@ const FAQ_ITEMS = [
     answer:
       "Our homemade Andhra pickles are crafted in small batches with cold-pressed oil and authentic spices. They stay fresh for 3–6 months in a dry, room-temperature spot.",
   },
-  {
-    id: "order",
-    label: "Track active order",
-    question: "How do I check my order status?",
-    answer:
-      "You can track your order live anytime by clicking 'Track Orders' in the menu and entering your phone number! Updates stream live from placed to delivered.",
-  },
 ]
 
 function getAutomatedAnswer(query: string): string {
   const q = query.toLowerCase()
+  if (q.includes("pin") || q.includes("code") || q.includes("pickup code") || q.includes("verification code")) {
+    return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it to the counter staff to collect your order!"
+  }
+  if (q.includes("utr") || q.includes("verify") || q.includes("verification") || q.includes("fraud") || q.includes("phonepe") || q.includes("upi")) {
+    return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
+  }
+  if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
+    return "In 'Track Orders', click the '🔁 Reorder This Meal' button on any past order to refill your cart instantly!"
+  }
+  if (q.includes("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
+    return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
+  }
+  if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
+    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
+  }
   if (
     q.includes("delivery") ||
     q.includes("timing") ||
@@ -2314,7 +2545,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and pickup at Hostel 3 Entrance is free!"
+    return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and campus pickup is free!"
   }
   if (
     q.includes("pickup") ||
@@ -2323,7 +2554,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("point") ||
     q.includes("location")
   ) {
-    return "Our campus pickup station is at Hostel 3 Entrance beside the security desk. Look for the MessMate pickup table!"
+    return "Pickups are available at Hostel 3 Entrance, APJ Abdul Kalam Block (Room 341), and Asima Hostel. Select your preferred station during checkout!"
   }
   if (
     q.includes("fruit") ||
@@ -2332,7 +2563,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("cost") ||
     q.includes("portion")
   ) {
-    return "Custom fruit bowls are ₹35 base + ₹7 per portion. Choose from 10 fruits including Apple, Banana, Papaya, Watermelon, and Pomegranate."
+    return "Custom fruit bowls are ₹35 base + ₹7 per portion. Choose from 10 fresh fruits including Apple, Banana, Papaya, Watermelon, and Pomegranate."
   }
   if (
     q.includes("pickle") ||
@@ -2343,10 +2574,10 @@ function getAutomatedAnswer(query: string): string {
     q.includes("lemon") ||
     q.includes("expiry")
   ) {
-    return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with natural ingredients."
+    return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with cold-pressed oils."
   }
   if (q.includes("track") || q.includes("status") || q.includes("where is")) {
-    return "Go to the 'Track Orders' section in the navigation and enter your phone number to track live order progress!"
+    return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
   }
   if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
     return "Orders can be modified before prep starts. Please click 'Request Live Chat Support' below so our team can update your order right away!"
@@ -2870,10 +3101,123 @@ export default function App() {
   const [slot, setSlot] = useState("8:30–9:00 PM")
 
   const [orderNumber, setOrderNumber] = useState<number | string>(1048)
+  const [orderPin, setOrderPin] = useState<string>("1048")
 
   const [paymentMethodName, setPaymentMethodName] = useState("PhonePe UPI")
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Real-time Sold Out items state
+  const [soldOutItems, setSoldOutItems] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("messmate_menu_inventory")
+      if (saved) {
+        const items: any[] = JSON.parse(saved)
+        return new Set(items.filter((i) => !i.is_available).map((i) => i.name))
+      }
+    } catch (e) {
+      console.warn("Could not read inventory cache", e)
+    }
+    return new Set()
+  })
+
+  // Live Ready-for-Pickup Alert state
+  const [activeReadyOrder, setActiveReadyOrder] = useState<any>(null)
+  const [dismissedReadyIds, setDismissedReadyIds] = useState<Set<string>>(new Set())
+
+  // Sync inventory with Supabase realtime & broadcast
+  useEffect(() => {
+    if (!supabase) return
+
+    // 1. Fetch current inventory from table if available
+    supabase
+      .from("menu_inventory")
+      .select("*")
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const out = new Set<string>()
+          data.forEach((row: any) => {
+            if (!row.is_available) out.add(row.name)
+          })
+          setSoldOutItems(out)
+        }
+      })
+
+    // 2. Realtime broadcast channel
+    const stockChannel = supabase
+      .channel("menu_stock_updates")
+      .on("broadcast", { event: "stock_update" }, ({ payload }) => {
+        if (payload?.id) {
+          const match = DEFAULT_MENU_ITEMS.find((i) => i.id === payload.id)
+          if (match) {
+            setSoldOutItems((prev) => {
+              const next = new Set(prev)
+              if (payload.is_available) {
+                next.delete(match.name)
+              } else {
+                next.add(match.name)
+              }
+              return next
+            })
+          }
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(stockChannel)
+    }
+  }, [])
+
+  // Live listener for Ready-for-pickup alert
+  useEffect(() => {
+    if (!supabase) return
+    const phone = details.phone || localStorage.getItem("messmate_phone")
+    if (!phone) return
+
+    const checkReadyOrders = async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("customer_phone", phone)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      if (data && data.length > 0) {
+        const order = data[0]
+        if (!dismissedReadyIds.has(order.id)) {
+          setActiveReadyOrder(order)
+        }
+      } else {
+        setActiveReadyOrder(null)
+      }
+    }
+
+    checkReadyOrders()
+
+    const ordersChannel = supabase
+      .channel("student_ready_alerts")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        (payload) => {
+          const updated = payload.new as any
+          if (updated.customer_phone === phone) {
+            if (updated.status === "ready" && !dismissedReadyIds.has(updated.id)) {
+              setActiveReadyOrder(updated)
+            } else if (updated.status === "delivered" || updated.status === "cancelled") {
+              setActiveReadyOrder(null)
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(ordersChannel)
+    }
+  }, [details.phone, dismissedReadyIds])
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -2915,6 +3259,13 @@ export default function App() {
           ),
     )
 
+  // 1-Click Reorder Handler
+  const handleReorder = (items: CartItem[]) => {
+    if (!Array.isArray(items) || items.length === 0) return
+    setCart(items)
+    go("cart")
+  }
+
   const handlePay = async (method: "upi" | "counter", utr?: string) => {
     setIsSubmitting(true)
 
@@ -2938,25 +3289,46 @@ export default function App() {
 
       setPaymentMethodName(paymentLabel)
 
+      // Generate a 4-digit pickup PIN for this order
+      const generatedPin = Math.floor(1000 + Math.random() * 9000).toString()
+      setOrderPin(generatedPin)
+
       if (supabase) {
-        const { data, error } = await supabase
+        const payload: any = {
+          customer_name: details.name || "Student",
+          customer_phone: details.phone || "0000000000",
+          hostel: fulfilment === "pickup" ? pickupPoint : (details.hostel || "Hostel 3"),
+          room: fulfilment === "pickup" ? "" : (details.room || "Room"),
+          fulfilment,
+          slot,
+          items: cart,
+          subtotal,
+          delivery_fee: fee,
+          total: orderTotal,
+          payment_method: paymentLabel,
+          status: "placed",
+          pickup_code: generatedPin,
+          payment_status: "pending",
+        }
+
+        let { data, error } = await supabase
           .from("orders")
-          .insert({
-            customer_name: details.name || "Student",
-            customer_phone: details.phone || "0000000000",
-            hostel: fulfilment === "pickup" ? pickupPoint : (details.hostel || "Hostel 3"),
-            room: fulfilment === "pickup" ? "" : (details.room || "Room"),
-            fulfilment,
-            slot,
-            items: cart,
-            subtotal,
-            delivery_fee: fee,
-            total: orderTotal,
-            payment_method: paymentLabel,
-            status: "placed",
-          })
+          .insert(payload)
           .select("order_number")
           .single()
+
+        // Fallback: If DB columns pickup_code or payment_status not yet added in Supabase
+        if (error && error.code === "42703") {
+          delete payload.pickup_code
+          delete payload.payment_status
+          const retry = await supabase
+            .from("orders")
+            .insert(payload)
+            .select("order_number")
+            .single()
+          data = retry.data
+          error = retry.error
+        }
 
         if (error) {
           console.error("Supabase insert error:", error)
@@ -2978,6 +3350,41 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
+        {/* Live Floating Alert Banner for Ready Orders */}
+        {activeReadyOrder && (
+          <div className="ready-order-alert-banner">
+            <div className="alert-banner-content">
+              <span className="alert-bell">🎉</span>
+              <div>
+                <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
+                <p>
+                  At <u>{activeReadyOrder.hostel || "Campus Station"}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
+                </p>
+              </div>
+            </div>
+            <div className="alert-banner-actions">
+              <button
+                type="button"
+                className="alert-track-btn"
+                onClick={() => go("orders")}
+              >
+                Track
+              </button>
+              <button
+                type="button"
+                className="alert-dismiss-btn"
+                onClick={() => {
+                  setDismissedReadyIds((prev) => new Set([...prev, activeReadyOrder.id]))
+                  setActiveReadyOrder(null)
+                }}
+                aria-label="Dismiss alert"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {screen === "home" && (
           <Home go={go} cartCount={cartCount} cartTotal={total} />
         )}
@@ -2985,6 +3392,7 @@ export default function App() {
           <PickleList
             go={go}
             cartCount={cartCount}
+            soldOutItems={soldOutItems}
             selectProduct={(name) => {
               setSelectedProduct(name)
               go("pickle-detail")
@@ -2997,10 +3405,16 @@ export default function App() {
             productName={selectedProduct}
             add={add}
             cartCount={cartCount}
+            isSoldOut={soldOutItems.has(selectedProduct)}
           />
         )}
         {screen === "fruit-builder" && (
-          <FruitBuilder go={go} add={add} cartCount={cartCount} />
+          <FruitBuilder
+            go={go}
+            add={add}
+            cartCount={cartCount}
+            soldOutItems={soldOutItems}
+          />
         )}
         {screen === "cart" && (
           <Cart
@@ -3052,6 +3466,7 @@ export default function App() {
             orderNumber={orderNumber}
             paymentMethod={paymentMethodName}
             pickupPoint={pickupPoint}
+            pickupPin={orderPin}
           />
         )}
         {screen === "orders" && (
@@ -3060,9 +3475,10 @@ export default function App() {
             phone={details.phone}
             setPhone={(phone) => setDetails((prev) => ({ ...prev, phone }))}
             cartCount={cartCount}
+            onReorder={handleReorder}
           />
         )}
-          {cartCount > 0 &&
+        {cartCount > 0 &&
           ![
             "home",
             "cart",

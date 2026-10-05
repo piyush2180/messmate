@@ -1470,3 +1470,258 @@ button, input, select, textarea {
     display: none;
   }
 }
+
+/* Pickup PIN Pill */
+.pickup-pin-pill {
+  font-size: 11px;
+  font-weight: 800;
+  background: #fdf2f8;
+  color: #be185d;
+  border: 1px solid #fbcfe8;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+}
+
+/* Payment Verification Badges & Actions */
+.payment-verification-status {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+.verify-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.verify-badge.success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.verify-badge.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.verify-badge.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.payment-verify-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fafbfa;
+  border: 1px solid #ecefe8;
+  border-radius: 10px;
+}
+.action-btn-small {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+.action-btn-small.verify-btn {
+  background: var(--olive);
+  color: #ffffff;
+}
+.action-btn-small.verify-btn:hover {
+  background: var(--olive-dark);
+}
+.action-btn-small.flag-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.action-btn-small.flag-btn:hover {
+  background: #fecaca;
+}
+.verified-confirm-text {
+  font-size: 11px;
+  color: #15803d;
+  font-weight: 700;
+}
+
+/* Order Rating & Feedback Box */
+.order-rating-box {
+  background: #fcfbf5;
+  border: 1px solid #f2edd9;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rating-stars {
+  font-size: 13px;
+}
+.rating-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-left: 6px;
+}
+.rating-comment {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-style: italic;
+  margin: 2px 0 0 0;
+}
+
+/* Menu & Stock Inventory Management View */
+.inventory-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.inventory-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 18px 22px;
+  border-radius: var(--radius);
+}
+.inventory-category-pills {
+  display: flex;
+  gap: 6px;
+}
+.inventory-cat-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f7f8f4;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.inventory-cat-btn.active {
+  background: var(--olive);
+  color: #ffffff;
+  border-color: var(--olive);
+}
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.inventory-item-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+.inventory-item-card.sold-out {
+  opacity: 0.8;
+  background: #faf8f7;
+  border-color: #f1d4d4;
+}
+.inventory-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.inventory-item-cat {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  color: var(--muted);
+}
+.inventory-item-name {
+  font-size: 14px;
+  color: var(--text);
+}
+.inventory-stock-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.inventory-stock-pill.available {
+  background: #dcfce7;
+  color: #15803d;
+}
+.inventory-stock-pill.out {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.inventory-toggle-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s ease;
+}
+.inventory-toggle-btn.to-sold {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+.inventory-toggle-btn.to-sold:hover {
+  background: #ffe4e6;
+}
+.inventory-toggle-btn.to-stock {
+  background: var(--olive);
+  color: #ffffff;
+}
+.inventory-toggle-btn.to-stock:hover {
+  background: var(--olive-dark);
+}
+
+/* Financial Settlement Breakdown Grid */
+.analytics-financial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.fin-metric-box {
+  background: #fbfbfa;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fin-metric-box.highlight {
+  background: var(--olive-soft);
+  border-color: #d1dcc5;
+}
+.fin-metric-box small {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.fin-metric-box strong {
+  font-size: 20px;
+  color: var(--olive);
+}
+.fin-metric-box span {
+  font-size: 11px;
+  color: var(--muted);
+}

@@ -14,6 +14,8 @@ export type OrderStatus =
   | "delivered"
   | "cancelled"
 
+export type PaymentStatus = "pending" | "verified" | "failed"
+
 export type OrderRecord = {
   id: string
   order_number: number
@@ -30,6 +32,10 @@ export type OrderRecord = {
   payment_method: string
   status: OrderStatus
   created_at: string
+  pickup_code?: string
+  payment_status?: PaymentStatus
+  rating?: number
+  rating_feedback?: string
 }
 
 export type SupportMessage = {
@@ -41,4 +47,11 @@ export type SupportMessage = {
   created_at: string
 }
 
-export type DashboardTab = "orders" | "support" | "analytics"
+export type MenuItemStock = {
+  id: string
+  name: string
+  category: "Pickles" | "Fruits" | "Bowls"
+  is_available: boolean
+}
+
+export type DashboardTab = "orders" | "inventory" | "support" | "analytics"
