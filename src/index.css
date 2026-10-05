@@ -42,15 +42,18 @@ h1, h2, h3, p { margin: 0; }
 .header-heading { display: grid; justify-items: center; gap: 1px; white-space: nowrap; }
 .header-heading > span { color: var(--olive); font-size: 7px; line-height: 1; font-weight: 800; letter-spacing: .14em; }
 .header-title { font-size: 14px; font-weight: 800; white-space: nowrap; }
-.icon-button, .bag-button, .orders-button { border: 1px solid var(--line); background: var(--white); width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-soft); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-.icon-button { justify-self: start; }
-.header-actions { display: flex; align-items: center; gap: 8px; justify-self: end; }
-.orders-button { position: relative; color: var(--charcoal); }
-.orders-button:hover, .bag-button:hover, .icon-button:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--olive); }
-.orders-button.active { background: var(--olive); color: white; border-color: var(--olive); }
-.orders-button .orders-dot { position: absolute; top: -1px; right: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); border: 2px solid var(--cream); }
-.bag-button { position: relative; }
-.bag-button span { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--terracotta); color: white; font-size: 10px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--cream); }
+.icon-button { border: 1px solid var(--line); background: var(--white); width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-soft); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; justify-self: start; }
+.bag-button, .orders-button { border: none; background: var(--olive-pale); color: var(--olive); width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; cursor: pointer; box-shadow: none; transition: background .18s ease, transform .18s ease, color .18s ease; }
+.header-actions { display: flex; align-items: center; gap: 6px; grid-column: -1; justify-self: end; }
+.orders-button { position: relative; }
+.orders-button:hover { background: var(--olive); color: white; transform: translateY(-1px); }
+.bag-button:hover { background: var(--olive-dark); transform: translateY(-1px); }
+.icon-button:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--olive); }
+.orders-button.active { background: var(--olive); color: white; }
+.orders-button .orders-dot { position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); border: 2px solid var(--olive-pale); }
+.orders-button.active .orders-dot { border-color: var(--olive); }
+.bag-button { position: relative; background: var(--olive); color: white; }
+.bag-button span { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--terracotta); color: white; font-size: 10px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--cream); }
 .hero { padding: 54px 24px 40px; position: relative; }
 .hero::after { content: ""; position: absolute; width: 170px; height: 170px; border: 1px solid rgba(83,107,58,.12); border-radius: 50%; right: -100px; top: 10px; box-shadow: 0 0 0 28px rgba(83,107,58,.035), 0 0 0 56px rgba(83,107,58,.025); }
 .hero-kicker, .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: 10px; line-height: 1.4; color: var(--olive); font-weight: 800; }
@@ -62,7 +65,8 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .hero > p { margin-top: 22px; color: var(--muted); font-size: 14px; line-height: 1.8; max-width: 420px; }
 .trust-line { display: flex; align-items: center; gap: 8px; margin-top: 24px; color: var(--olive); font-size: 11px; font-weight: 700; }
 .category-list { padding: 0 16px; display: grid; gap: 20px; }
-.category-card { background: var(--white); border-radius: 30px; overflow: hidden; box-shadow: var(--shadow); }
+.category-card { background: var(--white); border-radius: 30px; overflow: hidden; box-shadow: var(--shadow); cursor: pointer; transition: transform .25s ease, box-shadow .25s ease; }
+.category-card:hover { transform: translateY(-3px); box-shadow: 0 18px 48px rgba(70, 55, 35, 0.13); }
 .category-image { height: 230px; position: relative; overflow: hidden; }
 .category-image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(30,25,20,.36), transparent 50%); }
 .category-image img { height: 100%; object-fit: cover; transition: transform .5s ease; }
@@ -92,7 +96,8 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .screen-intro.compact { padding-top: 24px; }
 .pickle-intro { position: relative; }
 .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.product-card { border-radius: 22px; overflow: hidden; background: var(--white); box-shadow: var(--shadow-soft); cursor: pointer; }
+.product-card { border-radius: 22px; overflow: hidden; background: var(--white); box-shadow: var(--shadow-soft); cursor: pointer; transition: transform .25s ease, box-shadow .25s ease; }
+.product-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .product-card > img { height: 142px; object-fit: cover; }
 .product-info { padding: 14px; }
 .spice { color: var(--terracotta-dark); font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 5px; }

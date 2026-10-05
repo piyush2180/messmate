@@ -518,7 +518,7 @@ function CategoryCard({
   onClick: () => void
 }) {
   return (
-    <article className={`category-card ${type}`}>
+    <article className={`category-card ${type}`} onClick={onClick} style={{ cursor: "pointer" }}>
       <div className="category-image">
         <img
           src={image}
@@ -544,12 +544,12 @@ function CategoryCard({
             <span key={label}>{label}</span>
           ))}
         </div>
-        <button className="text-cta" onClick={onClick}>
+        <span className="text-cta">
           {cta}
           <span>
             <Icon name="arrow-right" size={16} />
           </span>
-        </button>
+        </span>
       </div>
     </article>
   )
@@ -1252,12 +1252,14 @@ function Checkout({
   setDetails,
   fulfilment,
   setFulfilment,
+  pickupPoint,
 }: {
   go: (screen: Screen) => void
   details: CustomerDetails
   setDetails: (value: CustomerDetails) => void
   fulfilment: "pickup" | "delivery"
   setFulfilment: (value: "pickup" | "delivery") => void
+  pickupPoint: string
 }) {
   const set = (key: keyof CustomerDetails, value: string) =>
     setDetails({ ...details, [key]: value })
@@ -1372,7 +1374,7 @@ function Checkout({
                 </strong>
                 <p>
                   {fulfilment === "pickup"
-                    ? "Hostel 3 Entrance Security Point"
+                    ? pickupPoint
                     : details.hostel && details.room
                       ? `${details.hostel}, Room ${details.room}`
                       : "Direct to your hostel room door"}
@@ -1413,14 +1415,25 @@ function Fulfilment({
   details,
   slot,
   setSlot,
+  pickupPoint,
+  setPickupPoint,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
   details: CustomerDetails
   slot: string
   setSlot: (value: string) => void
+  pickupPoint: string
+  setPickupPoint: (value: string) => void
 }) {
   const slots = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
+
+  const pickupPoints = [
+    { name: "Hostel 3 Entrance", desc: "Next to the main security desk" },
+    { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block" },
+    { name: "Asima - 110", desc: "Asima Hostel Ground Floor" }
+  ]
+  const selectedPoint = pickupPoints.find(p => p.name === pickupPoint) || pickupPoints[0]
 
   return (
     <>
@@ -1441,7 +1454,7 @@ function Fulfilment({
           </h1>
           <p>
             {fulfilment === "pickup"
-              ? "Choose a pickup time that works for you."
+              ? "Choose a pickup point and time that works for you."
               : "Fresh food, straight to your room."}
           </p>
         </section>
@@ -1464,13 +1477,29 @@ function Fulfilment({
                     </span>
                     <div>
                       <small>PICKUP POINT</small>
-                      <strong>Hostel 3 Entrance</strong>
-                      <p>Next to the main security desk</p>
+                      <strong>{selectedPoint.name}</strong>
+                      <p>{selectedPoint.desc}</p>
                     </div>
                   </div>
                 </div>
                 <div className="availability">
                   <span></span>Pickup available today
+                </div>
+                <div className="time-section" style={{ marginBottom: "24px" }}>
+                  <h2>Choose a pickup point</h2>
+                  <div className="slot-list">
+                    {pickupPoints.map((pt) => (
+                      <button
+                        key={pt.name}
+                        className={pickupPoint === pt.name ? "selected" : ""}
+                        onClick={() => setPickupPoint(pt.name)}
+                      >
+                        <Icon name="location" size={18} />
+                        {pt.name}
+                        <span className="radio">{pickupPoint === pt.name && <span />}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="time-section">
                   <h2>Choose a pickup time</h2>
@@ -1786,6 +1815,7 @@ function Confirmation({
   items,
   orderNumber,
   paymentMethod,
+  pickupPoint,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
@@ -1794,6 +1824,7 @@ function Confirmation({
   items: CartItem[]
   orderNumber: number | string
   paymentMethod?: string
+  pickupPoint: string
 }) {
   return (
     <main className="confirmation">
@@ -1820,7 +1851,7 @@ function Confirmation({
               </small>
               <strong>
                 {fulfilment === "pickup"
-                  ? "Hostel 3 Entrance"
+                  ? pickupPoint
                   : `${details.hostel}, Room ${details.room}`}
               </strong>
             </div>
@@ -2159,7 +2190,7 @@ function OrdersPage({
                       <div>
                         <strong>
                           {order.fulfilment === "pickup"
-                            ? "Hostel 3 Entrance Pickup Point"
+                            ? `${order.hostel} Pickup Point`
                             : `${order.hostel}, Room ${order.room}`}
                         </strong>
                         <div
@@ -2834,6 +2865,7 @@ export default function App() {
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
+  const [pickupPoint, setPickupPoint] = useState("Hostel 3 Entrance")
 
   const [slot, setSlot] = useState("8:30–9:00 PM")
 
@@ -2912,8 +2944,8 @@ export default function App() {
           .insert({
             customer_name: details.name || "Student",
             customer_phone: details.phone || "0000000000",
-            hostel: details.hostel || "Hostel 3",
-            room: details.room || "Room",
+            hostel: fulfilment === "pickup" ? pickupPoint : (details.hostel || "Hostel 3"),
+            room: fulfilment === "pickup" ? "" : (details.room || "Room"),
             fulfilment,
             slot,
             items: cart,
@@ -2987,6 +3019,7 @@ export default function App() {
             setDetails={setDetails}
             fulfilment={fulfilment}
             setFulfilment={setFulfilment}
+            pickupPoint={pickupPoint}
           />
         )}
         {screen === "fulfilment" && (
@@ -2996,6 +3029,8 @@ export default function App() {
             details={details}
             slot={slot}
             setSlot={setSlot}
+            pickupPoint={pickupPoint}
+            setPickupPoint={setPickupPoint}
           />
         )}
         {screen === "payment" && (
@@ -3016,6 +3051,7 @@ export default function App() {
             items={cart}
             orderNumber={orderNumber}
             paymentMethod={paymentMethodName}
+            pickupPoint={pickupPoint}
           />
         )}
         {screen === "orders" && (
