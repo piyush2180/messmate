@@ -559,6 +559,7 @@ export default function App() {
                       <th>Customer</th>
                       <th>Fulfilment</th>
                       <th>Items</th>
+                      <th>Payment / UTR</th>
                       <th>Total</th>
                       <th>Status</th>
                       <th>Action</th>
@@ -593,6 +594,20 @@ export default function App() {
                               {it.quantity}x {it.name}
                             </div>
                           ))}
+                        </td>
+                        <td>
+                          {order.payment_method?.includes("PhonePe") ? (
+                            <div className="table-payment-cell">
+                              <span className="table-badge phonepe">⚡ PhonePe UPI</span>
+                              {order.payment_method.includes("UTR:") && (
+                                <code className="table-utr-tag">
+                                  {order.payment_method.split("UTR:")[1]?.replace(")", "").trim()}
+                                </code>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="table-badge counter">{order.payment_method || "Counter"}</span>
+                          )}
                         </td>
                         <td>
                           <strong>₹{order.total}</strong>
@@ -842,7 +857,13 @@ function OrderCard({
 
       <div className="order-card-footer">
         <span className="order-total-price">₹{order.total}</span>
-        <span className="order-payment-method">{order.payment_method || "UPI"}</span>
+        {order.payment_method?.includes("PhonePe") ? (
+          <div className="phonepe-admin-badge" title="PhonePe UPI">
+            <span>⚡ {order.payment_method}</span>
+          </div>
+        ) : (
+          <span className="order-payment-method">{order.payment_method || "Counter"}</span>
+        )}
       </div>
 
       <div className="card-actions">

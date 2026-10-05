@@ -1547,7 +1547,7 @@ function Payment({
   go: (screen: Screen) => void
   items: CartItem[]
   fulfilment: "pickup" | "delivery"
-  onPay: (method: "upi" | "other") => void
+  onPay: (method: "upi" | "counter", utr?: string) => void
   isSubmitting: boolean
 }) {
   const subtotal = items.reduce(
@@ -1556,10 +1556,27 @@ function Payment({
   )
 
   const fee = fulfilment === "delivery" ? 7 : 0
-
   const total = subtotal + fee
 
-  const [method, setMethod] = useState<"upi" | "other">("upi")
+  const [method, setMethod] = useState<"upi" | "counter">("upi")
+  const [utr, setUtr] = useState("")
+  const [copiedUpi, setCopiedUpi] = useState(false)
+
+  const merchantUpiId = "Q477490796@ybl"
+  const merchantName = "Pranith"
+  const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=PhonePeMerchant&am=${total}&cu=INR&tn=MessMate%20Food%20Order`
+
+  const handleCopyUpi = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(merchantUpiId)
+      setCopiedUpi(true)
+      setTimeout(() => setCopiedUpi(false), 2200)
+    }
+  }
+
+  const handleSubmit = () => {
+    onPay(method, utr)
+  }
 
   return (
     <>
@@ -1573,38 +1590,131 @@ function Payment({
       <main className="screen-content payment-page">
         <section className="screen-intro compact">
           <div className="eyebrow">Step 3 of 3</div>
-          <h1>One last look.</h1>
-          <p>Everything correct? You're ready to go.</p>
+          <h1>Complete Your Payment</h1>
+          <p>Scan & pay via merchant PhonePe QR or pay at counter.</p>
         </section>
         <div className="payment-layout">
           <div className="payment-left-col">
             <section className="payment-methods">
               <h2>Select Payment Method</h2>
               <button
+                type="button"
                 className={method === "upi" ? "selected" : ""}
                 onClick={() => setMethod("upi")}
               >
-                <span className="upi-mark">UPI</span>
+                <span className="upi-mark phonepe-pill">
+                  <span className="pe-symbol">पे</span>
+                </span>
                 <span>
-                  <strong>Pay with UPI</strong>
-                  <small>GPay, PhonePe, Paytm & more</small>
+                  <strong>Pay via PhonePe / UPI QR</strong>
+                  <small>GPay, PhonePe, Paytm, CRED & more</small>
                 </span>
                 <span className="radio">{method === "upi" && <span />}</span>
               </button>
               <button
-                className={method === "other" ? "selected" : ""}
-                onClick={() => setMethod("other")}
+                type="button"
+                className={method === "counter" ? "selected" : ""}
+                onClick={() => setMethod("counter")}
               >
-                <span className="card-mark">••••</span>
+                <span className="card-mark">💵</span>
                 <span>
-                  <strong>Other payment methods</strong>
-                  <small>Cards and net banking</small>
+                  <strong>Pay at Counter</strong>
+                  <small>Cash or soundbox scan upon pickup</small>
                 </span>
-                <span className="radio">{method === "other" && <span />}</span>
+                <span className="radio">{method === "counter" && <span />}</span>
               </button>
             </section>
+
+            {method === "upi" ? (
+              <div className="phonepe-payment-card">
+                <div className="merchant-header-badge">
+                  <div className="merchant-logo-pill">
+                    <span className="pe-symbol-small">पे</span>
+                    <span>PhonePe Merchant</span>
+                  </div>
+                  <span className="verified-pill">✓ Verified Merchant</span>
+                </div>
+
+                <div className="merchant-meta-row">
+                  <div>
+                    <span className="meta-label">Payee Name</span>
+                    <strong className="merchant-name">{merchantName}</strong>
+                    <div className="terminal-code">Terminal 1-Q477490796</div>
+                  </div>
+                  <div className="amount-highlight-box">
+                    <span className="meta-label">Amount Payable</span>
+                    <strong className="amount-val">₹{total}</strong>
+                  </div>
+                </div>
+
+                {/* The Official PhonePe QR Image */}
+                <div className="qr-container">
+                  <img
+                    src="/phonepe-qr.png"
+                    alt="PhonePe QR Code - Pranith"
+                    className="phonepe-qr-img"
+                  />
+                  <div className="qr-scan-instruction">
+                    <span>Scan with <strong>any UPI app</strong>: PhonePe, GPay, Paytm, CRED</span>
+                  </div>
+                </div>
+
+                {/* UPI ID Pill with Copy */}
+                <div className="upi-id-pill">
+                  <div className="upi-id-text">
+                    <span className="upi-id-label">UPI ID:</span>
+                    <code>{merchantUpiId}</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="copy-upi-btn"
+                    onClick={handleCopyUpi}
+                  >
+                    {copiedUpi ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+
+                {/* Mobile 1-Tap UPI Intent Button */}
+                <a
+                  href={upiIntentUri}
+                  className="mobile-upi-pay-link"
+                >
+                  <span className="mobile-upi-title">⚡ Pay ₹{total} via UPI App</span>
+                  <span className="mobile-upi-sub">Tap to open PhonePe / GPay / Paytm directly</span>
+                </a>
+
+                {/* UTR Input Section */}
+                <div className="utr-section">
+                  <label htmlFor="utr-field" className="utr-label">
+                    <span>12-Digit UPI Reference / UTR Number</span>
+                    <span className="optional-badge">Recommended</span>
+                  </label>
+                  <input
+                    id="utr-field"
+                    type="text"
+                    className="utr-input"
+                    maxLength={16}
+                    placeholder="e.g. 409128381920 (from PhonePe receipt)"
+                    value={utr}
+                    onChange={(e) => setUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ""))}
+                  />
+                  <p className="utr-hint">
+                    Found under payment details in PhonePe/GPay to speed up kitchen verification.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="counter-payment-card">
+                <div className="counter-icon">💵</div>
+                <div>
+                  <strong>Pay ₹{total} at the Counter</strong>
+                  <p>You can pay via cash or scan our countertop soundbox QR at the pickup table.</p>
+                </div>
+              </div>
+            )}
+
             <div className="reassurance">
-              <Icon name="shield" size={18} /> Your payment is safe and secure
+              <Icon name="shield" size={18} /> Payments are directly verified with our campus kitchen
             </div>
           </div>
           <div className="payment-right-col">
@@ -1638,8 +1748,12 @@ function Payment({
                 </div>
               </div>
               <div className="desktop-payment-cta">
-                <PrimaryButton disabled={isSubmitting} onClick={() => onPay(method)}>
-                  {isSubmitting ? "Placing order..." : `Pay ₹${total}`}
+                <PrimaryButton disabled={isSubmitting} onClick={handleSubmit}>
+                  {isSubmitting
+                    ? "Placing order..."
+                    : method === "upi"
+                    ? `✓ I've Paid ₹${total} — Place Order`
+                    : `Place Order (Pay ₹${total} at Counter)`}
                 </PrimaryButton>
               </div>
             </section>
@@ -1651,13 +1765,18 @@ function Payment({
           <small>Total</small>
           <strong>₹{total}</strong>
         </div>
-        <PrimaryButton disabled={isSubmitting} onClick={() => onPay(method)}>
-          {isSubmitting ? "Placing order..." : `Pay ₹${total}`}
+        <PrimaryButton disabled={isSubmitting} onClick={handleSubmit}>
+          {isSubmitting
+            ? "Placing order..."
+            : method === "upi"
+            ? `✓ I've Paid ₹${total} — Place Order`
+            : `Place Order (Pay ₹${total})`}
         </PrimaryButton>
       </BottomBar>
     </>
   )
 }
+
 
 function Confirmation({
   go,
@@ -1666,6 +1785,7 @@ function Confirmation({
   slot,
   items,
   orderNumber,
+  paymentMethod,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
@@ -1673,6 +1793,7 @@ function Confirmation({
   slot: string
   items: CartItem[]
   orderNumber: number | string
+  paymentMethod?: string
 }) {
   return (
     <main className="confirmation">
@@ -1723,6 +1844,13 @@ function Confirmation({
                 </strong>
               </span>
             </div>
+          </div>
+          <div className="confirm-payment-tag">
+            <span className="pay-mode-icon">⚡</span>
+            <span>
+              <small>PAYMENT METHOD</small>
+              <strong>{paymentMethod || "PhonePe UPI Verified"}</strong>
+            </span>
           </div>
         </section>
         <div className="sms-note">
@@ -2711,6 +2839,8 @@ export default function App() {
 
   const [orderNumber, setOrderNumber] = useState<number | string>(1048)
 
+  const [paymentMethodName, setPaymentMethodName] = useState("PhonePe UPI")
+
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
@@ -2753,52 +2883,47 @@ export default function App() {
           ),
     )
 
-  const handlePay = async (method: "upi" | "other") => {
+  const handlePay = async (method: "upi" | "counter", utr?: string) => {
     setIsSubmitting(true)
 
     try {
+      const fee = fulfilment === "delivery" ? 7 : 0
+
+      const subtotal = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      )
+
+      const orderTotal = subtotal + fee
+
+      const cleanUtr = utr?.trim()
+      const paymentLabel =
+        method === "upi"
+          ? cleanUtr
+            ? `PhonePe UPI (UTR: ${cleanUtr})`
+            : "PhonePe UPI"
+          : "Pay at Counter"
+
+      setPaymentMethodName(paymentLabel)
+
       if (supabase) {
-        const fee = fulfilment === "delivery" ? 7 : 0
-
-        const subtotal = cart.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0,
-        )
-
-        const orderTotal = subtotal + fee
-
         const { data, error } = await supabase
-
           .from("orders")
-
           .insert({
             customer_name: details.name || "Student",
-
             customer_phone: details.phone || "0000000000",
-
             hostel: details.hostel || "Hostel 3",
-
             room: details.room || "Room",
-
             fulfilment,
-
             slot,
-
             items: cart,
-
             subtotal,
-
             delivery_fee: fee,
-
             total: orderTotal,
-
-            payment_method: method,
-
+            payment_method: paymentLabel,
             status: "placed",
           })
-
           .select("order_number")
-
           .single()
 
         if (error) {
@@ -2814,7 +2939,6 @@ export default function App() {
       console.error("Failed to place order:", err)
     } finally {
       setIsSubmitting(false)
-
       go("confirmation")
     }
   }
@@ -2891,6 +3015,7 @@ export default function App() {
             slot={slot}
             items={cart}
             orderNumber={orderNumber}
+            paymentMethod={paymentMethodName}
           />
         )}
         {screen === "orders" && (

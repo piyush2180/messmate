@@ -583,6 +583,62 @@ button, input, select, textarea {
   letter-spacing: 0.05em;
 }
 
+/* PhonePe Payment Badges */
+.phonepe-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f4effa;
+  border: 1px solid #dfcff2;
+  color: #5f259f;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 6px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-payment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.table-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.table-badge.phonepe {
+  background: #f4effa;
+  color: #5f259f;
+  border: 1px solid #dfcff2;
+}
+
+.table-badge.counter {
+  background: #f1ede4;
+  color: var(--muted);
+  border: 1px solid #ded5c7;
+}
+
+.table-utr-tag {
+  font-family: monospace;
+  font-size: 11px;
+  color: #5f259f;
+  font-weight: 700;
+  background: #ffffff;
+  border: 1px solid #dfcff2;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
 /* Action Buttons */
 .card-actions {
   display: flex;

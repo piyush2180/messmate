@@ -261,6 +261,284 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .payment-methods button small { color: var(--muted); font-size: 7px; }
 .upi-mark, .card-mark { width: 43px; height: 35px; border-radius: 9px; display: grid; place-items: center; font-size: 10px; font-weight: 900; color: var(--olive); background: var(--olive-pale); }
 .card-mark { color: var(--terracotta-dark); background: var(--pickle-pale); letter-spacing: 2px; }
+
+/* PhonePe Merchant Payment Experience */
+.phonepe-pill {
+  background: #5f259f !important;
+  color: #fff !important;
+}
+.pe-symbol {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  color: #fff;
+}
+.phonepe-payment-card {
+  margin-top: 14px;
+  background: #ffffff;
+  border: 1.5px solid #e2d7f0;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(95, 37, 159, 0.07);
+}
+.merchant-header-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0eaf7;
+}
+.merchant-logo-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #5f259f;
+  font-weight: 700;
+  font-size: 13px;
+}
+.pe-symbol-small {
+  width: 22px;
+  height: 22px;
+  background: #5f259f;
+  color: #fff;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+}
+.verified-pill {
+  font-size: 11px;
+  font-weight: 600;
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.merchant-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.meta-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.merchant-name {
+  font-size: 16px;
+  color: var(--text);
+  display: block;
+  margin-top: 2px;
+}
+.terminal-code {
+  font-size: 10px;
+  color: #888;
+  font-family: monospace;
+}
+.amount-highlight-box {
+  text-align: right;
+  background: #fbfbf6;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid #eee9df;
+}
+.amount-val {
+  font-size: 18px;
+  color: var(--olive);
+  font-weight: 800;
+}
+.qr-container {
+  background: #faf9f6;
+  border: 1px dashed #d5cdbf;
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+  margin: 10px 0;
+}
+.phonepe-qr-img {
+  max-width: 210px;
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.qr-scan-instruction {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #666;
+}
+.upi-id-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f7f2fa;
+  border: 1px solid #e7dbf3;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+.upi-id-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.upi-id-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+.upi-id-text code {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5f259f;
+}
+.copy-upi-btn {
+  background: #5f259f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.copy-upi-btn:hover {
+  background: #4a1c7d;
+}
+.mobile-upi-pay-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #5f259f 0%, #7d33c8 100%);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 12px 0 10px;
+  box-shadow: 0 4px 14px rgba(95, 37, 159, 0.22);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.mobile-upi-pay-link:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.mobile-upi-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.mobile-upi-sub {
+  font-size: 10px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+.utr-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f0eaf7;
+}
+.utr-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.optional-badge {
+  font-size: 9px;
+  background: #f0ece3;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.utr-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #d8cfc4;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.utr-input:focus {
+  border-color: #5f259f;
+  box-shadow: 0 0 0 3px rgba(95, 37, 159, 0.12);
+}
+.utr-hint {
+  margin: 5px 0 0;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.counter-payment-card {
+  margin-top: 14px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.counter-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.counter-payment-card strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.counter-payment-card p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.confirm-payment-tag {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #faf8f5;
+  border: 1px solid #ece4d8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.confirm-payment-tag small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.confirm-payment-tag strong {
+  font-size: 12px;
+  color: var(--olive);
+}
+.pay-mode-icon {
+  font-size: 18px;
+}
+
 .confirmation { width: 100%; min-height: 100vh; padding: calc(24px + env(safe-area-inset-top, 0px)) 22px calc(45px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; text-align: center; overflow-x: hidden; }
 .confirmation > .brand { align-self: flex-start; }
 .success-visual { width: 126px; height: 126px; position: relative; display: grid; place-items: center; margin: 60px auto 28px; }
