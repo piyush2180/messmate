@@ -59,7 +59,9 @@ type IconName =
   | "arrow-right"
   | "bag"
   | "check"
-  | "chilli"
+  | "chili-mild"
+  | "chili-medium"
+  | "chili-hot"
   | "clock"
   | "close"
   | "drumstick"
@@ -208,6 +210,8 @@ function Icon({
         <path d="M9 9V6a3 3 0 0 1 6 0v3" />
       </>
     ),
+
+    check: <path d="m5 12 4 4L19 6" />,
 
     "chili-mild": (
       <g fill="currentColor" stroke="none">
@@ -1981,6 +1985,7 @@ function Confirmation({
   paymentMethod,
   pickupPoint,
   pickupPin,
+  isCancelled,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
@@ -1991,6 +1996,7 @@ function Confirmation({
   paymentMethod?: string
   pickupPoint: string
   pickupPin?: string
+  isCancelled?: boolean
 }) {
   const displayPin = pickupPin || getPickupPin({ order_number: orderNumber })
 
@@ -2006,6 +2012,17 @@ function Confirmation({
           </span>
         </div>
         <div className="eyebrow">Order confirmed · #{orderNumber}</div>
+
+        {isCancelled && (
+          <div className="confirmation-cancelled-banner">
+            <Icon name="close" size={18} />
+            <div>
+              <strong>Order #{orderNumber} has been Cancelled</strong>
+              <p>The kitchen cancelled this order. If you paid via UPI, please reach out to the MessMate Support Team.</p>
+            </div>
+          </div>
+        )}
+
         <h1>You're all set!</h1>
         <p>Good food is on the way. We'll take it from here.</p>
         <section className="confirmation-card">
@@ -2489,66 +2506,97 @@ function OrdersPage({
                           ? "Out for Delivery"
                           : "Ready for Pickup")}
                       {order.status === "delivered" && "Delivered"}
+                      {order.status === "cancelled" && "Order Cancelled"}
                     </span>
                   </div>
 
-                  {/* Live Tracker Stepper */}
-                  <div className="tracker-timeline">
-                    <div className="tracker-steps">
-                      {steps.map((step, idx) => {
-                        const isDone = idx < currentStep
-                        const isActive = idx === currentStep
-                        return (
-                          <div
-                            key={step.label}
-                            className={`tracker-step-item ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}
-                          >
-                            <div className="tracker-step-node">
-                              {isDone ? (
-                                <Icon name="check" size={16} />
-                              ) : (
-                                idx + 1
-                              )}
-                            </div>
-                            <span className="tracker-step-title">
-                              {step.label}
-                            </span>
-                            <span className="tracker-step-time">
-                              {step.desc}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    <div className="tracker-banner">
-                      <div className="tracker-banner-icon">
-                        <Icon
-                          name={
-                            order.fulfilment === "pickup" ? "location" : "bag"
-                          }
-                          size={16}
-                        />
+                  {order.status === "cancelled" ? (
+                    <div className="order-cancelled-notice-card">
+                      <div className="cancelled-card-top">
+                        <span className="cancelled-card-icon">
+                          <Icon name="close" size={16} />
+                        </span>
+                        <div>
+                          <strong>Order Cancelled by Kitchen</strong>
+                          <p>This order has been cancelled and will not be prepared or delivered.</p>
+                        </div>
                       </div>
-                      <div>
-                        <strong>
-                          {order.fulfilment === "pickup"
-                            ? `${order.hostel} Pickup Point`
-                            : `${order.hostel}, Room ${order.room}`}
-                        </strong>
-                        <div
-                          style={{
-                            color: "var(--muted)",
-                            fontSize: "8px",
-                            marginTop: "2px",
+                      <div className="cancelled-card-refund">
+                        <span>
+                          If you transferred payment via UPI, your refund will be processed or you can contact the <strong>MessMate Support Team</strong> for instant verification.
+                        </span>
+                        <button
+                          type="button"
+                          className="cancelled-card-support-btn"
+                          onClick={() => {
+                            const fab = document.querySelector(".support-fab") as HTMLButtonElement | null
+                            if (fab) fab.click()
                           }}
                         >
-                          Slot: {order.slot} · Contact: {order.customer_name} (
-                          {order.customer_phone?.replace(/\D/g, "").slice(-10) || order.customer_phone})
+                          <Icon name="chat" size={13} />
+                          Chat with Support
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Live Tracker Stepper */
+                    <div className="tracker-timeline">
+                      <div className="tracker-steps">
+                        {steps.map((step, idx) => {
+                          const isDone = idx < currentStep
+                          const isActive = idx === currentStep
+                          return (
+                            <div
+                              key={step.label}
+                              className={`tracker-step-item ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}
+                            >
+                              <div className="tracker-step-node">
+                                {isDone ? (
+                                  <Icon name="check" size={16} />
+                                ) : (
+                                  idx + 1
+                                )}
+                              </div>
+                              <span className="tracker-step-title">
+                                {step.label}
+                              </span>
+                              <span className="tracker-step-time">
+                                {step.desc}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      <div className="tracker-banner">
+                        <div className="tracker-banner-icon">
+                          <Icon
+                            name={
+                              order.fulfilment === "pickup" ? "location" : "bag"
+                            }
+                            size={16}
+                          />
+                        </div>
+                        <div>
+                          <strong>
+                            {order.fulfilment === "pickup"
+                              ? `${order.hostel} Pickup Point`
+                              : `${order.hostel}, Room ${order.room}`}
+                          </strong>
+                          <div
+                            style={{
+                              color: "var(--muted)",
+                              fontSize: "8px",
+                              marginTop: "2px",
+                            }}
+                          >
+                            Slot: {order.slot} · Contact: {order.customer_name} (
+                            {order.customer_phone?.replace(/\D/g, "").slice(-10) || order.customer_phone})
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Order items */}
                   <div className="order-ticket-details">
@@ -2767,9 +2815,9 @@ function getAutomatedAnswer(query: string): string {
     return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
   }
   if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
-    return "Orders can be modified before prep starts. Please click 'Request Live Chat Support' below so our team can update your order right away!"
+    return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our MessMate Support Team can update your order right away!"
   }
-  return "Thanks for asking! For order-specific requests or anything else, click 'Request Live Chat Support' below to speak directly with our team."
+  return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the MessMate Support Team."
 }
 
 function mergeSupportMessages(
@@ -2853,7 +2901,21 @@ function SupportChatWidget({
     try {
       if (savedCleanPhone) {
         const saved = localStorage.getItem(`messmate_chat_${savedCleanPhone}`)
-        if (saved) return mergeSupportMessages([], JSON.parse(saved))
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          const sanitized = Array.isArray(parsed)
+            ? parsed.map((m: any) => ({
+                ...m,
+                customer_name:
+                  m.customer_name === "MessMate Support" ||
+                  m.customer_name === "Campus Support Team" ||
+                  m.sender === "support"
+                    ? "MessMate Support Team"
+                    : m.customer_name,
+              }))
+            : []
+          return mergeSupportMessages([], sanitized)
+        }
       }
     } catch {}
     return []
@@ -3111,7 +3173,7 @@ function SupportChatWidget({
     localStorage.setItem("messmate_phone", activePhone)
     localStorage.setItem("messmate_customer_name", name.trim())
 
-    const issueText = issue.trim() || "Requested campus team callback."
+    const issueText = issue.trim() || "Requested MessMate Support Team callback."
 
     const initialCustomerMsg: SupportMsg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -3125,7 +3187,7 @@ function SupportChatWidget({
     const acknowledgmentMsg: SupportMsg = {
       id: `ack-${Date.now() + 1}-${Math.random().toString(36).slice(2, 6)}`,
       phone: activePhone,
-      customer_name: "MessMate Support",
+      customer_name: "MessMate Support Team",
       sender: "support",
       message: `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`,
       created_at: new Date().toISOString(),
@@ -3209,11 +3271,11 @@ function SupportChatWidget({
         className={`support-fab ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open support chat"
-        title="MessMate Support"
+        title="MessMate Support Team"
       >
         <span className="support-fab-dot" />
         <Icon name={isOpen ? "close" : "chat"} size={19} />
-        <span>{isOpen ? "Close" : "Support"}</span>
+        <span>{isOpen ? "Close" : "Support Team"}</span>
         {!isOpen && unreadCount > 0 && (
           <span className="support-fab-badge">{unreadCount}</span>
         )}
@@ -3227,9 +3289,9 @@ function SupportChatWidget({
                 <Icon name="chat" size={17} />
               </div>
               <div className="support-header-text">
-                <strong>MessMate Support</strong>
+                <strong>MessMate Support Team</strong>
                 <small>
-                  <span className="support-header-dot" /> Online · Campus Help
+                  <span className="support-header-dot" /> Online · MessMate Support Team
                 </small>
               </div>
             </div>
@@ -3256,7 +3318,7 @@ function SupportChatWidget({
                 view === "request" || view === "live" ? "active" : ""
               }`}
               onClick={() => {
-                if (liveMessages.length > 0) {
+                if (liveMessages.length > 0 || (phone.replace(/\D/g, "").length === 10 && name.trim())) {
                   setView("live")
                 } else {
                   setView("request")
@@ -3295,7 +3357,7 @@ function SupportChatWidget({
                           }}
                         >
                           <Icon name="chat" size={13} />
-                          {liveMessages.length > 0 ? "Resume Live Chat" : "Request Live Chat Support"}
+                          {liveMessages.length > 0 ? "Resume Live Chat" : "Talk to MessMate Support Team"}
                         </button>
                       </div>
                     )}
@@ -3344,9 +3406,9 @@ function SupportChatWidget({
                 onSubmit={handleStartLiveChat}
               >
                 <div className="support-request-intro">
-                  <h4>Talk to Campus Support</h4>
+                  <h4>Talk to MessMate Support Team</h4>
                   <p>
-                    Submit your name and phone number. Our campus team will
+                    Submit your name and phone number. Our MessMate Support Team will
                     contact you shortly!
                   </p>
                 </div>
@@ -3403,6 +3465,14 @@ function SupportChatWidget({
                     Back
                   </button>
                   <button
+                    type="button"
+                    className="support-back-text-btn"
+                    style={{ textDecoration: "underline", color: "var(--olive)" }}
+                    onClick={() => setView("live")}
+                  >
+                    Open Chat
+                  </button>
+                  <button
                     type="submit"
                     className="primary-button olive"
                     disabled={isSubmitting || !name.trim() || phone.replace(/\D/g, "").length !== 10}
@@ -3423,7 +3493,7 @@ function SupportChatWidget({
                 </div>
                 <div className="support-status-copy">
                   <strong>We will contact you shortly!</strong>
-                  <span>Reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
+                  <span>MessMate Support Team reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
                 </div>
                 <button
                   type="button"
@@ -3439,7 +3509,7 @@ function SupportChatWidget({
                 {liveMessages.length === 0 ? (
                   <div className="empty-state" style={{ padding: 20 }}>
                     <Icon name="chat" size={24} />
-                    <p>No messages yet. Send a message below to start.</p>
+                    <p>No messages yet. Send a message below to start chatting with the MessMate Support Team.</p>
                   </div>
                 ) : (
                   liveMessages.map((msg) => (
@@ -3454,9 +3524,14 @@ function SupportChatWidget({
                       }`}
                     >
                       <span className="chat-bubble-sender">
-                        {msg.sender === "customer"
+                        {msg.sender === "customer" &&
+                        msg.customer_name !== "MessMate Support" &&
+                        msg.customer_name !== "Campus Support Team" &&
+                        msg.customer_name !== "MessMate Support Team"
                           ? msg.customer_name || "You"
-                          : "Campus Support Team"}
+                          : msg.sender === "bot"
+                            ? "MessMate Bot"
+                            : "MessMate Support Team"}
                       </span>
                       <div>{msg.message}</div>
                       <span className="chat-bubble-time">
@@ -3538,9 +3613,11 @@ export default function App() {
     return new Set()
   })
 
-  // Live Ready-for-Pickup Alert state
+  // Live Ready & Cancelled Alert state
   const [activeReadyOrder, setActiveReadyOrder] = useState<any>(null)
   const [dismissedReadyIds, setDismissedReadyIds] = useState<Set<string>>(new Set())
+  const [activeCancelledOrder, setActiveCancelledOrder] = useState<any>(null)
+  const [dismissedCancelledIds, setDismissedCancelledIds] = useState<Set<string>>(new Set())
 
   // Sync inventory with Supabase realtime & broadcast
   useEffect(() => {
@@ -3586,15 +3663,16 @@ export default function App() {
     }
   }, [])
 
-  // Live listener for Ready-for-pickup alert
+  // Live listener for Ready & Cancelled alerts
   useEffect(() => {
     const client = supabase
     if (!client) return
     const phone = details.phone || localStorage.getItem("messmate_phone")
     if (!phone) return
 
-    const checkReadyOrders = async () => {
-      const { data } = await client
+    const checkOrderAlerts = async () => {
+      // 1. Ready orders
+      const { data: readyData } = await client
         .from("orders")
         .select("*")
         .eq("customer_phone", phone)
@@ -3602,20 +3680,40 @@ export default function App() {
         .order("created_at", { ascending: false })
         .limit(1)
 
-      if (data && data.length > 0) {
-        const order = data[0]
+      if (readyData && readyData.length > 0) {
+        const order = readyData[0]
         if (!dismissedReadyIds.has(order.id)) {
           setActiveReadyOrder(order)
         }
       } else {
         setActiveReadyOrder(null)
       }
+
+      // 2. Cancelled orders in last 3 hours
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+      const { data: cancelledData } = await client
+        .from("orders")
+        .select("*")
+        .eq("customer_phone", phone)
+        .eq("status", "cancelled")
+        .gte("created_at", threeHoursAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      if (cancelledData && cancelledData.length > 0) {
+        const order = cancelledData[0]
+        if (!dismissedCancelledIds.has(order.id)) {
+          setActiveCancelledOrder(order)
+        }
+      } else {
+        setActiveCancelledOrder(null)
+      }
     }
 
-    checkReadyOrders()
+    checkOrderAlerts()
 
     const ordersChannel = client
-      .channel("student_ready_alerts")
+      .channel("student_order_alerts")
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
@@ -3623,8 +3721,14 @@ export default function App() {
           const updated = payload.new as any
           if (updated.customer_phone === phone) {
             if (updated.status === "ready" && !dismissedReadyIds.has(updated.id)) {
+              setActiveCancelledOrder(null)
               setActiveReadyOrder(updated)
-            } else if (updated.status === "delivered" || updated.status === "cancelled") {
+            } else if (updated.status === "cancelled") {
+              setActiveReadyOrder(null)
+              if (!dismissedCancelledIds.has(updated.id)) {
+                setActiveCancelledOrder(updated)
+              }
+            } else if (updated.status === "delivered") {
               setActiveReadyOrder(null)
             }
           }
@@ -3635,7 +3739,7 @@ export default function App() {
     return () => {
       client.removeChannel(ordersChannel)
     }
-  }, [details.phone, dismissedReadyIds])
+  }, [details.phone, dismissedReadyIds, dismissedCancelledIds])
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -3828,6 +3932,47 @@ export default function App() {
           </div>
         )}
 
+        {/* Live Floating Alert Banner for Cancelled Orders */}
+        {activeCancelledOrder && (
+          <div className="cancelled-order-alert-banner">
+            <div className="alert-banner-content">
+              <span className="alert-bell cancelled-bell">
+                <Icon name="close" size={16} />
+              </span>
+              <div>
+                <strong>Order #{activeCancelledOrder.order_number} has been CANCELLED</strong>
+                <p>
+                  Kitchen cancelled this order · Tap Track to check details or talk to support
+                </p>
+              </div>
+            </div>
+            <div className="alert-banner-actions">
+              <button
+                type="button"
+                className="alert-track-btn cancelled-track-btn"
+                onClick={() => {
+                  setDismissedCancelledIds((prev) => new Set([...prev, activeCancelledOrder.id]))
+                  setActiveCancelledOrder(null)
+                  go("orders")
+                }}
+              >
+                Track
+              </button>
+              <button
+                type="button"
+                className="alert-dismiss-btn"
+                onClick={() => {
+                  setDismissedCancelledIds((prev) => new Set([...prev, activeCancelledOrder.id]))
+                  setActiveCancelledOrder(null)
+                }}
+                aria-label="Dismiss alert"
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {screen === "home" && (
           <Home go={go} cartCount={cartCount} cartTotal={total} />
         )}
@@ -3910,6 +4055,7 @@ export default function App() {
             paymentMethod={paymentMethodName}
             pickupPoint={pickupPoint}
             pickupPin={orderPin}
+            isCancelled={activeCancelledOrder?.order_number === orderNumber}
           />
         )}
         {screen === "orders" && (

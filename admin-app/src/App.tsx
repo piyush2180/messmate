@@ -107,7 +107,21 @@ export default function App() {
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>(() => {
     try {
       const saved = localStorage.getItem("messmate_admin_support_messages")
-      if (saved) return mergeSupportMessages([], JSON.parse(saved))
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        const sanitized = Array.isArray(parsed)
+          ? parsed.map((m: any) => ({
+              ...m,
+              customer_name:
+                m.customer_name === "MessMate Support" ||
+                m.customer_name === "Campus Support Team" ||
+                m.sender === "support"
+                  ? "MessMate Support Team"
+                  : m.customer_name || m.customerName || "Customer",
+            }))
+          : []
+        return mergeSupportMessages([], sanitized)
+      }
     } catch (e) {
       console.warn("Could not read local support cache", e)
     }
@@ -936,7 +950,7 @@ export default function App() {
 
         {/* Tab 3: Support & Callback Inbox */}
         {tab === "support" && (
-          <div className="support-inbox-grid">
+          <div className={`support-inbox-grid ${activeThread ? "has-selected" : ""}`}>
             {/* Left Column: Thread list */}
             <div className="support-list-pane">
               <div className="inbox-header">
@@ -976,6 +990,16 @@ export default function App() {
               {activeThread ? (
                 <>
                   <div className="thread-header">
+                    <button
+                      type="button"
+                      className="mobile-back-to-inbox"
+                      onClick={() => setSelectedPhone(null)}
+                      aria-label="Back to conversations"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                      </svg>
+                    </button>
                     <div className="thread-user-info">
                       <strong>{activeThread.customerName}</strong>
                       <span>({get10DigitPhone(activeThread.phone)})</span>
@@ -998,7 +1022,12 @@ export default function App() {
                         className={`thread-bubble ${m.sender === "customer" ? "customer" : "support"}`}
                       >
                         <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, opacity: 0.8 }}>
-                          {m.sender === "customer" ? activeThread.customerName : "Campus Support Team"}
+                          {m.sender === "customer" &&
+                          m.customer_name !== "MessMate Support" &&
+                          m.customer_name !== "Campus Support Team" &&
+                          m.customer_name !== "MessMate Support Team"
+                            ? activeThread.customerName
+                            : "MessMate Support Team"}
                         </div>
                         <div>{m.message}</div>
                         <div style={{ fontSize: 10, textAlign: "right", marginTop: 4, opacity: 0.7 }}>

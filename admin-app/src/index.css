@@ -760,6 +760,10 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
+.mobile-back-to-inbox {
+  display: none;
+}
+
 .support-list-pane {
   border-right: 1px solid var(--line);
   display: flex;
@@ -1460,8 +1464,16 @@ button, input, select, textarea {
     min-height: 520px;
   }
   .mobile-back-to-inbox {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.06);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 8px;
     margin-right: 8px;
+    cursor: pointer;
+    color: var(--charcoal);
   }
   .support-inbox-grid.has-selected .support-list-pane {
     display: none;

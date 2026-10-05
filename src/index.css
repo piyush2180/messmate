@@ -594,6 +594,7 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .order-status-badge.preparing { background: var(--olive-pale); color: var(--olive-dark); border: 1px solid rgba(83,107,58,.25); }
 .order-status-badge.ready { background: var(--green-pale); color: var(--green-dark); border: 1px solid rgba(79,138,91,.25); }
 .order-status-badge.delivered { background: #f1f4ed; color: #2e603a; border: 1px solid rgba(79,138,91,.2); }
+.order-status-badge.cancelled { background: #fef2f2; color: #b91c1c; border: 1px solid rgba(185,28,28,.25); }
 
 .tracker-timeline { margin: 18px 0; background: #faf8f5; border-radius: 18px; padding: 18px 12px; border: 1px solid var(--line); }
 .tracker-steps { display: grid; grid-template-columns: repeat(4, 1fr); position: relative; gap: 4px; }
@@ -1810,12 +1811,13 @@ h1 em { color: var(--olive); font-weight: inherit; }
   color: var(--text);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .support-fab {
     bottom: 84px;
     right: 16px;
     padding: 10px 16px;
     font-size: 13px;
+    z-index: 9999;
   }
 
   .support-chat-card {
@@ -1823,12 +1825,31 @@ h1 em { color: var(--olive); font-weight: inherit; }
     bottom: 0;
     left: 0;
     right: 0;
-    width: 100%;
-    max-width: 100vw;
-    height: 84vh;
-    max-height: 84vh;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 88vh;
+    max-height: 88vh;
+    height: 88dvh;
+    max-height: 88dvh;
     border-radius: 24px 24px 0 0;
     border-bottom: none;
+    z-index: 999999 !important;
+    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.28);
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .support-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px;
+  }
+
+  .support-input-bar {
+    padding: 10px 14px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    background: #ffffff;
   }
 }
 
@@ -1897,6 +1918,127 @@ h1 em { color: var(--olive); font-weight: inherit; }
   cursor: pointer;
   padding: 4px;
   opacity: 0.8;
+}
+
+/* Live Cancelled Order Alert Banner */
+.cancelled-order-alert-banner {
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
+  color: #ffffff;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 6px 20px rgba(127, 29, 29, 0.28);
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  border-bottom: 2px solid #ef4444;
+  animation: slideDownAlert 0.3s ease;
+}
+.alert-bell.cancelled-bell {
+  background: rgba(255, 255, 255, 0.2);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.alert-track-btn.cancelled-track-btn {
+  background: #ffffff;
+  color: #991b1b;
+}
+
+/* Cancelled Order Notice in Order Tracker */
+.order-cancelled-notice-card {
+  background: #fef2f2;
+  border: 1.5px solid rgba(239, 68, 68, 0.28);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cancelled-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.cancelled-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cancelled-card-top strong {
+  font-size: 13px;
+  color: #991b1b;
+  display: block;
+  font-weight: 800;
+}
+.cancelled-card-top p {
+  font-size: 11px;
+  color: #7f1d1d;
+  margin: 3px 0 0;
+  line-height: 1.35;
+}
+.cancelled-card-refund {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.45;
+  background: #ffffff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cancelled-card-support-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #991b1b;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.cancelled-card-support-btn:hover {
+  background: #7f1d1d;
+}
+
+/* Confirmation Screen Cancelled Alert */
+.confirmation-cancelled-banner {
+  background: #fef2f2;
+  border: 1.5px solid #f87171;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.confirmation-cancelled-banner strong {
+  display: block;
+  font-size: 13px;
 }
 
 /* Pickup PIN Confirmation Card */
