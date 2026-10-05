@@ -264,11 +264,13 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
-function Brand() {
+function Brand({ onClick }: { onClick?: () => void }) {
   return (
     <button
       className="brand"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      onClick={
+        onClick || (() => window.scrollTo({ top: 0, behavior: "smooth" }))
+      }
       aria-label="MessMate home"
     >
       <span className="brand-mark">
@@ -287,6 +289,7 @@ function Header({
   onOrders,
   hasOrders = false,
   activeScreen,
+  go,
 }: {
   title?: string
   onBack?: () => void
@@ -295,43 +298,118 @@ function Header({
   onOrders?: () => void
   hasOrders?: boolean
   activeScreen?: Screen
+  go?: (screen: Screen) => void
 }) {
   return (
     <header className="header">
-      {onBack ? (
-        <button className="icon-button" onClick={onBack} aria-label="Go back">
-          <Icon name="arrow-left" />
-        </button>
-      ) : (
-        <Brand />
-      )}
+      <div className="header-mobile-left">
+        {onBack ? (
+          <button className="icon-button" onClick={onBack} aria-label="Go back">
+            <Icon name="arrow-left" />
+          </button>
+        ) : (
+          <Brand onClick={go ? () => go("home") : undefined} />
+        )}
+      </div>
+
+      <div className="header-desktop-brand">
+        <Brand onClick={go ? () => go("home") : undefined} />
+        {onBack && (
+          <button className="desktop-back-btn" onClick={onBack}>
+            <Icon name="arrow-left" size={15} />
+            <span>Back</span>
+          </button>
+        )}
+      </div>
+
       {title && (
         <div className="header-heading">
           <span>MESSMATE</span>
           <div className="header-title">{title}</div>
         </div>
       )}
+
+      {go && (
+        <nav className="desktop-nav-menu" aria-label="Main Navigation">
+          <button
+            className={`desktop-nav-link ${activeScreen === "home" ? "active" : ""}`}
+            onClick={() => go("home")}
+          >
+            Home
+          </button>
+          <button
+            className={`desktop-nav-link ${
+              activeScreen === "pickles" || activeScreen === "pickle-detail"
+                ? "active"
+                : ""
+            }`}
+            onClick={() => go("pickles")}
+          >
+            Homemade Pickles
+          </button>
+          <button
+            className={`desktop-nav-link ${
+              activeScreen === "fruit-builder" ? "active" : ""
+            }`}
+            onClick={() => go("fruit-builder")}
+          >
+            Fresh Fruit Bowls
+          </button>
+          <button
+            className={`desktop-nav-link ${
+              activeScreen === "orders" ? "active" : ""
+            }`}
+            onClick={() => go("orders")}
+          >
+            Track Orders
+          </button>
+        </nav>
+      )}
+
       <div className="header-actions">
         {onOrders && (
-          <button
-            className={`orders-button ${activeScreen === "orders" ? "active" : ""}`}
-            onClick={onOrders}
-            aria-label="My Orders & Tracking"
-            title="My Orders & Tracking"
-          >
-            <Icon name="receipt" />
-            {hasOrders && <span className="orders-dot" />}
-          </button>
+          <>
+            <button
+              className={`orders-button mobile-only-inline-flex ${
+                activeScreen === "orders" ? "active" : ""
+              }`}
+              onClick={onOrders}
+              aria-label="My Orders & Tracking"
+              title="My Orders & Tracking"
+            >
+              <Icon name="receipt" />
+              {hasOrders && <span className="orders-dot" />}
+            </button>
+            <button
+              className={`desktop-track-btn desktop-only-inline-flex ${
+                activeScreen === "orders" ? "active" : ""
+              }`}
+              onClick={onOrders}
+            >
+              <Icon name="receipt" size={15} />
+              <span>Track Orders</span>
+            </button>
+          </>
         )}
         {onCart && (
-          <button
-            className="bag-button"
-            onClick={onCart}
-            aria-label={`Cart with ${cartCount} items`}
-          >
-            <Icon name="bag" />
-            {cartCount > 0 && <span>{cartCount}</span>}
-          </button>
+          <>
+            <button
+              className="bag-button mobile-only-inline-flex"
+              onClick={onCart}
+              aria-label={`Cart with ${cartCount} items`}
+            >
+              <Icon name="bag" />
+              {cartCount > 0 && <span>{cartCount}</span>}
+            </button>
+            <button
+              className="desktop-cart-pill desktop-only-inline-flex"
+              onClick={onCart}
+              aria-label={`Cart with ${cartCount} items`}
+            >
+              <Icon name="bag" size={15} />
+              <span>Cart {cartCount > 0 ? `(${cartCount})` : ""}</span>
+            </button>
+          </>
         )}
       </div>
     </header>
@@ -469,24 +547,74 @@ function Home({
         cartCount={cartCount}
         onCart={() => go("cart")}
         onOrders={() => go("orders")}
+        go={go}
+        activeScreen="home"
       />
-      <main>
+      <main className="home-main">
         <section className="hero">
-          <div className="hero-kicker">
-            <span></span>Made for campus life
+          <div className="hero-left">
+            <div className="hero-kicker">
+              <span></span>Made for campus life
+            </div>
+            <h1>
+              Good food.
+              <br />
+              <em>Made for hostel life.</em>
+            </h1>
+            <p>
+              A little homemade goodness for boring mess meals. A fresh option for
+              days when you want something better.
+            </p>
+            <div className="hero-desktop-actions">
+              <button
+                className="primary-button hero-cta-btn"
+                onClick={() => go("pickles")}
+              >
+                <span>Order Homemade Pickles</span>
+                <Icon name="arrow-right" size={18} />
+              </button>
+              <button
+                className="hero-secondary-btn"
+                onClick={() => go("fruit-builder")}
+              >
+                <span>Build Fresh Fruit Bowl</span>
+                <Icon name="leaf" size={18} />
+              </button>
+            </div>
+            <div className="trust-line">
+              <Icon name="shield" size={17} /> Freshly made in small batches,
+              right on campus.
+            </div>
           </div>
-          <h1>
-            Good food.
-            <br />
-            <em>Made for hostel life.</em>
-          </h1>
-          <p>
-            A little homemade goodness for boring mess meals. A fresh option for
-            days when you want something better.
-          </p>
-          <div className="trust-line">
-            <Icon name="shield" size={17} /> Freshly made in small batches,
-            right on campus.
+          <div className="hero-right">
+            <div className="hero-feature-card">
+              <div className="feature-card-img-wrap">
+                <img src={pickleImage} alt="Campus favourite pickles" />
+                <span className="feature-card-tag">Campus Favourite</span>
+              </div>
+              <div className="feature-card-body">
+                <div className="feature-badge">Hostel Delivery & Pickup</div>
+                <h3>Homemade Pickles & Fresh Cut Bowls</h3>
+                <p>
+                  Instant upgrade for bland mess food. Delivered directly to your
+                  room or ready at the hostel entrance.
+                </p>
+                <div className="feature-stats">
+                  <div className="stat-item">
+                    <strong>Fresh</strong>
+                    <small>Small batch</small>
+                  </div>
+                  <div className="stat-item">
+                    <strong>₹7</strong>
+                    <small>Room Drop</small>
+                  </div>
+                  <div className="stat-item">
+                    <strong>Quick</strong>
+                    <small>Easy Order</small>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
         <section className="category-list">
@@ -549,8 +677,10 @@ function PickleList({
         cartCount={cartCount}
         onCart={() => go("cart")}
         onOrders={() => go("orders")}
+        go={go}
+        activeScreen="pickles"
       />
-      <main className="screen-content">
+      <main className="screen-content pickles-page">
         <section className="screen-intro pickle-intro">
           <div className="eyebrow">Your mess meal's new best friend</div>
           <h1>
@@ -597,103 +727,137 @@ function PickleDetail({
   go,
   productName,
   add,
+  cartCount = 0,
 }: {
   go: (screen: Screen) => void
   productName: string
   add: (item: CartItem) => void
+  cartCount?: number
 }) {
   const [selected, setSelected] = useState(0)
 
   const pack = packOptions[selected]
 
+  const handleAdd = () => {
+    add({
+      id: `pickle-${pack.label}`,
+      name: productName,
+      detail: pack.label,
+      price: pack.price,
+      quantity: 1,
+      kind: "pickle",
+    })
+  }
+
   return (
     <>
-      <Header title="Pickle details" onBack={() => go("pickles")} />
+      <Header
+        title="Pickle details"
+        onBack={() => go("pickles")}
+        cartCount={cartCount}
+        onCart={() => go("cart")}
+        onOrders={() => go("orders")}
+        go={go}
+        activeScreen="pickle-detail"
+      />
       <main className="detail-page">
-        <div className="detail-image">
-          <img src={pickleImage} alt={productName} />
-          <span className="image-badge">
-            <Icon name="heart" size={16} /> Student favourite
-          </span>
-        </div>
-        <section className="detail-copy">
-          <div className="eyebrow">Homemade · Andhra style</div>
-          <h1>
-            {productName === "Andhra Mango Pickle"
-              ? "Authentic Andhra Mango Pickle"
-              : productName}
-          </h1>
-          <p>
-            Homemade in small batches. Bold South Indian flavour, made to rescue
-            even the most boring mess meal.
-          </p>
-          <div className="highlights">
-            {[
-              "Homemade with care",
-              "Authentic South Indian taste",
-              "Perfect with rice, dal & roti",
-            ].map((text) => (
-              <div key={text}>
-                <span>
-                  <Icon name="check" size={14} />
-                </span>
-                {text}
+        <div className="detail-layout">
+          <div className="detail-left-col">
+            <div className="detail-image">
+              <img src={pickleImage} alt={productName} />
+              <span className="image-badge">
+                <Icon name="heart" size={16} /> Student favourite
+              </span>
+            </div>
+            <aside className="love-note desktop-love-note">
+              <span>
+                <Icon name="sparkle" />
+              </span>
+              <div>
+                <small>WHY STUDENTS LOVE IT</small>
+                <strong>“One spoon can fix a boring mess meal.”</strong>
               </div>
-            ))}
+            </aside>
           </div>
-          <aside className="love-note">
-            <span>
-              <Icon name="sparkle" />
-            </span>
-            <div>
-              <small>WHY STUDENTS LOVE IT</small>
-              <strong>“One spoon can fix a boring mess meal.”</strong>
+          <section className="detail-copy">
+            <div className="eyebrow">Homemade · Andhra style</div>
+            <h1>
+              {productName === "Andhra Mango Pickle"
+                ? "Authentic Andhra Mango Pickle"
+                : productName}
+            </h1>
+            <p>
+              Homemade in small batches. Bold South Indian flavour, made to rescue
+              even the most boring mess meal.
+            </p>
+            <div className="highlights">
+              {[
+                "Homemade with care",
+                "Authentic South Indian taste",
+                "Perfect with rice, dal & roti",
+              ].map((text) => (
+                <div key={text}>
+                  <span>
+                    <Icon name="check" size={14} />
+                  </span>
+                  {text}
+                </div>
+              ))}
             </div>
-          </aside>
-          <div className="section-heading">
-            <div>
-              <h2>Choose your pack</h2>
-              <p>Start small. Come back for more.</p>
+            <aside className="love-note mobile-love-note">
+              <span>
+                <Icon name="sparkle" />
+              </span>
+              <div>
+                <small>WHY STUDENTS LOVE IT</small>
+                <strong>“One spoon can fix a boring mess meal.”</strong>
+              </div>
+            </aside>
+            <div className="section-heading">
+              <div>
+                <h2>Choose your pack</h2>
+                <p>Start small. Come back for more.</p>
+              </div>
             </div>
-          </div>
-          <div className="option-list">
-            {packOptions.map((option, index) => (
-              <button
-                className={`pack-option ${
-                  selected === index ? "selected" : ""
-                }`}
-                onClick={() => setSelected(index)}
-                key={option.label}
-              >
-                <span className="radio">{selected === index && <span />}</span>
-                <span className="pack-copy">
-                  <strong>{option.label}</strong>
-                  <small>{option.note}</small>
-                </span>
-                <strong>₹{option.price}</strong>
-              </button>
-            ))}
-          </div>
-        </section>
+            <div className="option-list">
+              {packOptions.map((option, index) => (
+                <button
+                  className={`pack-option ${
+                    selected === index ? "selected" : ""
+                  }`}
+                  onClick={() => setSelected(index)}
+                  key={option.label}
+                >
+                  <span className="radio">{selected === index && <span />}</span>
+                  <span className="pack-copy">
+                    <strong>{option.label}</strong>
+                    <small>{option.note}</small>
+                  </span>
+                  <strong>₹{option.price}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="desktop-pack-cta">
+              <div className="desktop-pack-price-row">
+                <div>
+                  <small>Selected pack</small>
+                  <strong>{pack.label} (₹{pack.price})</strong>
+                </div>
+                <div className="desktop-pack-tag">In stock today</div>
+              </div>
+              <PrimaryButton tone="pickle" onClick={handleAdd}>
+                Add to cart
+              </PrimaryButton>
+            </div>
+          </section>
+        </div>
       </main>
       <BottomBar>
         <div className="dock-price">
           <small>Selected pack</small>
           <strong>₹{pack.price}</strong>
         </div>
-        <PrimaryButton
-          tone="pickle"
-          onClick={() =>
-            add({
-              id: `pickle-${pack.label}`,
-              name: productName,
-              detail: pack.label,
-              price: pack.price,
-              quantity: 1,
-              kind: "pickle",
-            })
-          }
-        >
+        <PrimaryButton tone="pickle" onClick={handleAdd}>
           Add to cart
         </PrimaryButton>
       </BottomBar>
@@ -730,6 +894,19 @@ function FruitBuilder({
   const update = (name: string, value: number) =>
     setCounts((current) => ({ ...current, [name]: value }))
 
+  const handleAdd = () => {
+    add({
+      id: "fruit-bowl",
+      name: "Custom Fruit Bowl",
+      detail: `${selectedCount} fruits · ${
+        totalPortions > 6 ? "450–550g" : "350–450g"
+      }`,
+      price,
+      quantity: 1,
+      kind: "fruit",
+    })
+  }
+
   return (
     <>
       <Header
@@ -738,75 +915,104 @@ function FruitBuilder({
         cartCount={cartCount}
         onCart={cartCount ? () => go("cart") : undefined}
         onOrders={() => go("orders")}
+        go={go}
+        activeScreen="fruit-builder"
       />
       <main className="screen-content builder-page">
-        <section className="builder-hero">
-          <div>
-            <div className="eyebrow">Freshly cut · Made to order</div>
-            <h1>
-              Pick your fruits.
-              <br />
-              <em>Build your bowl.</em>
-            </h1>
-            <p>Your bowl, your fruits, your choice.</p>
-          </div>
-          <div className="bowl-thumb">
-            <img src={fruitImage} alt="Fresh mixed fruit bowl" />
-          </div>
-        </section>
-        <div className="builder-note">
-          <Icon name="leaf" size={18} />
-          <span>We've started you with our favourite mix. Make it yours.</span>
-        </div>
-        <div className="fruit-grid">
-          {fruits.map((fruit) => {
-            const count = counts[fruit.name] || 0
-
-            return (
-              <article
-                className={`fruit-card ${count ? "selected" : ""}`}
-                key={fruit.name}
-              >
-                <div
-                  className="fruit-orb"
-                  style={{ backgroundColor: fruit.color }}
-                >
-                  {fruit.emoji}
-                </div>
-                <div className="fruit-meta">
-                  <strong>{fruit.name}</strong>
-                  <small>
-                    {count
-                      ? `${count} portion${count > 1 ? "s" : ""}`
-                      : "Tap + to add"}
-                  </small>
-                </div>
-                <Quantity
-                  value={count}
-                  onChange={(value) => update(fruit.name, value)}
-                  small
-                />
-              </article>
-            )
-          })}
-        </div>
-        <div className="bowl-summary">
-          <div className="summary-top">
-            <div>
-              <small>YOUR BOWL</small>
-              <strong>{selectedCount} fruits selected</strong>
+        <div className="builder-layout">
+          <div className="builder-left-col">
+            <section className="builder-hero">
+              <div>
+                <div className="eyebrow">Freshly cut · Made to order</div>
+                <h1>
+                  Pick your fruits.
+                  <br />
+                  <em>Build your bowl.</em>
+                </h1>
+                <p>Your bowl, your fruits, your choice.</p>
+              </div>
+              <div className="bowl-thumb">
+                <img src={fruitImage} alt="Fresh mixed fruit bowl" />
+              </div>
+            </section>
+            <div className="builder-note">
+              <Icon name="leaf" size={18} />
+              <span>We've started you with our favourite mix. Make it yours.</span>
             </div>
-            <span>
-              <Icon name="check" size={16} />
-            </span>
+            <div className="fruit-grid">
+              {fruits.map((fruit) => {
+                const count = counts[fruit.name] || 0
+
+                return (
+                  <article
+                    className={`fruit-card ${count ? "selected" : ""}`}
+                    key={fruit.name}
+                  >
+                    <div
+                      className="fruit-orb"
+                      style={{ backgroundColor: fruit.color }}
+                    >
+                      {fruit.emoji}
+                    </div>
+                    <div className="fruit-meta">
+                      <strong>{fruit.name}</strong>
+                      <small>
+                        {count
+                          ? `${count} portion${count > 1 ? "s" : ""}`
+                          : "Tap + to add"}
+                      </small>
+                    </div>
+                    <Quantity
+                      value={count}
+                      onChange={(value) => update(fruit.name, value)}
+                      small
+                    />
+                  </article>
+                )
+              })}
+            </div>
           </div>
-          <div className="summary-row">
-            <span>Approx. weight</span>
-            <strong>{totalPortions > 6 ? "450–550g" : "350–450g"}</strong>
-          </div>
-          <div className="summary-row">
-            <span>Estimated price</span>
-            <strong>₹{price}</strong>
+          <div className="builder-right-col">
+            <div className="bowl-summary">
+              <div className="summary-top">
+                <div>
+                  <small>YOUR BOWL</small>
+                  <strong>{selectedCount} fruits selected</strong>
+                </div>
+                <span>
+                  <Icon name="check" size={16} />
+                </span>
+              </div>
+              <div className="summary-row">
+                <span>Total Portions</span>
+                <strong>{totalPortions} portions</strong>
+              </div>
+              <div className="summary-row">
+                <span>Approx. weight</span>
+                <strong>{totalPortions > 6 ? "450–550g" : "350–450g"}</strong>
+              </div>
+              <div className="summary-row">
+                <span>Base bowl</span>
+                <strong>₹35</strong>
+              </div>
+              <div className="summary-row">
+                <span>Portions ({totalPortions} × ₹7)</span>
+                <strong>₹{totalPortions * 7}</strong>
+              </div>
+              <div className="summary-row" style={{ paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.2)", fontSize: 13 }}>
+                <span>Estimated total</span>
+                <strong>₹{price}</strong>
+              </div>
+              <div className="desktop-builder-cta">
+                <PrimaryButton
+                  tone="fruit"
+                  disabled={!selectedCount}
+                  onClick={handleAdd}
+                >
+                  Add bowl to cart (₹{price})
+                </PrimaryButton>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -818,18 +1024,7 @@ function FruitBuilder({
         <PrimaryButton
           tone="fruit"
           disabled={!selectedCount}
-          onClick={() =>
-            add({
-              id: "fruit-bowl",
-              name: "Custom Fruit Bowl",
-              detail: `${selectedCount} fruits · ${
-                totalPortions > 6 ? "450–550g" : "350–450g"
-              }`,
-              price,
-              quantity: 1,
-              kind: "fruit",
-            })
-          }
+          onClick={handleAdd}
         >
           Add bowl to cart
         </PrimaryButton>
@@ -882,12 +1077,18 @@ function Cart({
     0,
   )
 
+  const cartCount = items.reduce((sum, item) => sum + item.quantity, 0)
+
   return (
     <>
       <Header
         title="Your Cart"
         onBack={() => go("home")}
         onOrders={() => go("orders")}
+        cartCount={cartCount}
+        onCart={() => go("cart")}
+        go={go}
+        activeScreen="cart"
       />
       <main className="screen-content cart-page">
         <section className="screen-intro compact">
@@ -899,67 +1100,75 @@ function Cart({
           </h1>
         </section>
         {items.length ? (
-          <>
-            <div className="cart-list">
-              {items.map((item) => (
-                <article className="cart-card" key={item.id}>
-                  <img
-                    src={item.kind === "pickle" ? pickleImage : fruitImage}
-                    alt=""
-                  />
-                  <div className="cart-item-copy">
-                    <span className={`item-kind ${item.kind}`}>
-                      {item.kind === "pickle"
-                        ? "Homemade pickle"
-                        : "Fresh bowl"}
-                    </span>
-                    <h3>{item.name}</h3>
-                    <p>{item.detail}</p>
-                    <div className="cart-controls">
-                      <Quantity
-                        value={item.quantity}
-                        onChange={(quantity) =>
-                          updateQuantity(item.id, quantity)
-                        }
-                        small
-                      />
-                      <strong>₹{item.price * item.quantity}</strong>
+          <div className="cart-layout">
+            <div className="cart-left-col">
+              <div className="cart-list">
+                {items.map((item) => (
+                  <article className="cart-card" key={item.id}>
+                    <img
+                      src={item.kind === "pickle" ? pickleImage : fruitImage}
+                      alt=""
+                    />
+                    <div className="cart-item-copy">
+                      <span className={`item-kind ${item.kind}`}>
+                        {item.kind === "pickle"
+                          ? "Homemade pickle"
+                          : "Fresh bowl"}
+                      </span>
+                      <h3>{item.name}</h3>
+                      <p>{item.detail}</p>
+                      <div className="cart-controls">
+                        <Quantity
+                          value={item.quantity}
+                          onChange={(quantity) =>
+                            updateQuantity(item.id, quantity)
+                          }
+                          small
+                        />
+                        <strong>₹{item.price * item.quantity}</strong>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    className="remove"
-                    onClick={() => remove(item.id)}
-                    aria-label={`Remove ${item.name}`}
-                  >
-                    <Icon name="close" size={17} />
-                  </button>
-                </article>
-              ))}
-            </div>
-            <div className="add-more">
-              <button onClick={() => go("home")}>
-                <Icon name="plus" size={17} /> Add something else
-              </button>
-            </div>
-            <div className="price-card">
-              <div>
-                <span>Subtotal</span>
-                <strong>₹{subtotal}</strong>
+                    <button
+                      className="remove"
+                      onClick={() => remove(item.id)}
+                      aria-label={`Remove ${item.name}`}
+                    >
+                      <Icon name="close" size={17} />
+                    </button>
+                  </article>
+                ))}
               </div>
-              <div>
-                <span>Delivery</span>
-                <small>Calculated at checkout</small>
-              </div>
-              <div className="price-total">
-                <span>Total</span>
-                <strong>₹{subtotal}</strong>
+              <div className="add-more">
+                <button onClick={() => go("home")}>
+                  <Icon name="plus" size={17} /> Add something else
+                </button>
               </div>
             </div>
-            <div className="reassurance">
-              <Icon name="shield" size={18} /> Secure checkout · No account
-              needed
+            <div className="cart-right-col">
+              <div className="price-card">
+                <div>
+                  <span>Subtotal</span>
+                  <strong>₹{subtotal}</strong>
+                </div>
+                <div>
+                  <span>Delivery</span>
+                  <small>Calculated at checkout</small>
+                </div>
+                <div className="price-total">
+                  <span>Total</span>
+                  <strong>₹{subtotal}</strong>
+                </div>
+                <div className="desktop-cart-cta">
+                  <PrimaryButton onClick={() => go("checkout")}>
+                    Go to checkout
+                  </PrimaryButton>
+                </div>
+              </div>
+              <div className="reassurance">
+                <Icon name="shield" size={18} /> Secure checkout · No account needed
+              </div>
             </div>
-          </>
+          </div>
         ) : (
           <div className="empty-state">
             <span>
@@ -1030,94 +1239,142 @@ function Checkout({
   const set = (key: keyof CustomerDetails, value: string) =>
     setDetails({ ...details, [key]: value })
 
+  const isComplete = Boolean(
+    details.name && details.phone && details.hostel && details.room,
+  )
+
   return (
     <>
-      <Header title="Checkout" onBack={() => go("cart")} />
+      <Header
+        title="Checkout"
+        onBack={() => go("cart")}
+        onOrders={() => go("orders")}
+        go={go}
+        activeScreen="checkout"
+      />
       <main className="screen-content checkout-page">
         <section className="screen-intro compact">
           <div className="eyebrow">Step 1 of 3</div>
           <h1>Almost there!</h1>
           <p>Just a few details and we'll take care of the rest.</p>
         </section>
-        <div className="form-grid">
-          <Field
-            label="Your name"
-            placeholder="e.g. Ananya"
-            value={details.name}
-            onChange={(v) => set("name", v)}
-          />
-          <Field
-            label="Phone number"
-            placeholder="+91 98765 43210"
-            type="tel"
-            value={details.phone}
-            onChange={(v) => set("phone", v)}
-          />
-          <Field
-            label="Hostel"
-            placeholder="e.g. Hostel 3"
-            value={details.hostel}
-            onChange={(v) => set("hostel", v)}
-          />
-          <Field
-            label="Room number"
-            placeholder="e.g. 214"
-            value={details.room}
-            onChange={(v) => set("room", v)}
-          />
-        </div>
-        <div className="privacy-note">
-          <Icon name="shield" size={17} /> We'll only use your phone number for
-          order updates.
-        </div>
-        <section className="receive-section">
-          <div className="section-heading">
-            <div>
-              <div className="eyebrow">Choose one</div>
-              <h2>How would you like it?</h2>
+        <div className="checkout-layout">
+          <div className="checkout-left-col">
+            <div className="checkout-card-box">
+              <h2 className="box-title">Your Details</h2>
+              <div className="form-grid">
+                <Field
+                  label="Your name"
+                  placeholder="e.g. Ananya"
+                  value={details.name}
+                  onChange={(v) => set("name", v)}
+                />
+                <Field
+                  label="Phone number"
+                  placeholder="+91 98765 43210"
+                  type="tel"
+                  value={details.phone}
+                  onChange={(v) => set("phone", v)}
+                />
+                <Field
+                  label="Hostel"
+                  placeholder="e.g. Hostel 3"
+                  value={details.hostel}
+                  onChange={(v) => set("hostel", v)}
+                />
+                <Field
+                  label="Room number"
+                  placeholder="e.g. 214"
+                  value={details.room}
+                  onChange={(v) => set("room", v)}
+                />
+              </div>
+              <div className="privacy-note">
+                <Icon name="shield" size={17} /> We'll only use your phone number for
+                order updates.
+              </div>
+            </div>
+
+            <section className="receive-section">
+              <div className="section-heading">
+                <div>
+                  <div className="eyebrow">Choose one</div>
+                  <h2>How would you like it?</h2>
+                </div>
+              </div>
+              <button
+                className={`fulfilment-card ${
+                  fulfilment === "pickup" ? "selected" : ""
+                }`}
+                onClick={() => setFulfilment("pickup")}
+              >
+                <span className="fulfilment-icon">
+                  <Icon name="location" />
+                </span>
+                <span>
+                  <strong>Campus pickup</strong>
+                  <small>Pick it up, nice and easy.</small>
+                  <em>FREE · 8:30–9:00 PM</em>
+                </span>
+                <span className="radio">{fulfilment === "pickup" && <span />}</span>
+              </button>
+              <button
+                className={`fulfilment-card ${
+                  fulfilment === "delivery" ? "selected" : ""
+                }`}
+                onClick={() => setFulfilment("delivery")}
+              >
+                <span className="fulfilment-icon">
+                  <Icon name="bag" />
+                </span>
+                <span>
+                  <strong>Room delivery</strong>
+                  <small>Right to your hostel room.</small>
+                  <em>+₹7 delivery fee</em>
+                </span>
+                <span className="radio">
+                  {fulfilment === "delivery" && <span />}
+                </span>
+              </button>
+            </section>
+          </div>
+          <div className="checkout-right-col">
+            <div className="desktop-step-summary-card">
+              <h3>Fulfilment Preference</h3>
+              <div className="selected-delivery-preview">
+                <strong>
+                  {fulfilment === "pickup"
+                    ? "Hostel Pickup (Free)"
+                    : "Room Delivery (+₹7)"}
+                </strong>
+                <p>
+                  {fulfilment === "pickup"
+                    ? "Hostel 3 Entrance Security Point"
+                    : details.hostel && details.room
+                      ? `${details.hostel}, Room ${details.room}`
+                      : "Direct to your hostel room door"}
+                </p>
+              </div>
+              <div className="desktop-checkout-cta">
+                <PrimaryButton
+                  disabled={!isComplete}
+                  onClick={() => go("fulfilment")}
+                >
+                  Continue to Fulfilment
+                </PrimaryButton>
+              </div>
+              {!isComplete && (
+                <div className="validation-hint">
+                  Please fill in all contact fields to continue
+                </div>
+              )}
             </div>
           </div>
-          <button
-            className={`fulfilment-card ${
-              fulfilment === "pickup" ? "selected" : ""
-            }`}
-            onClick={() => setFulfilment("pickup")}
-          >
-            <span className="fulfilment-icon">
-              <Icon name="location" />
-            </span>
-            <span>
-              <strong>Campus pickup</strong>
-              <small>Pick it up, nice and easy.</small>
-              <em>FREE · 8:30–9:00 PM</em>
-            </span>
-            <span className="radio">{fulfilment === "pickup" && <span />}</span>
-          </button>
-          <button
-            className={`fulfilment-card ${
-              fulfilment === "delivery" ? "selected" : ""
-            }`}
-            onClick={() => setFulfilment("delivery")}
-          >
-            <span className="fulfilment-icon">
-              <Icon name="bag" />
-            </span>
-            <span>
-              <strong>Room delivery</strong>
-              <small>Right to your hostel room.</small>
-              <em>+₹7 delivery fee</em>
-            </span>
-            <span className="radio">
-              {fulfilment === "delivery" && <span />}
-            </span>
-          </button>
-        </section>
+        </div>
       </main>
       <BottomBar>
         <PrimaryButton
-          disabled={
-            !details.name || !details.phone || !details.hostel || !details.room
-          }
+          disabled={!isComplete}
           onClick={() => go("fulfilment")}
         >
           Continue
@@ -1147,6 +1404,9 @@ function Fulfilment({
       <Header
         title={fulfilment === "pickup" ? "Pickup details" : "Delivery details"}
         onBack={() => go("checkout")}
+        onOrders={() => go("orders")}
+        go={go}
+        activeScreen="fulfilment"
       />
       <main className="screen-content fulfilment-page">
         <section className="screen-intro compact">
@@ -1162,66 +1422,88 @@ function Fulfilment({
               : "Fresh food, straight to your room."}
           </p>
         </section>
-        {fulfilment === "pickup" ? (
-          <>
-            <div className="map-card">
-              <div className="map-pattern">
-                <span className="map-pin">
-                  <Icon name="location" />
-                </span>
-                <i></i>
-                <i></i>
-                <i></i>
-              </div>
-              <div className="map-copy">
-                <span>
-                  <Icon name="location" size={19} />
-                </span>
-                <div>
-                  <small>PICKUP POINT</small>
-                  <strong>Hostel 3 Entrance</strong>
-                  <p>Next to the main security desk</p>
+        <div className="fulfilment-layout">
+          <div className="fulfilment-left-col">
+            {fulfilment === "pickup" ? (
+              <>
+                <div className="map-card">
+                  <div className="map-pattern">
+                    <span className="map-pin">
+                      <Icon name="location" />
+                    </span>
+                    <i></i>
+                    <i></i>
+                    <i></i>
+                  </div>
+                  <div className="map-copy">
+                    <span>
+                      <Icon name="location" size={19} />
+                    </span>
+                    <div>
+                      <small>PICKUP POINT</small>
+                      <strong>Hostel 3 Entrance</strong>
+                      <p>Next to the main security desk</p>
+                    </div>
+                  </div>
                 </div>
+                <div className="availability">
+                  <span></span>Pickup available today
+                </div>
+                <div className="time-section">
+                  <h2>Choose a pickup time</h2>
+                  <div className="slot-list">
+                    {slots.map((item) => (
+                      <button
+                        key={item}
+                        className={slot === item ? "selected" : ""}
+                        onClick={() => setSlot(item)}
+                      >
+                        <Icon name="clock" size={18} />
+                        {item}
+                        <span className="radio">{slot === item && <span />}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="delivery-card">
+                <span className="big-icon">
+                  <Icon name="bag" size={30} />
+                </span>
+                <div className="eyebrow">Room delivery · ₹7</div>
+                <h2>
+                  {details.hostel}, Room {details.room}
+                </h2>
+                <p>
+                  We'll call you when your order is outside. Estimated arrival:
+                  8:30–9:00 PM.
+                </p>
+                <button onClick={() => go("checkout")}>
+                  <Icon name="edit" size={16} /> Edit room details
+                </button>
               </div>
-            </div>
-            <div className="availability">
-              <span></span>Pickup available today
-            </div>
-            <div className="time-section">
-              <h2>Choose a pickup time</h2>
-              <div className="slot-list">
-                {slots.map((item) => (
-                  <button
-                    key={item}
-                    className={slot === item ? "selected" : ""}
-                    onClick={() => setSlot(item)}
-                  >
-                    <Icon name="clock" size={18} />
-                    {item}
-                    <span className="radio">{slot === item && <span />}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="delivery-card">
-            <span className="big-icon">
-              <Icon name="bag" size={30} />
-            </span>
-            <div className="eyebrow">Room delivery · ₹7</div>
-            <h2>
-              {details.hostel}, Room {details.room}
-            </h2>
-            <p>
-              We'll call you when your order is outside. Estimated arrival:
-              8:30–9:00 PM.
-            </p>
-            <button onClick={() => go("checkout")}>
-              <Icon name="edit" size={16} /> Edit room details
-            </button>
+            )}
           </div>
-        )}
+          <div className="fulfilment-right-col">
+            <div className="desktop-step-summary-card">
+              <h3>Fulfilment Schedule</h3>
+              <div className="selected-delivery-preview">
+                <strong>
+                  {fulfilment === "pickup"
+                    ? `Pickup Window: ${slot}`
+                    : "Room Delivery (8:30–9:00 PM)"}
+                </strong>
+                <p>Contact: {details.name} ({details.phone})</p>
+              </div>
+              <div className="desktop-fulfilment-cta">
+                <PrimaryButton onClick={() => go("payment")}>
+                  Review & pay
+                </PrimaryButton>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
       <BottomBar>
         <PrimaryButton onClick={() => go("payment")}>
@@ -1258,70 +1540,87 @@ function Payment({
 
   return (
     <>
-      <Header title="Review & Pay" onBack={() => go("fulfilment")} />
+      <Header
+        title="Review & Pay"
+        onBack={() => go("fulfilment")}
+        onOrders={() => go("orders")}
+        go={go}
+        activeScreen="payment"
+      />
       <main className="screen-content payment-page">
         <section className="screen-intro compact">
           <div className="eyebrow">Step 3 of 3</div>
           <h1>One last look.</h1>
           <p>Everything correct? You're ready to go.</p>
         </section>
-        <section className="order-card">
-          <div className="section-title">
-            <h2>Your order</h2>
-            <button onClick={() => go("cart")}>Edit</button>
+        <div className="payment-layout">
+          <div className="payment-left-col">
+            <section className="payment-methods">
+              <h2>Select Payment Method</h2>
+              <button
+                className={method === "upi" ? "selected" : ""}
+                onClick={() => setMethod("upi")}
+              >
+                <span className="upi-mark">UPI</span>
+                <span>
+                  <strong>Pay with UPI</strong>
+                  <small>GPay, PhonePe, Paytm & more</small>
+                </span>
+                <span className="radio">{method === "upi" && <span />}</span>
+              </button>
+              <button
+                className={method === "other" ? "selected" : ""}
+                onClick={() => setMethod("other")}
+              >
+                <span className="card-mark">••••</span>
+                <span>
+                  <strong>Other payment methods</strong>
+                  <small>Cards and net banking</small>
+                </span>
+                <span className="radio">{method === "other" && <span />}</span>
+              </button>
+            </section>
+            <div className="reassurance">
+              <Icon name="shield" size={18} /> Your payment is safe and secure
+            </div>
           </div>
-          {items.map((item) => (
-            <div className="order-line" key={item.id}>
-              <span className="order-qty">{item.quantity}×</span>
-              <span>
-                <strong>{item.name}</strong>
-                <small>{item.detail}</small>
-              </span>
-              <strong>₹{item.price * item.quantity}</strong>
-            </div>
-          ))}
-          <div className="totals">
-            <div>
-              <span>Subtotal</span>
-              <strong>₹{subtotal}</strong>
-            </div>
-            <div>
-              <span>Delivery</span>
-              <strong>{fee ? `₹${fee}` : "Free"}</strong>
-            </div>
-            <div>
-              <span>Total</span>
-              <strong>₹{total}</strong>
-            </div>
+          <div className="payment-right-col">
+            <section className="order-card">
+              <div className="section-title">
+                <h2>Your order</h2>
+                <button onClick={() => go("cart")}>Edit</button>
+              </div>
+              {items.map((item) => (
+                <div className="order-line" key={item.id}>
+                  <span className="order-qty">{item.quantity}×</span>
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>{item.detail}</small>
+                  </span>
+                  <strong>₹{item.price * item.quantity}</strong>
+                </div>
+              ))}
+              <div className="totals">
+                <div>
+                  <span>Subtotal</span>
+                  <strong>₹{subtotal}</strong>
+                </div>
+                <div>
+                  <span>Delivery</span>
+                  <strong>{fee ? `₹${fee}` : "Free"}</strong>
+                </div>
+                <div>
+                  <span>Total</span>
+                  <strong>₹{total}</strong>
+                </div>
+              </div>
+              <div className="desktop-payment-cta">
+                <PrimaryButton disabled={isSubmitting} onClick={() => onPay(method)}>
+                  {isSubmitting ? "Placing order..." : `Pay ₹${total}`}
+                </PrimaryButton>
+              </div>
+            </section>
           </div>
-        </section>
-        <section className="payment-methods">
-          <h2>Payment</h2>
-          <button
-            className={method === "upi" ? "selected" : ""}
-            onClick={() => setMethod("upi")}
-          >
-            <span className="upi-mark">UPI</span>
-            <span>
-              <strong>Pay with UPI</strong>
-              <small>GPay, PhonePe, Paytm & more</small>
-            </span>
-            <span className="radio">{method === "upi" && <span />}</span>
-          </button>
-          <button
-            className={method === "other" ? "selected" : ""}
-            onClick={() => setMethod("other")}
-          >
-            <span className="card-mark">••••</span>
-            <span>
-              <strong>Other payment methods</strong>
-              <small>Cards and net banking</small>
-            </span>
-            <span className="radio">{method === "other" && <span />}</span>
-          </button>
-        </section>
-        <div className="reassurance">
-          <Icon name="shield" size={18} /> Your payment is safe and secure
         </div>
       </main>
       <BottomBar>
@@ -1354,70 +1653,72 @@ function Confirmation({
 }) {
   return (
     <main className="confirmation">
-      <Brand />
-      <div className="success-visual">
-        <div className="success-ring one"></div>
-        <div className="success-ring two"></div>
-        <span>
-          <Icon name="check" size={38} />
-        </span>
-      </div>
-      <div className="eyebrow">Order confirmed · #{orderNumber}</div>
-      <h1>You're all set!</h1>
-      <p>Good food is on the way. We'll take it from here.</p>
-      <section className="confirmation-card">
-        <div className="confirm-head">
+      <div className="confirmation-inner">
+        <Brand onClick={() => go("home")} />
+        <div className="success-visual">
+          <div className="success-ring one"></div>
+          <div className="success-ring two"></div>
           <span>
-            <Icon name={fulfilment === "pickup" ? "location" : "bag"} />
+            <Icon name="check" size={38} />
           </span>
-          <div>
-            <small>
-              {fulfilment === "pickup" ? "PICKUP" : "ROOM DELIVERY"}
-            </small>
-            <strong>
-              {fulfilment === "pickup"
-                ? "Hostel 3 Entrance"
-                : `${details.hostel}, Room ${details.room}`}
-            </strong>
-          </div>
         </div>
-        <div className="confirm-info">
-          <div>
-            <Icon name="clock" size={18} />
+        <div className="eyebrow">Order confirmed · #{orderNumber}</div>
+        <h1>You're all set!</h1>
+        <p>Good food is on the way. We'll take it from here.</p>
+        <section className="confirmation-card">
+          <div className="confirm-head">
             <span>
+              <Icon name={fulfilment === "pickup" ? "location" : "bag"} />
+            </span>
+            <div>
               <small>
-                {fulfilment === "pickup" ? "Pickup time" : "Estimated arrival"}
+                {fulfilment === "pickup" ? "PICKUP" : "ROOM DELIVERY"}
               </small>
-              <strong>{slot}</strong>
-            </span>
-          </div>
-          <div>
-            <Icon name="bag" size={18} />
-            <span>
-              <small>Your order</small>
               <strong>
-                {items.reduce((sum, item) => sum + item.quantity, 0)} items
+                {fulfilment === "pickup"
+                  ? "Hostel 3 Entrance"
+                  : `${details.hostel}, Room ${details.room}`}
               </strong>
-            </span>
+            </div>
           </div>
+          <div className="confirm-info">
+            <div>
+              <Icon name="clock" size={18} />
+              <span>
+                <small>
+                  {fulfilment === "pickup" ? "Pickup time" : "Estimated arrival"}
+                </small>
+                <strong>{slot}</strong>
+              </span>
+            </div>
+            <div>
+              <Icon name="bag" size={18} />
+              <span>
+                <small>Your order</small>
+                <strong>
+                  {items.reduce((sum, item) => sum + item.quantity, 0)} items
+                </strong>
+              </span>
+            </div>
+          </div>
+        </section>
+        <div className="sms-note">
+          <Icon name="shield" size={18} />
+          <span>
+            We'll send order details and live updates to{" "}
+            <strong>{details.phone}</strong>.
+          </span>
         </div>
-      </section>
-      <div className="sms-note">
-        <Icon name="shield" size={18} />
-        <span>
-          We'll send order details and live updates to{" "}
-          <strong>{details.phone}</strong>.
-        </span>
+        <div className="confirm-actions">
+          <PrimaryButton onClick={() => go("home")}>Back to home</PrimaryButton>
+          <button className="secondary-button" onClick={() => go("orders")}>
+            Track your order
+          </button>
+        </div>
+        <p className="thank-you">
+          Made fresh on campus. Thanks for supporting small.
+        </p>
       </div>
-      <div className="confirm-actions">
-        <PrimaryButton onClick={() => go("home")}>Back to home</PrimaryButton>
-        <button className="secondary-button" onClick={() => go("orders")}>
-          Track your order
-        </button>
-      </div>
-      <p className="thank-you">
-        Made fresh on campus. Thanks for supporting small.
-      </p>
     </main>
   )
 }
@@ -1446,14 +1747,17 @@ function OrdersPage({
     setMessage(null)
     try {
       const q = (targetPhone !== undefined ? targetPhone : searchInput).trim()
+      if (!q) {
+        setOrders([])
+        setIsLoading(false)
+        return
+      }
       let query = supabase.from("orders").select("*")
 
-      if (q && q.toLowerCase() !== "all") {
-        if (/^\d{1,4}$/.test(q)) {
-          query = query.or(`order_number.eq.${parseInt(q)},customer_phone.eq.${q}`)
-        } else {
-          query = query.eq("customer_phone", q)
-        }
+      if (/^\d{1,4}$/.test(q)) {
+        query = query.or(`order_number.eq.${parseInt(q)},customer_phone.eq.${q}`)
+      } else {
+        query = query.eq("customer_phone", q)
       }
 
       const { data, error } = await query.order("order_number", {
@@ -1464,10 +1768,8 @@ function OrdersPage({
         setMessage(error.message)
       } else {
         setOrders(data as OrderRecord[])
-        if (q && q.toLowerCase() !== "all") {
-          localStorage.setItem("messmate_phone", q)
-          setPhone(q)
-        }
+        localStorage.setItem("messmate_phone", q)
+        setPhone(q)
       }
     } catch {
       setMessage("Could not retrieve orders at this time.")
@@ -1527,11 +1829,12 @@ function OrdersPage({
         cartCount={cartCount}
         onCart={() => go("cart")}
         onOrders={() => go("orders")}
+        go={go}
         activeScreen="orders"
       />
       <main className="screen-content orders-page">
         <section className="screen-intro compact">
-          <div className="eyebrow">Zero-login live tracking</div>
+          <div className="eyebrow">Live order tracking</div>
           <h1>
             Your orders.
             <br />
@@ -1549,7 +1852,7 @@ function OrdersPage({
               type="tel"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="e.g. 9876543210 (or 'all')"
+              placeholder="e.g. 9876543210"
               onKeyDown={(e) => {
                 if (e.key === "Enter") loadOrders(searchInput)
               }}
@@ -1558,10 +1861,24 @@ function OrdersPage({
               <Icon name="refresh" size={16} /> Find
             </button>
           </div>
+          {phone && (
+            <div className="orders-quick-filters">
+              <button
+                type="button"
+                className={`filter-chip ${searchInput === phone ? "active" : ""}`}
+                onClick={() => {
+                  setSearchInput(phone)
+                  loadOrders(phone)
+                }}
+              >
+                <Icon name="receipt" size={13} /> My Phone ({phone})
+              </button>
+            </div>
+          )}
           <div className="orders-search-note">
             <Icon name="shield" size={14} />
             <span>
-              Zero login needed · Enter phone number or type "all" to view campus orders
+              Enter your phone number to view your active delivery and past orders
             </span>
           </div>
         </section>
@@ -1582,7 +1899,7 @@ function OrdersPage({
             <h2>No orders found</h2>
             <p>
               {searchInput
-                ? `No orders found for "${searchInput}". Try another phone number or search "all".`
+                ? `No orders found for "${searchInput}". Please check the phone number and try again.`
                 : "Enter your phone number above to see active deliveries and past orders."}
             </p>
             <PrimaryButton onClick={() => go("home")}>Browse the menu</PrimaryButton>
@@ -1902,7 +2219,12 @@ export default function App() {
           />
         )}
         {screen === "pickle-detail" && (
-          <PickleDetail go={go} productName={selectedProduct} add={add} />
+          <PickleDetail
+            go={go}
+            productName={selectedProduct}
+            add={add}
+            cartCount={cartCount}
+          />
         )}
         {screen === "fruit-builder" && (
           <FruitBuilder go={go} add={add} cartCount={cartCount} />
