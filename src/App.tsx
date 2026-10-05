@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
 import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
+import phonepeQrImg from "./assets/phonepe-qr.png"
 
 type Screen =
   | "home"
@@ -1697,8 +1698,8 @@ function Payment({
   const [copiedUpi, setCopiedUpi] = useState(false)
 
   const merchantUpiId = "Q477490796@ybl"
-  const merchantName = "Pranith"
-  const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=PhonePeMerchant&am=${total}&cu=INR&tn=MessMate%20Food%20Order`
+  const merchantName = "MessMate"
+  const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=MessMate&am=${total}&cu=INR&tn=MessMate%20Food%20Order`
 
   const handleCopyUpi = () => {
     if (navigator.clipboard) {
@@ -1788,9 +1789,14 @@ function Payment({
                 {/* The Official PhonePe QR Image */}
                 <div className="qr-container">
                   <img
-                    src="/phonepe-qr.png"
-                    alt="PhonePe QR Code - Pranith"
+                    src={phonepeQrImg}
+                    alt="PhonePe QR Code - MessMate"
                     className="phonepe-qr-img"
+                    onError={(e) => {
+                      if (e.currentTarget.src !== "/phonepe-qr.png") {
+                        e.currentTarget.src = "/phonepe-qr.png"
+                      }
+                    }}
                   />
                   <div className="qr-scan-instruction">
                     <span>Scan with <strong>any UPI app</strong>: PhonePe, GPay, Paytm, CRED</span>
