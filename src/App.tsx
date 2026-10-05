@@ -3291,7 +3291,7 @@ function SupportChatWidget({
               <div className="support-header-text">
                 <strong>MessMate Support Team</strong>
                 <small>
-                  <span className="support-header-dot" /> Online · MessMate Support Team
+                  <span className="support-header-dot" /> Online
                 </small>
               </div>
             </div>
