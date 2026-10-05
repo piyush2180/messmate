@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type ReactNode } from "react"
+import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
 
@@ -65,6 +65,10 @@ type IconName =
   | "sparkle"
   | "receipt"
   | "refresh"
+  | "chat"
+  | "send"
+  | "user"
+  | "whatsapp"
 
 const pickleImage =
   "https://images.unsplash.com/photo-1601702538934-efffab67ab65?auto=format&fit=crop&w=1200&q=88"
@@ -243,6 +247,32 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
         <path d="M3 3v5h5" />
         <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
         <path d="M16 21h5v-5" />
+      </>
+    ),
+
+    chat: (
+      <>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </>
+    ),
+
+    send: (
+      <>
+        <path d="m22 2-7 20-4-9-9-4Z" />
+        <path d="M22 2 11 13" />
+      </>
+    ),
+
+    user: (
+      <>
+        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </>
+    ),
+
+    whatsapp: (
+      <>
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
       </>
     ),
   }
@@ -2074,6 +2104,584 @@ function OrdersPage({
   )
 }
 
+type ChatView = "faq" | "request" | "live"
+
+type SupportMsg = {
+  id: string
+  phone: string
+  customer_name: string
+  sender: "customer" | "support" | "bot"
+  message: string
+  created_at: string
+}
+
+const FAQ_ITEMS = [
+  {
+    id: "delivery",
+    label: "Delivery & pickup slots",
+    question: "When are delivery and pickup timings?",
+    answer:
+      "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance is free, and room delivery right to your door is ₹7.",
+  },
+  {
+    id: "pickup",
+    label: "Where is pickup point?",
+    question: "Where is the pickup point located?",
+    answer:
+      "Our campus pickup point is at Hostel 3 Entrance, right beside the main security desk. Orders are securely packaged and labeled with your order number and name.",
+  },
+  {
+    id: "fruit",
+    label: "Fruit bowl customization",
+    question: "How does the fruit bowl builder work?",
+    answer:
+      "Start with a fresh base bowl for ₹35, then choose any combination from 10 fruits for ₹7 per portion! You get a generous, fresh-cut bowl made right before evening delivery.",
+  },
+  {
+    id: "pickle",
+    label: "Pickle shelf life & storage",
+    question: "How long do the pickles stay fresh?",
+    answer:
+      "Our homemade Andhra pickles are crafted in small batches with cold-pressed oil and authentic spices. They stay fresh for 3–6 months in a dry, room-temperature spot.",
+  },
+  {
+    id: "order",
+    label: "Track active order",
+    question: "How do I check my order status?",
+    answer:
+      "You can track your order live anytime by clicking 'Track Orders' in the menu and entering your phone number! Updates stream live from placed to delivered.",
+  },
+]
+
+function getAutomatedAnswer(query: string): string {
+  const q = query.toLowerCase()
+  if (
+    q.includes("delivery") ||
+    q.includes("timing") ||
+    q.includes("time") ||
+    q.includes("when") ||
+    q.includes("slot")
+  ) {
+    return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and pickup at Hostel 3 Entrance is free!"
+  }
+  if (
+    q.includes("pickup") ||
+    q.includes("where") ||
+    q.includes("hostel 3") ||
+    q.includes("point") ||
+    q.includes("location")
+  ) {
+    return "Our campus pickup station is at Hostel 3 Entrance beside the security desk. Look for the MessMate pickup table!"
+  }
+  if (
+    q.includes("fruit") ||
+    q.includes("bowl") ||
+    q.includes("price") ||
+    q.includes("cost") ||
+    q.includes("portion")
+  ) {
+    return "Custom fruit bowls are ₹35 base + ₹7 per portion. Choose from 10 fruits including Apple, Banana, Papaya, Watermelon, and Pomegranate."
+  }
+  if (
+    q.includes("pickle") ||
+    q.includes("shelf") ||
+    q.includes("mango") ||
+    q.includes("gongura") ||
+    q.includes("garlic") ||
+    q.includes("lemon") ||
+    q.includes("expiry")
+  ) {
+    return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with natural ingredients."
+  }
+  if (q.includes("track") || q.includes("status") || q.includes("where is")) {
+    return "Go to the 'Track Orders' section in the navigation and enter your phone number to track live order progress!"
+  }
+  if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
+    return "Orders can be modified before prep starts. Please click 'Request Live Chat Support' below so our team can update your order right away!"
+  }
+  return "Thanks for asking! For order-specific requests or anything else, click 'Request Live Chat Support' below to speak directly with our team."
+}
+
+function SupportChatWidget({
+  customerPhone = "",
+  customerName = "",
+}: {
+  customerPhone?: string
+  customerName?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [view, setView] = useState<ChatView>("faq")
+
+  // Request form state
+  const [name, setName] = useState(customerName || "")
+  const [phone, setPhone] = useState(
+    customerPhone || localStorage.getItem("messmate_phone") || ""
+  )
+  const [issue, setIssue] = useState("")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // FAQ chat history
+  const [faqHistory, setFaqHistory] = useState<
+    Array<{ id: string; sender: "user" | "bot"; text: string; showEscalate?: boolean }>
+  >([
+    {
+      id: "init-1",
+      sender: "bot",
+      text: "Hi there! 👋 How can we help you today with your MessMate order?",
+    },
+  ])
+  const [faqInput, setFaqInput] = useState("")
+
+  // Live chat messages
+  const [liveMessages, setLiveMessages] = useState<SupportMsg[]>([])
+  const [liveInput, setLiveInput] = useState("")
+
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [faqHistory, liveMessages, view])
+
+  useEffect(() => {
+    if (customerPhone && !phone) setPhone(customerPhone)
+    if (customerName && !name) setName(customerName)
+  }, [customerPhone, customerName])
+
+  // Realtime subscription for live chat
+  useEffect(() => {
+    if (!phone || view !== "live" || !supabase) return
+
+    supabase
+      .from("support_messages")
+      .select("*")
+      .eq("phone", phone)
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          setLiveMessages(data as SupportMsg[])
+        }
+      })
+
+    const channel = supabase
+      .channel(`support_chat_${phone}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "support_messages",
+        },
+        (payload) => {
+          const newMsg = payload.new as SupportMsg
+          if (newMsg.phone === phone) {
+            setLiveMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev
+              return [...prev, newMsg]
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase?.removeChannel(channel)
+    }
+  }, [phone, view])
+
+  const handleSelectFaq = (faq: (typeof FAQ_ITEMS)[0]) => {
+    const userMsg = {
+      id: `faq-u-${Date.now()}`,
+      sender: "user" as const,
+      text: faq.question,
+    }
+    const botMsg = {
+      id: `faq-b-${Date.now() + 1}`,
+      sender: "bot" as const,
+      text: faq.answer,
+      showEscalate: true,
+    }
+    setFaqHistory((prev) => [...prev, userMsg, botMsg])
+  }
+
+  const handleSendFaqQuestion = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!faqInput.trim()) return
+    const query = faqInput.trim()
+    setFaqInput("")
+    const answer = getAutomatedAnswer(query)
+
+    setFaqHistory((prev) => [
+      ...prev,
+      { id: `faq-u-${Date.now()}`, sender: "user", text: query },
+      { id: `faq-b-${Date.now() + 1}`, sender: "bot", text: answer, showEscalate: true },
+    ])
+  }
+
+  const handleStartLiveChat = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError(null)
+
+    if (!name.trim()) {
+      setFormError("Please enter your name.")
+      return
+    }
+    if (!phone.trim() || phone.trim().length < 6) {
+      setFormError("Please enter a valid phone number.")
+      return
+    }
+    if (!issue.trim()) {
+      setFormError("Please describe what you need help with.")
+      return
+    }
+
+    setIsSubmitting(true)
+    const activePhone = phone.trim()
+    localStorage.setItem("messmate_phone", activePhone)
+
+    const initialCustomerMsg: SupportMsg = {
+      id: `local-${Date.now()}`,
+      phone: activePhone,
+      customer_name: name.trim(),
+      sender: "customer",
+      message: issue.trim(),
+      created_at: new Date().toISOString(),
+    }
+
+    const acknowledgmentMsg: SupportMsg = {
+      id: `local-ack-${Date.now() + 1}`,
+      phone: activePhone,
+      customer_name: "MessMate Support",
+      sender: "support",
+      message: `Thanks ${name.trim()}! We've received your request: "${issue.trim()}". A campus support team member will respond right here shortly.`,
+      created_at: new Date().toISOString(),
+    }
+
+    setLiveMessages([initialCustomerMsg, acknowledgmentMsg])
+
+    try {
+      if (supabase) {
+        await supabase.from("support_messages").insert({
+          phone: activePhone,
+          customer_name: name.trim(),
+          sender: "customer",
+          message: issue.trim(),
+        })
+      }
+    } catch (err) {
+      console.error("Failed to submit support request to Supabase:", err)
+    } finally {
+      setIsSubmitting(false)
+      setView("live")
+    }
+  }
+
+  const handleSendLiveMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!liveInput.trim()) return
+    const text = liveInput.trim()
+    setLiveInput("")
+
+    const optimistic: SupportMsg = {
+      id: `local-${Date.now()}`,
+      phone,
+      customer_name: name || "Student",
+      sender: "customer",
+      message: text,
+      created_at: new Date().toISOString(),
+    }
+    setLiveMessages((prev) => [...prev, optimistic])
+
+    if (supabase) {
+      try {
+        await supabase.from("support_messages").insert({
+          phone,
+          customer_name: name || "Student",
+          sender: "customer",
+          message: text,
+        })
+      } catch (err) {
+        console.error("Failed to send live message:", err)
+      }
+    }
+  }
+
+  return (
+    <>
+      <button
+        className={`support-fab ${isOpen ? "open" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Open support chat"
+        title="MessMate Support"
+      >
+        <span className="support-fab-dot" />
+        <Icon name={isOpen ? "close" : "chat"} size={19} />
+        <span>{isOpen ? "Close" : "Support"}</span>
+      </button>
+
+      {isOpen && (
+        <aside className="support-chat-card" role="dialog" aria-label="Support Chat">
+          <div className="support-header">
+            <div className="support-header-info">
+              <div className="support-avatar">
+                <Icon name="chat" size={17} />
+              </div>
+              <div className="support-header-text">
+                <strong>MessMate Support</strong>
+                <small>
+                  <span className="support-header-dot" /> Online · Campus Help
+                </small>
+              </div>
+            </div>
+            <button
+              className="support-close-btn"
+              onClick={() => setIsOpen(false)}
+              aria-label="Close support chat"
+            >
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+
+          <div className="support-subnav">
+            <button
+              type="button"
+              className={`support-subnav-btn ${view === "faq" ? "active" : ""}`}
+              onClick={() => setView("faq")}
+            >
+              <Icon name="sparkle" size={13} /> Instant Answers
+            </button>
+            <button
+              type="button"
+              className={`support-subnav-btn ${
+                view === "request" || view === "live" ? "active" : ""
+              }`}
+              onClick={() => {
+                if (liveMessages.length > 0) {
+                  setView("live")
+                } else {
+                  setView("request")
+                }
+              }}
+            >
+              <Icon name="user" size={13} />
+              {liveMessages.length > 0 ? "Live Chat Active" : "Talk to Team"}
+            </button>
+          </div>
+
+          {view === "faq" && (
+            <>
+              <div className="support-body">
+                {faqHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`chat-bubble ${item.sender}`}
+                  >
+                    <span className="chat-bubble-sender">
+                      {item.sender === "bot" ? "MessMate Bot" : "You"}
+                    </span>
+                    <div>{item.text}</div>
+                    {item.showEscalate && (
+                      <div className="support-escalate-card">
+                        <p>Need more details or direct assistance?</p>
+                        <button
+                          type="button"
+                          className="support-escalate-btn"
+                          onClick={() => setView("request")}
+                        >
+                          <Icon name="chat" size={13} />
+                          Request Live Chat Support
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div className="support-chips-header">Quick topics</div>
+                <div className="support-chips-grid">
+                  {FAQ_ITEMS.map((faq) => (
+                    <button
+                      key={faq.id}
+                      type="button"
+                      className="support-faq-chip"
+                      onClick={() => handleSelectFaq(faq)}
+                    >
+                      {faq.label}
+                    </button>
+                  ))}
+                </div>
+                <div ref={chatBottomRef} />
+              </div>
+
+              <form className="support-input-bar" onSubmit={handleSendFaqQuestion}>
+                <input
+                  type="text"
+                  placeholder="Ask a question (e.g. delivery time)..."
+                  value={faqInput}
+                  onChange={(e) => setFaqInput(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="support-send-btn"
+                  disabled={!faqInput.trim()}
+                  aria-label="Send question"
+                >
+                  <Icon name="send" size={14} />
+                </button>
+              </form>
+            </>
+          )}
+
+          {view === "request" && (
+            <div className="support-body">
+              <form
+                className="support-request-form"
+                onSubmit={handleStartLiveChat}
+              >
+                <div className="support-request-intro">
+                  <h4>Talk to Campus Support</h4>
+                  <p>
+                    Enter your name, phone number, and issue. Our campus team
+                    will connect with you in live chat right away.
+                  </p>
+                </div>
+
+                {formError && (
+                  <div className="validation-hint" style={{ textAlign: "left" }}>
+                    {formError}
+                  </div>
+                )}
+
+                <div className="support-field">
+                  <label>Your Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ananya"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="support-field">
+                  <label>Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="support-field">
+                  <label>Your Issue / Question</label>
+                  <textarea
+                    placeholder="What do you need help with? (e.g., change room number, late delivery inquiry...)"
+                    value={issue}
+                    onChange={(e) => setIssue(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="support-form-actions">
+                  <button
+                    type="button"
+                    className="support-back-text-btn"
+                    onClick={() => setView("faq")}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    className="primary-button olive"
+                    disabled={isSubmitting || !name || !phone || !issue}
+                    style={{ flex: 1, minHeight: 44, fontSize: 13 }}
+                  >
+                    {isSubmitting ? "Connecting..." : "Start Live Chat"}
+                  </button>
+                </div>
+
+                <div className="support-whatsapp-bar">
+                  <span>Urgent campus delivery issue?</span>
+                  <a
+                    href="https://wa.me/919876543210?text=Hi%20MessMate%2C%20I%20have%20an%20urgent%20query%20about%20my%20campus%20order"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="support-whatsapp-link"
+                  >
+                    <Icon name="whatsapp" size={14} />
+                    <span>Chat on WhatsApp</span>
+                  </a>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {view === "live" && (
+            <>
+              <div className="support-body">
+                {liveMessages.length === 0 ? (
+                  <div className="empty-state" style={{ padding: 20 }}>
+                    <Icon name="chat" size={24} />
+                    <p>No messages yet. Send a message below to start.</p>
+                  </div>
+                ) : (
+                  liveMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`chat-bubble ${
+                        msg.sender === "customer"
+                          ? "user"
+                          : msg.sender === "bot"
+                            ? "bot"
+                            : "support-agent"
+                      }`}
+                    >
+                      <span className="chat-bubble-sender">
+                        {msg.sender === "customer"
+                          ? msg.customer_name || "You"
+                          : "Campus Support Team"}
+                      </span>
+                      <div>{msg.message}</div>
+                      <span className="chat-bubble-time">
+                        {new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  ))
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              <form
+                className="support-input-bar"
+                onSubmit={handleSendLiveMessage}
+              >
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  value={liveInput}
+                  onChange={(e) => setLiveInput(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="support-send-btn"
+                  disabled={!liveInput.trim()}
+                  aria-label="Send message"
+                >
+                  <Icon name="send" size={14} />
+                </button>
+              </form>
+            </>
+          )}
+        </aside>
+      )}
+    </>
+  )
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
 
@@ -2284,7 +2892,7 @@ export default function App() {
             cartCount={cartCount}
           />
         )}
-        {cartCount > 0 &&
+          {cartCount > 0 &&
           ![
             "home",
             "cart",
@@ -2302,6 +2910,11 @@ export default function App() {
               onClick={() => go("cart")}
             />
           )}
+
+        <SupportChatWidget
+          customerPhone={details.phone}
+          customerName={details.name}
+        />
       </div>
     </div>
   )

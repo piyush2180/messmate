@@ -41,3 +41,29 @@ create policy "Anyone can update orders"
 
 -- 6. Enable Realtime on the orders table
 alter publication supabase_realtime add table public.orders;
+
+-- 7. Create the support_messages table for student support chat
+create table if not exists public.support_messages (
+  id uuid primary key default gen_random_uuid(),
+  phone text not null,
+  customer_name text not null,
+  sender text not null check (sender in ('customer', 'support', 'bot')),
+  message text not null,
+  created_at timestamptz default now()
+);
+
+-- 8. Enable Row Level Security (RLS) on support_messages
+alter table public.support_messages enable row level security;
+
+-- 9. Policy: Allow anyone to insert support messages
+create policy "Anyone can insert support messages"
+  on public.support_messages for insert
+  with check (true);
+
+-- 10. Policy: Allow anyone to view support messages
+create policy "Anyone can view support messages"
+  on public.support_messages for select
+  using (true);
+
+-- 11. Enable Realtime on the support_messages table
+alter publication supabase_realtime add table public.support_messages;
