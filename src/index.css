@@ -1511,41 +1511,6 @@ h1 em { color: var(--olive); font-weight: inherit; }
   color: var(--text);
 }
 
-.support-whatsapp-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(40, 54, 24, 0.15);
-}
-
-.support-whatsapp-bar span {
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.support-whatsapp-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: #25d366;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 0.15s;
-  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.25);
-}
-
-.support-whatsapp-link:hover {
-  background: #1eb855;
-  color: #ffffff;
-}
-
 @media (max-width: 480px) {
   .support-fab {
     bottom: 84px;

@@ -68,7 +68,6 @@ type IconName =
   | "chat"
   | "send"
   | "user"
-  | "whatsapp"
 
 const pickleImage =
   "https://images.unsplash.com/photo-1601702538934-efffab67ab65?auto=format&fit=crop&w=1200&q=88"
@@ -267,12 +266,6 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       <>
         <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
         <circle cx="12" cy="7" r="4" />
-      </>
-    ),
-
-    whatsapp: (
-      <>
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
       </>
     ),
   }
@@ -2610,19 +2603,6 @@ function SupportChatWidget({
                   >
                     {isSubmitting ? "Submitting..." : "Submit & Contact Me"}
                   </button>
-                </div>
-
-                <div className="support-whatsapp-bar">
-                  <span>Urgent campus delivery issue?</span>
-                  <a
-                    href="https://wa.me/919876543210?text=Hi%20MessMate%2C%20I%20have%20an%20urgent%20query%20about%20my%20campus%20order"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="support-whatsapp-link"
-                  >
-                    <Icon name="whatsapp" size={14} />
-                    <span>Chat on WhatsApp</span>
-                  </a>
                 </div>
               </form>
             </div>
