@@ -102,6 +102,11 @@ h1 em { color: var(--olive); font-weight: inherit; }
 .product-info { padding: 14px; }
 .spice { color: var(--terracotta-dark); font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 5px; }
 .spice span { width: 5px; height: 5px; border-radius: 50%; background: var(--terracotta); }
+.product-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.spice-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--terracotta); background: rgba(217,100,74,.12); padding: 2px 7px; border-radius: 8px; line-height: 1.4; }
+.diet-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 8px; line-height: 1.4; }
+.diet-tag.veg { color: var(--olive); background: rgba(83,107,58,.12); }
+.diet-tag.non-veg { color: var(--terracotta); background: rgba(217,100,74,.12); }
 .product-info h3 { font-size: 13px; line-height: 1.35; margin: 7px 0 4px; }
 .product-info p { font-size: 9px; color: var(--muted); min-height: 25px; line-height: 1.4; }
 .product-bottom { border-top: 1px solid var(--line); padding-top: 11px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }

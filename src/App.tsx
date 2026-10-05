@@ -59,8 +59,10 @@ type IconName =
   | "arrow-right"
   | "bag"
   | "check"
+  | "chilli"
   | "clock"
   | "close"
+  | "drumstick"
   | "edit"
   | "heart"
   | "leaf"
@@ -92,6 +94,9 @@ const lemonImage =
 const garlicImage =
   "https://images.unsplash.com/photo-1593329344473-6a9dfc15dc3d?auto=format&fit=crop&w=800&q=86"
 
+const chickenPickleImage =
+  "https://images.unsplash.com/photo-1603496987351-f84a3ba5ec85?auto=format&fit=crop&w=800&q=86"
+
 const pickleProducts = [
   {
     name: "Andhra Mango Pickle",
@@ -99,6 +104,7 @@ const pickleProducts = [
     spice: "Hot",
     price: 10,
     image: pickleImage,
+    diet: "veg" as const,
   },
 
   {
@@ -107,6 +113,7 @@ const pickleProducts = [
     spice: "Medium",
     price: 15,
     image: garlicImage,
+    diet: "veg" as const,
   },
 
   {
@@ -115,6 +122,7 @@ const pickleProducts = [
     spice: "Medium",
     price: 10,
     image: lemonImage,
+    diet: "veg" as const,
   },
 
   {
@@ -123,6 +131,16 @@ const pickleProducts = [
     spice: "Mild",
     price: 15,
     image: garlicImage,
+    diet: "veg" as const,
+  },
+
+  {
+    name: "Chicken Pickle",
+    desc: "Rich, spicy & flavourful",
+    spice: "Medium",
+    price: 60,
+    image: chickenPickleImage,
+    diet: "non_veg" as const,
   },
 ]
 
@@ -191,7 +209,29 @@ function Icon({
       </>
     ),
 
-    check: <path d="m5 12 4 4L19 6" />,
+    "chili-mild": (
+      <g fill="currentColor" stroke="none">
+        <path d="M16 10V22C16 22 8 20 8 11V10C8 9.27 8.4 8.63 9 8.28L10.25 9L12 8L13.75 9L15 8.28C15.6 8.63 16 9.27 16 10M12 6.5L13.75 7.5L15.27 6.63C14.72 5.66 13.91 4.94 12.97 4.65C12.79 3.16 11.54 2 10 2V4C10.44 4 10.8 4.29 10.94 4.69C10.03 5 9.26 5.7 8.73 6.63L10.25 7.5L12 6.5Z" />
+      </g>
+    ),
+
+    "chili-medium": (
+      <g fill="currentColor" stroke="none">
+        <path d="M8.43 7.32L6.86 6.42C7.38 5.6 8.11 5 8.94 4.7C8.81 4.3 8.45 4 8 4V2C8.77 2 9.47 2.29 10 2.77V4C10.45 4 10.81 4.3 10.94 4.7C9.83 5.08 8.93 6.05 8.43 7.32M8 11C8 10.23 8.23 9.5 8.6 8.91L7.26 8.15C6.5 8.44 6 9.16 6 10V11C6 18.05 10.9 20.8 13.03 21.66C10.41 19.62 8 16.2 8 11M17 8.28L15.75 9L14 8L12.25 9L11 8.28C10.4 8.63 10 9.27 10 10V11C10 20 18 22 18 22V10C18 9.27 17.6 8.63 17 8.28M10.73 6.63L12.25 7.5L14 6.5L15.75 7.5L17.27 6.63C16.72 5.66 15.91 4.94 14.97 4.65C14.79 3.16 13.54 2 12 2V4C12.44 4 12.8 4.29 12.94 4.69C12.03 5 11.26 5.7 10.73 6.63Z" />
+      </g>
+    ),
+
+    "chili-hot": (
+      <g fill="currentColor" stroke="none">
+        <path d="M10.43 7.32L8.86 6.42C9.38 5.6 10.11 5 10.94 4.7C10.81 4.3 10.45 4 10 4V2C10.77 2 11.47 2.29 12 2.77V4C12.45 4 12.81 4.3 12.94 4.7C11.83 5.08 10.93 6.05 10.43 7.32M10 11C10 10.23 10.23 9.5 10.6 8.91L9.26 8.15C8.5 8.44 8 9.16 8 10V11C8 18.05 12.9 20.8 15.03 21.66C12.41 19.62 10 16.2 10 11M6.43 7.32L4.86 6.42C5.38 5.6 6.11 5 6.94 4.7C6.81 4.3 6.45 4 6 4V2C6.77 2 7.47 2.29 8 2.77V4C8.45 4 8.81 4 8.94 4.7C7.83 5.08 6.93 6.05 6.43 7.32M6 11C6 10.23 6.23 9.5 6.6 8.91L5.26 8.15C4.5 8.44 4 9.16 4 10V11C4 18.05 8.9 20.8 11.03 21.66C8.41 19.62 6 16.2 6 11M19 8.28L17.75 9L16 8L14.25 9L13 8.28C12.4 8.63 12 9.27 12 10V11C12 20 20 22 20 22V10C20 9.27 19.6 8.63 19 8.28M12.73 6.63L14.25 7.5L16 6.5L17.75 7.5L19.27 6.63C18.72 5.66 17.91 4.94 16.97 4.65C16.79 3.16 15.54 2 14 2V4C14.44 4 14.8 4.29 14.94 4.69C14.03 5 13.26 5.7 12.73 6.63Z" />
+      </g>
+    ),
+
+    drumstick: (
+      <g fill="currentColor" stroke="none">
+        <path d="M20.16 12.73C22.93 9.96 22.57 5.26 19.09 3C17.08 1.67 14.39 1.66 12.36 2.97C10.6 4.1 9.63 5.86 9.46 7.68C9.33 9 8.83 10.23 7.91 11.15L7.88 11.18C6.72 12.34 6.72 14.11 7.81 15.19L8.8 16.18C9.89 17.27 11.66 17.27 12.75 16.18C13.72 15.21 15 14.68 16.39 14.53C17.76 14.38 19.1 13.78 20.16 12.73M6.26 19.86C6.53 20.42 6.44 21.1 5.97 21.56C5.39 22.15 4.44 22.15 3.85 21.56C3.58 21.29 3.44 20.94 3.42 20.58C3.06 20.56 2.71 20.42 2.44 20.15C1.85 19.56 1.85 18.61 2.44 18.03C2.9 17.57 3.59 17.47 4.14 17.74L6.62 15.31C6.76 15.5 6.92 15.72 7.1 15.9L8.09 16.89C8.3 17.09 8.5 17.26 8.76 17.41L6.26 19.86Z" />
+      </g>
+    ),
 
     clock: (
       <>
@@ -777,9 +817,15 @@ function PickleList({
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
                 </div>
                 <div className="product-info">
-                  <div className="spice">
-                    <span></span>
-                    {product.spice} spice
+                  <div className="product-meta-row">
+                    <span className="spice-pill">
+                      <Icon name={product.spice === "Hot" ? "chili-hot" : product.spice === "Medium" ? "chili-medium" : "chili-mild"} size={18} />
+                      {product.spice}
+                    </span>
+                    <span className={`diet-tag ${product.diet === "veg" ? "veg" : "non-veg"}`}>
+                      <Icon name={product.diet === "veg" ? "leaf" : "drumstick"} size={18} />
+                      {product.diet === "veg" ? "VEG" : "NON-VEG"}
+                    </span>
                   </div>
                   <h3>{product.name}</h3>
                   <p>{product.desc}</p>
