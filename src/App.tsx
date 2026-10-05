@@ -2791,11 +2791,66 @@ function SupportChatWidget({
   customerPhone?: string
   customerName?: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [view, setView] = useState<ChatView>("faq")
+  // 1. Initial saved messages from localStorage
+  const savedCleanPhone = (customerPhone || localStorage.getItem("messmate_phone") || "")
+    .replace(/\D/g, "")
+    .slice(-10)
 
-  // Request form state
-  const [name, setName] = useState(customerName || "")
+  const initialLocalMessages = useMemo(() => {
+    try {
+      if (savedCleanPhone) {
+        const saved = localStorage.getItem(`messmate_chat_${savedCleanPhone}`)
+        if (saved) return mergeSupportMessages([], JSON.parse(saved))
+      }
+    } catch {}
+    return []
+  }, [savedCleanPhone])
+
+  const [liveMessages, setLiveMessages] = useState<SupportMsg[]>(initialLocalMessages)
+
+  // 2. Open state persisted across refreshes so user does not lose their place
+  const [isOpen, setIsOpenState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("messmate_support_open") === "true"
+    } catch {
+      return false
+    }
+  })
+
+  const [unreadCount, setUnreadCount] = useState<number>(0)
+
+  const setIsOpen = (open: boolean) => {
+    setIsOpenState(open)
+    try {
+      localStorage.setItem("messmate_support_open", open ? "true" : "false")
+    } catch {}
+    if (open) {
+      setUnreadCount(0)
+    }
+  }
+
+  // 3. View state: if there is an active live chat with messages or saved as 'live', stay on live!
+  const [view, setViewState] = useState<ChatView>(() => {
+    try {
+      const savedView = localStorage.getItem("messmate_support_view") as ChatView | null
+      if (savedView === "live" || initialLocalMessages.length > 0) {
+        return "live"
+      }
+    } catch {}
+    return "faq"
+  })
+
+  const setView = (v: ChatView) => {
+    setViewState(v)
+    try {
+      localStorage.setItem("messmate_support_view", v)
+    } catch {}
+  }
+
+  // Request form state - restored from customer prop or localStorage
+  const [name, setName] = useState(
+    customerName || localStorage.getItem("messmate_customer_name") || ""
+  )
   const [phone, setPhone] = useState(
     customerPhone || localStorage.getItem("messmate_phone") || ""
   )
@@ -2814,19 +2869,6 @@ function SupportChatWidget({
     },
   ])
   const [faqInput, setFaqInput] = useState("")
-
-  // Live chat messages
-  const [liveMessages, setLiveMessages] = useState<SupportMsg[]>(() => {
-    try {
-      const p = customerPhone || localStorage.getItem("messmate_phone")
-      if (p) {
-        const clean = p.replace(/\D/g, "").slice(-10)
-        const saved = localStorage.getItem(`messmate_chat_${clean}`)
-        if (saved) return mergeSupportMessages([], JSON.parse(saved))
-      }
-    } catch {}
-    return []
-  })
   const [liveInput, setLiveInput] = useState("")
 
   const chatBottomRef = useRef<HTMLDivElement>(null)
@@ -2834,6 +2876,8 @@ function SupportChatWidget({
   liveMessagesRef.current = liveMessages
   const phoneRef = useRef<string>(phone)
   phoneRef.current = phone
+  const isOpenRef = useRef<boolean>(isOpen)
+  isOpenRef.current = isOpen
 
   const saveChatToLocal = (cleanP: string, msgs: SupportMsg[]) => {
     try {
@@ -2873,6 +2917,9 @@ function SupportChatWidget({
           })
           if (incoming.sender === "support") {
             setView("live")
+            if (!isOpenRef.current) {
+              setUnreadCount((c) => c + 1)
+            }
           }
         }
       })
@@ -2910,6 +2957,7 @@ function SupportChatWidget({
             saveChatToLocal(clean, next)
             return next
           })
+          setView("live")
         }
       })
 
@@ -2931,6 +2979,12 @@ function SupportChatWidget({
               saveChatToLocal(clean, next)
               return next
             })
+            if (newMsg.sender === "support") {
+              setView("live")
+              if (!isOpenRef.current) {
+                setUnreadCount((c) => c + 1)
+              }
+            }
           }
         }
       )
@@ -2971,8 +3025,15 @@ function SupportChatWidget({
   }
 
   const handleResetChat = () => {
+    const clean = (phone || "").replace(/\D/g, "").slice(-10)
+    if (clean) {
+      try {
+        localStorage.removeItem(`messmate_chat_${clean}`)
+        localStorage.removeItem("messmate_support_view")
+      } catch {}
+    }
     setLiveMessages([])
-    setName(customerName || "")
+    setName(customerName || localStorage.getItem("messmate_customer_name") || "")
     setPhone(customerPhone || localStorage.getItem("messmate_phone") || "")
     setIssue("")
     setView("faq")
@@ -2995,6 +3056,7 @@ function SupportChatWidget({
     setIsSubmitting(true)
     const activePhone = cleanPhone
     localStorage.setItem("messmate_phone", activePhone)
+    localStorage.setItem("messmate_customer_name", name.trim())
 
     const issueText = issue.trim() || "Requested campus team callback."
 
@@ -3099,6 +3161,9 @@ function SupportChatWidget({
         <span className="support-fab-dot" />
         <Icon name={isOpen ? "close" : "chat"} size={19} />
         <span>{isOpen ? "Close" : "Support"}</span>
+        {!isOpen && unreadCount > 0 && (
+          <span className="support-fab-badge">{unreadCount}</span>
+        )}
       </button>
 
       {isOpen && (
@@ -3168,10 +3233,16 @@ function SupportChatWidget({
                         <button
                           type="button"
                           className="support-escalate-btn"
-                          onClick={() => setView("request")}
+                          onClick={() => {
+                            if (liveMessages.length > 0 || (phone.replace(/\D/g, "").length === 10 && name.trim())) {
+                              setView("live")
+                            } else {
+                              setView("request")
+                            }
+                          }}
                         >
                           <Icon name="chat" size={13} />
-                          Request Live Chat Support
+                          {liveMessages.length > 0 ? "Resume Live Chat" : "Request Live Chat Support"}
                         </button>
                       </div>
                     )}
