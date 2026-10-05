@@ -2318,6 +2318,14 @@ function SupportChatWidget({
     ])
   }
 
+  const handleResetChat = () => {
+    setLiveMessages([])
+    setName(customerName || "")
+    setPhone(customerPhone || localStorage.getItem("messmate_phone") || "")
+    setIssue("")
+    setView("faq")
+  }
+
   const handleStartLiveChat = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
@@ -2330,21 +2338,19 @@ function SupportChatWidget({
       setFormError("Please enter a valid phone number.")
       return
     }
-    if (!issue.trim()) {
-      setFormError("Please describe what you need help with.")
-      return
-    }
 
     setIsSubmitting(true)
     const activePhone = phone.trim()
     localStorage.setItem("messmate_phone", activePhone)
+
+    const issueText = issue.trim() || "Requested campus team callback."
 
     const initialCustomerMsg: SupportMsg = {
       id: `local-${Date.now()}`,
       phone: activePhone,
       customer_name: name.trim(),
       sender: "customer",
-      message: issue.trim(),
+      message: issueText,
       created_at: new Date().toISOString(),
     }
 
@@ -2353,26 +2359,32 @@ function SupportChatWidget({
       phone: activePhone,
       customer_name: "MessMate Support",
       sender: "support",
-      message: `Thanks ${name.trim()}! We've received your request: "${issue.trim()}". A campus support team member will respond right here shortly.`,
+      message: `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`,
       created_at: new Date().toISOString(),
     }
 
     setLiveMessages([initialCustomerMsg, acknowledgmentMsg])
+    setView("live")
 
     try {
       if (supabase) {
-        await supabase.from("support_messages").insert({
-          phone: activePhone,
-          customer_name: name.trim(),
-          sender: "customer",
-          message: issue.trim(),
-        })
+        supabase
+          .from("support_messages")
+          .insert({
+            phone: activePhone,
+            customer_name: name.trim(),
+            sender: "customer",
+            message: issueText,
+          })
+          .then(() => {})
+          .catch((err) =>
+            console.error("Failed to submit support request to Supabase:", err)
+          )
       }
     } catch (err) {
       console.error("Failed to submit support request to Supabase:", err)
     } finally {
       setIsSubmitting(false)
-      setView("live")
     }
   }
 
@@ -2540,8 +2552,8 @@ function SupportChatWidget({
                 <div className="support-request-intro">
                   <h4>Talk to Campus Support</h4>
                   <p>
-                    Enter your name, phone number, and issue. Our campus team
-                    will connect with you in live chat right away.
+                    Submit your name and phone number. Our campus team will
+                    contact you shortly!
                   </p>
                 </div>
 
@@ -2574,12 +2586,11 @@ function SupportChatWidget({
                 </div>
 
                 <div className="support-field">
-                  <label>Your Issue / Question</label>
+                  <label>Your Issue / Question (Optional)</label>
                   <textarea
-                    placeholder="What do you need help with? (e.g., change room number, late delivery inquiry...)"
+                    placeholder="What do you need help with? (e.g. delivery query, change room number...)"
                     value={issue}
                     onChange={(e) => setIssue(e.target.value)}
-                    required
                   />
                 </div>
 
@@ -2594,10 +2605,10 @@ function SupportChatWidget({
                   <button
                     type="submit"
                     className="primary-button olive"
-                    disabled={isSubmitting || !name || !phone || !issue}
+                    disabled={isSubmitting || !name.trim() || !phone.trim()}
                     style={{ flex: 1, minHeight: 44, fontSize: 13 }}
                   >
-                    {isSubmitting ? "Connecting..." : "Start Live Chat"}
+                    {isSubmitting ? "Submitting..." : "Submit & Contact Me"}
                   </button>
                 </div>
 
@@ -2619,6 +2630,24 @@ function SupportChatWidget({
 
           {view === "live" && (
             <>
+              <div className="support-status-banner">
+                <div className="support-status-badge">
+                  <Icon name="check" size={14} />
+                </div>
+                <div className="support-status-copy">
+                  <strong>We will contact you shortly!</strong>
+                  <span>Reaching out to <strong>{phone}</strong></span>
+                </div>
+                <button
+                  type="button"
+                  className="support-status-reset"
+                  onClick={handleResetChat}
+                  title="Submit a new inquiry"
+                >
+                  New
+                </button>
+              </div>
+
               <div className="support-body">
                 {liveMessages.length === 0 ? (
                   <div className="empty-state" style={{ padding: 20 }}>
