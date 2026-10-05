@@ -30,6 +30,12 @@ function playOrderChime() {
   }
 }
 
+function get10DigitPhone(raw: string | null | undefined): string {
+  if (!raw) return ""
+  const digits = raw.replace(/\D/g, "")
+  return digits.length > 10 ? digits.slice(-10) : digits
+}
+
 export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
@@ -48,11 +54,12 @@ export default function App() {
   })
   const [inventoryCategory, setInventoryCategory] = useState<string>("all")
 
-  // Filters
+  // Filters & Timeframe
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [fulfilmentFilter, setFulfilmentFilter] = useState<string>("all")
   const [slotFilter, setSlotFilter] = useState<string>("all")
+  const [revenuePeriod, setRevenuePeriod] = useState<"today" | "all">("today")
 
   // Support thread state
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null)
@@ -302,8 +309,11 @@ export default function App() {
     const today = new Date().toISOString().split("T")[0]
     const todayOrders = orders.filter((o) => (o.created_at || "").startsWith(today))
     const nonCancelledToday = todayOrders.filter((o) => o.status !== "cancelled")
+    const nonCancelledAllTime = orders.filter((o) => o.status !== "cancelled")
 
     const revenue = nonCancelledToday.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const allTimeRevenue = nonCancelledAllTime.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+
     const active = orders.filter((o) => ["placed", "preparing", "ready"].includes(o.status)).length
     const deliveries = todayOrders.filter((o) => o.fulfilment === "delivery").length
     const pickups = todayOrders.filter((o) => o.fulfilment === "pickup").length
@@ -311,12 +321,19 @@ export default function App() {
       supportMessages.filter((m) => m.sender === "customer").map((m) => m.phone)
     ).size
 
-    // Financial Breakdown
-    const upiOrders = nonCancelledToday.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
-    const upiRevenue = upiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const cashOrders = nonCancelledToday.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
-    const cashRevenue = cashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const deliveryFees = nonCancelledToday.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
+    // Today Financial Breakdown
+    const todayUpiOrders = nonCancelledToday.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
+    const todayUpiRevenue = todayUpiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const todayCashOrders = nonCancelledToday.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
+    const todayCashRevenue = todayCashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const todayDeliveryFees = nonCancelledToday.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
+
+    // All Time Financial Breakdown
+    const allTimeUpiOrders = nonCancelledAllTime.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
+    const allTimeUpiRevenue = allTimeUpiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const allTimeCashOrders = nonCancelledAllTime.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
+    const allTimeCashRevenue = allTimeCashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+    const allTimeDeliveryFees = nonCancelledAllTime.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
 
     const pendingUtrs = orders.filter(
       (o) =>
@@ -337,15 +354,22 @@ export default function App() {
 
     return {
       revenue,
+      allTimeRevenue,
       active,
       deliveries,
       pickups,
       pendingCallbacks,
-      upiRevenue,
-      upiCount: upiOrders.length,
-      cashRevenue,
-      cashCount: cashOrders.length,
-      deliveryFees,
+      todayUpiRevenue,
+      todayUpiCount: todayUpiOrders.length,
+      todayCashRevenue,
+      todayCashCount: todayCashOrders.length,
+      todayDeliveryFees,
+      allTimeUpiRevenue,
+      allTimeUpiCount: allTimeUpiOrders.length,
+      allTimeCashRevenue,
+      allTimeCashCount: allTimeCashOrders.length,
+      allTimeDeliveryFees,
+      allTimeTotalOrders: nonCancelledAllTime.length,
       pendingUtrs,
       ratedCount: ratedOrders.length,
       avgRating,
@@ -502,17 +526,45 @@ export default function App() {
         <section className="kpi-grid">
           <div className="kpi-card">
             <div className="kpi-header">
-              <span>Today's Revenue</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <span>{revenuePeriod === "all" ? "All-Time Complete Revenue" : "Today's Revenue"}</span>
+                <div className="revenue-toggle-group">
+                  <button
+                    type="button"
+                    className={`revenue-toggle-btn ${revenuePeriod === "today" ? "active" : ""}`}
+                    onClick={() => setRevenuePeriod("today")}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    className={`revenue-toggle-btn ${revenuePeriod === "all" ? "active" : ""}`}
+                    onClick={() => setRevenuePeriod("all")}
+                  >
+                    All Time
+                  </button>
+                </div>
+              </div>
               <div className="kpi-icon-wrap olive">₹</div>
             </div>
-            <div className="kpi-value">₹{stats.revenue.toLocaleString()}</div>
-            <span className="kpi-subtext">₹{stats.upiRevenue} UPI · ₹{stats.cashRevenue} Cash</span>
+            <div className="kpi-value">
+              ₹{(revenuePeriod === "all" ? stats.allTimeRevenue : stats.revenue).toLocaleString()}
+            </div>
+            <span className="kpi-subtext">
+              {revenuePeriod === "all"
+                ? `₹${stats.allTimeUpiRevenue.toLocaleString()} UPI · ₹${stats.allTimeCashRevenue.toLocaleString()} Cash (${stats.allTimeTotalOrders} orders)`
+                : `₹${stats.todayUpiRevenue.toLocaleString()} UPI · ₹${stats.todayCashRevenue.toLocaleString()} Cash (${stats.todayUpiCount + stats.todayCashCount} orders)`}
+            </span>
           </div>
 
           <div className="kpi-card">
             <div className="kpi-header">
               <span>Kitchen Active</span>
-              <div className="kpi-icon-wrap amber">⚡</div>
+              <div className="kpi-icon-wrap amber">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
             </div>
             <div className="kpi-value">{stats.active}</div>
             <span className="kpi-subtext">Placed, preparing, or ready</span>
@@ -521,7 +573,12 @@ export default function App() {
           <div className="kpi-card">
             <div className="kpi-header">
               <span>Pending UTRs</span>
-              <div className="kpi-icon-wrap amber">⏳</div>
+              <div className="kpi-icon-wrap amber">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
             </div>
             <div className="kpi-value">{stats.pendingUtrs}</div>
             <span className="kpi-subtext">Awaiting payment verification</span>
@@ -530,7 +587,11 @@ export default function App() {
           <div className="kpi-card">
             <div className="kpi-header">
               <span>Customer Rating</span>
-              <div className="kpi-icon-wrap green">⭐</div>
+              <div className="kpi-icon-wrap green">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#2d6a4f" stroke="#2d6a4f" strokeWidth="1.5">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </div>
             </div>
             <div className="kpi-value">{stats.avgRating} <small style={{ fontSize: 13, color: "var(--muted)" }}>/ 5.0</small></div>
             <span className="kpi-subtext">{stats.ratedCount} delivered reviews</span>
@@ -565,7 +626,10 @@ export default function App() {
             {/* Filter and Search Bar */}
             <div className="controls-bar">
               <div className="search-input-wrap">
-                <span className="search-icon">🔍</span>
+                <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
                 <input
                   type="text"
                   placeholder="Search by order #, PIN (e.g. 4821), phone, student..."
@@ -578,8 +642,12 @@ export default function App() {
                     type="button"
                     className="search-clear-btn"
                     onClick={() => setSearch("")}
+                    aria-label="Clear search"
                   >
-                    ✕
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
                 )}
               </div>
@@ -674,7 +742,7 @@ export default function App() {
                       <strong className="inventory-item-name">{item.name}</strong>
                     </div>
                     <span className={`inventory-stock-pill ${item.is_available ? "available" : "out"}`}>
-                      {item.is_available ? "✓ In Stock" : "✕ Sold Out"}
+                      {item.is_available ? "In Stock" : "Sold Out"}
                     </span>
                   </div>
 
@@ -684,7 +752,7 @@ export default function App() {
                       className={`inventory-toggle-btn ${item.is_available ? "to-sold" : "to-stock"}`}
                       onClick={() => handleToggleStock(item.id, item.is_available)}
                     >
-                      {item.is_available ? "Mark as Sold Out" : "Mark as In Stock ✓"}
+                      {item.is_available ? "Mark as Sold Out" : "Mark as In Stock"}
                     </button>
                   </div>
                 </div>
@@ -720,7 +788,7 @@ export default function App() {
                           {new Date(thread.latestAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
-                      <span className="inbox-item-phone">{thread.phone}</span>
+                      <span className="inbox-item-phone">{get10DigitPhone(thread.phone)}</span>
                       <div className="inbox-item-preview">
                         {thread.messages[thread.messages.length - 1]?.message || "Requested contact"}
                       </div>
@@ -737,13 +805,16 @@ export default function App() {
                   <div className="thread-header">
                     <div className="thread-user-info">
                       <strong>{activeThread.customerName}</strong>
-                      <span>({activeThread.phone})</span>
+                      <span>({get10DigitPhone(activeThread.phone)})</span>
                     </div>
                     <a
-                      href={`tel:${activeThread.phone}`}
+                      href={`tel:${get10DigitPhone(activeThread.phone)}`}
                       className="action-btn call"
                     >
-                      📞 Call {activeThread.phone}
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                      <span>Call {get10DigitPhone(activeThread.phone)}</span>
                     </a>
                   </div>
 
@@ -797,29 +868,70 @@ export default function App() {
             {/* Financial Settlement Breakdown */}
             <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
               <div className="analytics-card-title">
-                <span>Daily Financial Settlement & Cash Flow</span>
-                <span className="brand-pill">Verified vs Cash</span>
+                <div>
+                  <span>
+                    {revenuePeriod === "all"
+                      ? "All-Time Complete Financial Settlement & Revenue"
+                      : "Daily Financial Settlement & Cash Flow"}
+                  </span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    {revenuePeriod === "all"
+                      ? "Complete historical revenue ledger across all fulfilled orders"
+                      : "Today's ledger from midnight to present"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div className="revenue-toggle-group">
+                    <button
+                      type="button"
+                      className={`revenue-toggle-btn ${revenuePeriod === "today" ? "active" : ""}`}
+                      onClick={() => setRevenuePeriod("today")}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className={`revenue-toggle-btn ${revenuePeriod === "all" ? "active" : ""}`}
+                      onClick={() => setRevenuePeriod("all")}
+                    >
+                      All Time Complete Revenue
+                    </button>
+                  </div>
+                  <span className="brand-pill">Verified vs Cash</span>
+                </div>
               </div>
               <div className="analytics-financial-grid">
                 <div className="fin-metric-box">
                   <small>PhonePe UPI Collections</small>
-                  <strong>₹{stats.upiRevenue.toLocaleString()}</strong>
-                  <span>{stats.upiCount} orders</span>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.allTimeUpiRevenue : stats.todayUpiRevenue).toLocaleString()}
+                  </strong>
+                  <span>{revenuePeriod === "all" ? stats.allTimeUpiCount : stats.todayUpiCount} orders</span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Counter Cash Collections</small>
-                  <strong>₹{stats.cashRevenue.toLocaleString()}</strong>
-                  <span>{stats.cashCount} orders</span>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.allTimeCashRevenue : stats.todayCashRevenue).toLocaleString()}
+                  </strong>
+                  <span>{revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount} orders</span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Delivery Fees (₹7/drop)</small>
-                  <strong>₹{stats.deliveryFees.toLocaleString()}</strong>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.allTimeDeliveryFees : stats.todayDeliveryFees).toLocaleString()}
+                  </strong>
                   <span>{stats.deliveries} room deliveries</span>
                 </div>
                 <div className="fin-metric-box highlight">
                   <small>Total Gross Revenue</small>
-                  <strong>₹{stats.revenue.toLocaleString()}</strong>
-                  <span>{stats.upiCount + stats.cashCount} total orders today</span>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.allTimeRevenue : stats.revenue).toLocaleString()}
+                  </strong>
+                  <span>
+                    {revenuePeriod === "all"
+                      ? `${stats.allTimeTotalOrders} total completed orders (All Time)`
+                      : `${stats.todayUpiCount + stats.todayCashCount} total orders today`}
+                  </span>
                 </div>
               </div>
             </div>
@@ -916,14 +1028,14 @@ function OrderCard({
     }
   }
 
-  const statusMap: Record<OrderStatus, { label: string; icon: string; cls: string }> = {
-    placed: { label: "Placed (New)", icon: "🕒", cls: "placed" },
-    preparing: { label: "Preparing", icon: "🔥", cls: "preparing" },
-    ready: { label: "Ready", icon: "📦", cls: "ready" },
-    delivered: { label: "Delivered", icon: "✅", cls: "delivered" },
-    cancelled: { label: "Cancelled", icon: "❌", cls: "cancelled" },
+  const statusMap: Record<OrderStatus, { label: string; cls: string }> = {
+    placed: { label: "Placed (New)", cls: "placed" },
+    preparing: { label: "Preparing", cls: "preparing" },
+    ready: { label: "Ready", cls: "ready" },
+    delivered: { label: "Delivered", cls: "delivered" },
+    cancelled: { label: "Cancelled", cls: "cancelled" },
   }
-  const st = statusMap[order.status] || { label: order.status, icon: "•", cls: "placed" }
+  const st = statusMap[order.status] || { label: order.status, cls: "placed" }
 
   return (
     <div className={`order-card-mobile ${order.status}`}>
@@ -931,12 +1043,12 @@ function OrderCard({
       <div className="card-top-bar">
         <div className="card-top-left">
           <span className={`order-status-badge ${st.cls}`}>
-            <span>{st.icon}</span>
+            <span className={`status-dot ${st.cls}`} />
             <span>{st.label}</span>
           </span>
           <span className="order-number-pill">#{order.order_number}</span>
           <span className="pickup-pin-pill" title="Student must show this 4-digit code to collect">
-            🔑 PIN: {pin}
+            PIN {pin}
           </span>
         </div>
         <div className="order-time-slot">
@@ -953,24 +1065,38 @@ function OrderCard({
           <span className="customer-name-heading">{order.customer_name || "Campus Student"}</span>
           <span className="customer-location-desc">
             {order.fulfilment === "delivery" ? (
-              <>🚪 {order.hostel || "Hostel"}, Room {order.room || "—"}</>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                {order.hostel || "Hostel"}, Room {order.room || "—"}
+              </span>
             ) : (
-              <>📍 {order.hostel || "Campus Pickup Table"}</>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                {order.hostel || "Campus Pickup Table"}
+              </span>
             )}
           </span>
         </div>
         <a
-          href={`tel:${order.customer_phone}`}
+          href={`tel:${get10DigitPhone(order.customer_phone)}`}
           className="customer-call-action"
-          title={`Call ${order.customer_phone}`}
+          title={`Call ${get10DigitPhone(order.customer_phone)}`}
         >
-          <span>📞</span>
-          <span>{order.customer_phone}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+          </svg>
+          <span>{get10DigitPhone(order.customer_phone)}</span>
         </a>
       </div>
 
       <div className={`fulfilment-pill-row ${order.fulfilment}`}>
-        <span>{order.fulfilment === "delivery" ? "🚀 Hostel Room Delivery (₹7)" : `🛍️ ${order.hostel || "Campus Pickup"}`}</span>
+        <span>{order.fulfilment === "delivery" ? "Hostel Room Delivery (₹7)" : (order.hostel || "Campus Pickup")}</span>
       </div>
 
       {/* Items List */}
@@ -992,7 +1118,6 @@ function OrderCard({
         <div className="payment-badge-wrap">
           {isUpi ? (
             <div className="phonepe-status-pill">
-              <span className="pe-bolt">⚡</span>
               <span className="pe-brand">PhonePe UPI</span>
               {utrCode && (
                 <button
@@ -1002,23 +1127,23 @@ function OrderCard({
                   title="Click to copy UTR"
                 >
                   <code>{utrCode}</code>
-                  <span className="utr-copy-state">{copiedUtr ? "✓" : "📋"}</span>
+                  <span className="utr-copy-state">{copiedUtr ? "Copied" : "Copy"}</span>
                 </button>
               )}
             </div>
           ) : (
-            <span className="counter-status-pill">💵 Pay at Counter</span>
+            <span className="counter-status-pill">Pay at Counter</span>
           )}
 
           {/* Payment Verification Status Badge */}
           {isUpi && (
             <div className="payment-verification-status">
               {isVerified ? (
-                <span className="verify-badge success">✓ UTR Verified</span>
+                <span className="verify-badge success">UTR Verified</span>
               ) : isFailed ? (
-                <span className="verify-badge danger">⚠️ Unverified / Fraud</span>
+                <span className="verify-badge danger">Unverified / Flagged</span>
               ) : (
-                <span className="verify-badge pending">⏳ Pending Verification</span>
+                <span className="verify-badge pending">Pending Verification</span>
               )}
             </div>
           )}
@@ -1040,7 +1165,7 @@ function OrderCard({
               onClick={() => onVerifyPayment(order.id, true)}
               title="Click after checking soundbox/merchant app"
             >
-              ✓ Verify Payment
+              Verify Payment
             </button>
           )}
           {!isFailed && (
@@ -1050,11 +1175,11 @@ function OrderCard({
               onClick={() => onVerifyPayment(order.id, false)}
               title="Flag if UTR is fake or payment was not received"
             >
-              ✕ Flag Unpaid
+              Flag Unpaid
             </button>
           )}
           {isVerified && (
-            <span className="verified-confirm-text">✓ Payment confirmed by kitchen staff</span>
+            <span className="verified-confirm-text">Payment confirmed by kitchen staff</span>
           )}
         </div>
       )}
@@ -1062,7 +1187,21 @@ function OrderCard({
       {/* Student Feedback & Star Rating (if present) */}
       {typeof order.rating === "number" && order.rating > 0 && (
         <div className="order-rating-box">
-          <span className="rating-stars">{"⭐".repeat(order.rating)}</span>
+          <div style={{ display: "inline-flex", gap: "2px", alignItems: "center" }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <svg
+                key={s}
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill={s <= order.rating! ? "#f59e0b" : "none"}
+                stroke="#f59e0b"
+                strokeWidth="1.5"
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            ))}
+          </div>
           <span className="rating-val">{order.rating}/5.0</span>
           {order.rating_feedback && (
             <p className="rating-comment">"{order.rating_feedback}"</p>
@@ -1079,7 +1218,7 @@ function OrderCard({
               className="action-btn blue main-touch-btn"
               onClick={() => onUpdateStatus(order.id, "preparing")}
             >
-              🔥 Start Kitchen Prep →
+              Start Kitchen Prep →
             </button>
             <button
               type="button"
@@ -1097,7 +1236,7 @@ function OrderCard({
             className="action-btn green main-touch-btn"
             onClick={() => onUpdateStatus(order.id, "ready")}
           >
-            📦 Mark Ready for Pickup / Drop ✓
+            Mark Ready for Pickup / Drop
           </button>
         )}
 
@@ -1107,19 +1246,19 @@ function OrderCard({
             className="action-btn primary main-touch-btn"
             onClick={() => onUpdateStatus(order.id, "delivered")}
           >
-            ✅ Complete & Mark Delivered ✓
+            Complete & Mark Delivered
           </button>
         )}
 
         {order.status === "delivered" && (
           <div className="order-closed-banner">
-            <span>✅ Completed & Delivered</span>
+            <span>Completed & Delivered</span>
           </div>
         )}
 
         {order.status === "cancelled" && (
           <div className="order-cancelled-banner">
-            <span>❌ Order Cancelled</span>
+            <span>Order Cancelled</span>
           </div>
         )}
       </div>

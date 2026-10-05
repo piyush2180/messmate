@@ -73,6 +73,11 @@ type IconName =
   | "chat"
   | "send"
   | "user"
+  | "star"
+  | "phone"
+  | "key"
+  | "bell"
+  | "zap"
 
 const pickleImage =
   "https://images.unsplash.com/photo-1601702538934-efffab67ab65?auto=format&fit=crop&w=1200&q=88"
@@ -156,7 +161,15 @@ const fruits = [
   { name: "Seasonal", color: "#4F8A5B", emoji: "S" },
 ]
 
-function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+function Icon({
+  name,
+  size = 20,
+  fill = "none",
+}: {
+  name: IconName
+  size?: number
+  fill?: string
+}) {
   const paths: Record<IconName, ReactNode> = {
     "arrow-left": (
       <>
@@ -273,6 +286,33 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
         <circle cx="12" cy="7" r="4" />
       </>
     ),
+
+    star: (
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    ),
+
+    phone: (
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    ),
+
+    key: (
+      <>
+        <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" />
+        <path d="m21 2-9.6 9.6" />
+        <circle cx="7.5" cy="15.5" r="5.5" />
+      </>
+    ),
+
+    bell: (
+      <>
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      </>
+    ),
+
+    zap: (
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    ),
   }
 
   return (
@@ -280,7 +320,7 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={fill}
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"
@@ -750,7 +790,7 @@ function PickleList({
                       </strong>
                     </div>
                     <button disabled={isSoldOut} aria-label={`View ${product.name}`}>
-                      {isSoldOut ? "✕" : <Icon name="arrow-right" size={17} />}
+                      {isSoldOut ? <Icon name="close" size={14} /> : <Icon name="arrow-right" size={17} />}
                     </button>
                   </div>
                 </div>
@@ -1033,7 +1073,7 @@ function FruitBuilder({
                         small
                       />
                     ) : (
-                      <span style={{ fontSize: "10px", color: "#d90429", fontWeight: 700 }}>✕ Out</span>
+                      <span style={{ fontSize: "10px", color: "#d90429", fontWeight: 700 }}>Out of Stock</span>
                     )}
                   </article>
                 )
@@ -1271,21 +1311,29 @@ function Field({
   value,
   onChange,
   type = "text",
+  maxLength,
+  hint,
 }: {
   label: string
   placeholder: string
   value: string
   onChange: (value: string) => void
   type?: string
+  maxLength?: number
+  hint?: string
 }) {
   return (
     <label className="field">
-      <span>{label}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+        <span>{label}</span>
+        {hint && <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 500 }}>{hint}</span>}
+      </div>
       <input
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
       />
     </label>
   )
@@ -1309,8 +1357,13 @@ function Checkout({
   const set = (key: keyof CustomerDetails, value: string) =>
     setDetails({ ...details, [key]: value })
 
+  const cleanPhone = details.phone.replace(/\D/g, "")
+  const isPhoneValid = cleanPhone.length === 10
   const isComplete = Boolean(
-    details.name && details.phone && details.hostel && details.room,
+    details.name.trim() &&
+    isPhoneValid &&
+    details.hostel.trim() &&
+    details.room.trim()
   )
 
   return (
@@ -1341,10 +1394,15 @@ function Checkout({
                 />
                 <Field
                   label="Phone number"
-                  placeholder="+91 98765 43210"
+                  placeholder="10-digit mobile number"
                   type="tel"
+                  maxLength={10}
+                  hint={details.phone ? `${cleanPhone.length}/10 digits` : "10 digits required"}
                   value={details.phone}
-                  onChange={(v) => set("phone", v)}
+                  onChange={(v) => {
+                    const digits = v.replace(/\D/g, "").slice(0, 10)
+                    set("phone", digits)
+                  }}
                 />
                 <Field
                   label="Hostel"
@@ -1360,7 +1418,7 @@ function Checkout({
                 />
               </div>
               <div className="privacy-note">
-                <Icon name="shield" size={17} /> We'll only use your phone number for
+                <Icon name="shield" size={17} /> We'll only use your 10-digit phone number for
                 order updates.
               </div>
             </div>
@@ -1435,7 +1493,9 @@ function Checkout({
               </div>
               {!isComplete && (
                 <div className="validation-hint">
-                  Please fill in all contact fields to continue
+                  {!isPhoneValid && details.phone
+                    ? "Please enter a valid 10-digit mobile number"
+                    : "Please fill in all contact fields to continue"}
                 </div>
               )}
             </div>
@@ -1690,7 +1750,9 @@ function Payment({
                 className={method === "counter" ? "selected" : ""}
                 onClick={() => setMethod("counter")}
               >
-                <span className="card-mark">💵</span>
+                <span className="card-mark">
+                  <Icon name="receipt" size={18} />
+                </span>
                 <span>
                   <strong>Pay at Counter</strong>
                   <small>Cash or soundbox scan upon pickup</small>
@@ -1706,7 +1768,9 @@ function Payment({
                     <span className="pe-symbol-small">पे</span>
                     <span>PhonePe Merchant</span>
                   </div>
-                  <span className="verified-pill">✓ Verified Merchant</span>
+                  <span className="verified-pill">
+                    <Icon name="shield" size={12} /> Verified Merchant
+                  </span>
                 </div>
 
                 <div className="merchant-meta-row">
@@ -1744,7 +1808,7 @@ function Payment({
                     className="copy-upi-btn"
                     onClick={handleCopyUpi}
                   >
-                    {copiedUpi ? "✓ Copied" : "Copy"}
+                    {copiedUpi ? "Copied" : "Copy"}
                   </button>
                 </div>
 
@@ -1753,7 +1817,9 @@ function Payment({
                   href={upiIntentUri}
                   className="mobile-upi-pay-link"
                 >
-                  <span className="mobile-upi-title">⚡ Pay ₹{total} via UPI App</span>
+                  <span className="mobile-upi-title">
+                    <Icon name="zap" size={16} /> Pay ₹{total} via UPI App
+                  </span>
                   <span className="mobile-upi-sub">Tap to open PhonePe / GPay / Paytm directly</span>
                 </a>
 
@@ -1779,7 +1845,9 @@ function Payment({
               </div>
             ) : (
               <div className="counter-payment-card">
-                <div className="counter-icon">💵</div>
+                <div className="counter-icon">
+                  <Icon name="receipt" size={24} />
+                </div>
                 <div>
                   <strong>Pay ₹{total} at the Counter</strong>
                   <p>You can pay via cash or scan our countertop soundbox QR at the pickup table.</p>
@@ -1826,7 +1894,7 @@ function Payment({
                   {isSubmitting
                     ? "Placing order..."
                     : method === "upi"
-                    ? `✓ I've Paid ₹${total} — Place Order`
+                    ? `I've Paid ₹${total} — Place Order`
                     : `Place Order (Pay ₹${total} at Counter)`}
                 </PrimaryButton>
               </div>
@@ -1843,7 +1911,7 @@ function Payment({
           {isSubmitting
             ? "Placing order..."
             : method === "upi"
-            ? `✓ I've Paid ₹${total} — Place Order`
+            ? `I've Paid ₹${total} — Place Order`
             : `Place Order (Pay ₹${total})`}
         </PrimaryButton>
       </BottomBar>
@@ -1926,7 +1994,9 @@ function Confirmation({
             </div>
           </div>
           <div className="confirm-payment-tag">
-            <span className="pay-mode-icon">⚡</span>
+            <span className="pay-mode-icon">
+              <Icon name="zap" size={16} />
+            </span>
             <span>
               <small>PAYMENT METHOD</small>
               <strong>{paymentMethod || "PhonePe UPI Verified"}</strong>
@@ -1935,7 +2005,9 @@ function Confirmation({
 
           {/* Prominent Counter Pickup PIN Code */}
           <div className="pickup-pin-confirmation-card">
-            <div className="pin-card-icon">🔑</div>
+            <div className="pin-card-icon">
+              <Icon name="key" size={20} />
+            </div>
             <div className="pin-card-copy">
               <small>YOUR 4-DIGIT PICKUP PIN</small>
               <strong className="pin-digit-display">{displayPin}</strong>
@@ -1951,7 +2023,7 @@ function Confirmation({
           <Icon name="shield" size={18} />
           <span>
             We'll send order details and live updates to{" "}
-            <strong>{details.phone}</strong>.
+            <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
           </span>
         </div>
         <div className="confirm-actions">
@@ -2005,8 +2077,18 @@ function OrderRatingWidget({
   if (submitted) {
     return (
       <div className="order-rating-widget">
-        <div className="rating-done-badge">
-          <span>{"⭐".repeat(rating)}</span> {rating}/5.0 · Thank you for your review!
+        <div className="rating-done-badge" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ display: "inline-flex", gap: "2px", alignItems: "center" }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Icon
+                key={s}
+                name="star"
+                size={14}
+                fill={s <= rating ? "#f59e0b" : "none"}
+              />
+            ))}
+          </div>
+          <span>{rating}/5.0 · Thank you for your review!</span>
         </div>
         {feedback && (
           <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px", fontStyle: "italic" }}>
@@ -2024,19 +2106,27 @@ function OrderRatingWidget({
         <small style={{ color: "var(--muted)", fontSize: "10px" }}>Rate your experience</small>
       </div>
       <div className="stars-selector">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            className="star-btn"
-            onMouseEnter={() => setHovered(star)}
-            onMouseLeave={() => setHovered(0)}
-            onClick={() => setRating(star)}
-            title={`${star} Star${star > 1 ? "s" : ""}`}
-          >
-            {(hovered || rating) >= star ? "⭐" : "☆"}
-          </button>
-        ))}
+        {[1, 2, 3, 4, 5].map((star) => {
+          const isFilled = (hovered || rating) >= star
+          return (
+            <button
+              key={star}
+              type="button"
+              className="star-btn"
+              onMouseEnter={() => setHovered(star)}
+              onMouseLeave={() => setHovered(0)}
+              onClick={() => setRating(star)}
+              title={`${star} Star${star > 1 ? "s" : ""}`}
+              style={{ color: isFilled ? "#f59e0b" : "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "2px" }}
+            >
+              <Icon
+                name="star"
+                size={20}
+                fill={isFilled ? "#f59e0b" : "none"}
+              />
+            </button>
+          )
+        })}
       </div>
       {rating > 0 && (
         <>
@@ -2048,7 +2138,7 @@ function OrderRatingWidget({
             className="rating-feedback-input"
           />
           <button type="submit" className="submit-rating-btn" disabled={isSending}>
-            {isSending ? "Submitting..." : "Submit Review ✓"}
+            {isSending ? "Submitting..." : "Submit Review"}
           </button>
         </>
       )}
@@ -2185,8 +2275,9 @@ function OrdersPage({
           <div className="orders-search-row">
             <input
               type="tel"
+              maxLength={10}
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => setSearchInput(e.target.value.replace(/\D/g, "").slice(0, 10))}
               placeholder="e.g. 9876543210"
               onKeyDown={(e) => {
                 if (e.key === "Enter") loadOrders(searchInput)
@@ -2200,20 +2291,21 @@ function OrdersPage({
             <div className="orders-quick-filters">
               <button
                 type="button"
-                className={`filter-chip ${searchInput === phone ? "active" : ""}`}
+                className={`filter-chip ${searchInput === phone.replace(/\D/g, "").slice(-10) ? "active" : ""}`}
                 onClick={() => {
-                  setSearchInput(phone)
-                  loadOrders(phone)
+                  const clean = phone.replace(/\D/g, "").slice(-10)
+                  setSearchInput(clean)
+                  loadOrders(clean)
                 }}
               >
-                <Icon name="receipt" size={13} /> My Phone ({phone})
+                <Icon name="receipt" size={13} /> My Phone ({phone.replace(/\D/g, "").slice(-10)})
               </button>
             </div>
           )}
           <div className="orders-search-note">
             <Icon name="shield" size={14} />
             <span>
-              Enter your phone number to view your active delivery and past orders
+              Enter your 10-digit phone number to view your active delivery and past orders
             </span>
           </div>
         </section>
@@ -2265,7 +2357,7 @@ function OrdersPage({
                     <div className="order-ticket-id">
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <small>Order #{order.order_number}</small>
-                        <span className="order-ticket-pin-pill">🔑 PIN: {getPickupPin(order)}</span>
+                        <span className="order-ticket-pin-pill">PIN: {getPickupPin(order)}</span>
                       </div>
                       <strong>₹{order.total}</strong>
                       <span
@@ -2357,7 +2449,7 @@ function OrdersPage({
                           }}
                         >
                           Slot: {order.slot} · Contact: {order.customer_name} (
-                          {order.customer_phone})
+                          {order.customer_phone?.replace(/\D/g, "").slice(-10) || order.customer_phone})
                         </div>
                       </div>
                     </div>
@@ -2397,13 +2489,13 @@ function OrdersPage({
                             {order.payment_method}
                           </strong>
                           {order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]") ? (
-                            <span className="pay-verify-badge success">✓ Payment Verified</span>
+                            <span className="pay-verify-badge success">Payment Verified</span>
                           ) : order.payment_status === "failed" || order.payment_method?.includes("[FAILED]") ? (
-                            <span className="pay-verify-badge danger">⚠️ Verification Issue</span>
+                            <span className="pay-verify-badge danger">Verification Issue</span>
                           ) : order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi") ? (
-                            <span className="pay-verify-badge pending">⏳ UTR Under Verification</span>
+                            <span className="pay-verify-badge pending">UTR Under Verification</span>
                           ) : (
-                            <span className="pay-verify-badge neutral">💵 Pay at Counter</span>
+                            <span className="pay-verify-badge neutral">Pay at Counter</span>
                           )}
                         </div>
                       </div>
@@ -2420,7 +2512,7 @@ function OrdersPage({
                         className="reorder-button"
                         onClick={() => onReorder(order.items)}
                       >
-                        <span>🔁</span>
+                        <Icon name="refresh" size={14} />
                         <span>Reorder This Meal (1-Click)</span>
                       </button>
                     )}
@@ -2475,7 +2567,7 @@ const FAQ_ITEMS = [
     label: "1-Click Reorder",
     question: "How do I reorder a past meal?",
     answer:
-      "Open 'Track Orders' from the top menu, find your previous order, and tap '🔁 Reorder This Meal'. Your cart will immediately be filled with the exact same items ready for checkout!",
+      "Open 'Track Orders' from the top menu, find your previous order, and tap 'Reorder This Meal'. Your cart will immediately be filled with the exact same items ready for checkout!",
   },
   {
     id: "rating",
@@ -2530,7 +2622,7 @@ function getAutomatedAnswer(query: string): string {
     return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
   }
   if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
-    return "In 'Track Orders', click the '🔁 Reorder This Meal' button on any past order to refill your cart instantly!"
+    return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
   }
   if (q.includes("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
@@ -2611,7 +2703,7 @@ function SupportChatWidget({
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi there! 👋 How can we help you today with your MessMate order?",
+      text: "Hello! How can we help you today with your MessMate order?",
     },
   ])
   const [faqInput, setFaqInput] = useState("")
@@ -2717,13 +2809,14 @@ function SupportChatWidget({
       setFormError("Please enter your name.")
       return
     }
-    if (!phone.trim() || phone.trim().length < 6) {
-      setFormError("Please enter a valid phone number.")
+    const cleanPhone = phone.replace(/\D/g, "").slice(0, 10)
+    if (cleanPhone.length !== 10) {
+      setFormError("Please enter a valid 10-digit mobile number.")
       return
     }
 
     setIsSubmitting(true)
-    const activePhone = phone.trim()
+    const activePhone = cleanPhone
     localStorage.setItem("messmate_phone", activePhone)
 
     const issueText = issue.trim() || "Requested campus team callback."
@@ -2958,12 +3051,18 @@ function SupportChatWidget({
                 </div>
 
                 <div className="support-field">
-                  <label>Phone Number</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                    <label>Phone Number</label>
+                    <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                      {phone.replace(/\D/g, "").length}/10 digits
+                    </span>
+                  </div>
                   <input
                     type="tel"
-                    placeholder="e.g. 9876543210"
+                    maxLength={10}
+                    placeholder="10-digit mobile number"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     required
                   />
                 </div>
@@ -2988,7 +3087,7 @@ function SupportChatWidget({
                   <button
                     type="submit"
                     className="primary-button olive"
-                    disabled={isSubmitting || !name.trim() || !phone.trim()}
+                    disabled={isSubmitting || !name.trim() || phone.replace(/\D/g, "").length !== 10}
                     style={{ flex: 1, minHeight: 44, fontSize: 13 }}
                   >
                     {isSubmitting ? "Submitting..." : "Submit & Contact Me"}
@@ -3006,7 +3105,7 @@ function SupportChatWidget({
                 </div>
                 <div className="support-status-copy">
                   <strong>We will contact you shortly!</strong>
-                  <span>Reaching out to <strong>{phone}</strong></span>
+                  <span>Reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
                 </div>
                 <button
                   type="button"
@@ -3090,7 +3189,7 @@ export default function App() {
 
   const [details, setDetails] = useState<CustomerDetails>(() => ({
     name: "",
-    phone: localStorage.getItem("messmate_phone") || "",
+    phone: (localStorage.getItem("messmate_phone") || "").replace(/\D/g, "").slice(-10),
     hostel: "",
     room: "",
   }))
@@ -3354,7 +3453,9 @@ export default function App() {
         {activeReadyOrder && (
           <div className="ready-order-alert-banner">
             <div className="alert-banner-content">
-              <span className="alert-bell">🎉</span>
+              <span className="alert-bell">
+                <Icon name="bell" size={16} />
+              </span>
               <div>
                 <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
                 <p>
@@ -3379,7 +3480,7 @@ export default function App() {
                 }}
                 aria-label="Dismiss alert"
               >
-                ✕
+                <Icon name="close" size={14} />
               </button>
             </div>
           </div>

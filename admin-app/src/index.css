@@ -1725,3 +1725,38 @@ button, input, select, textarea {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Revenue Scope Toggle Buttons */
+.revenue-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: #eef1e6;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.revenue-toggle-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.revenue-toggle-btn:hover {
+  color: var(--text);
+}
+
+.revenue-toggle-btn.active {
+  background: #ffffff;
+  color: var(--olive);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
