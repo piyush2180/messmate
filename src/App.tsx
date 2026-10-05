@@ -2721,6 +2721,71 @@ function getAutomatedAnswer(query: string): string {
   return "Thanks for asking! For order-specific requests or anything else, click 'Request Live Chat Support' below to speak directly with our team."
 }
 
+function mergeSupportMessages(
+  existing: SupportMsg[],
+  incomingList: SupportMsg[]
+): SupportMsg[] {
+  let result = [...existing]
+
+  for (const incoming of incomingList) {
+    if (!incoming || !incoming.message) continue
+
+    // 1. Direct ID match
+    const exactIndex = result.findIndex((m) => m.id === incoming.id)
+    if (exactIndex !== -1) {
+      result[exactIndex] = { ...result[exactIndex], ...incoming }
+      continue
+    }
+
+    // 2. Fuzzy match for optimistic local messages vs canonical server messages
+    const fuzzyIndex = result.findIndex((m) => {
+      const sameSender = m.sender === incoming.sender
+      const p1 = (m.phone || "").replace(/\D/g, "").slice(-10)
+      const p2 = (incoming.phone || "").replace(/\D/g, "").slice(-10)
+      const samePhone = !p1 || !p2 || p1 === p2
+      const sameText = m.message.trim() === incoming.message.trim()
+      const t1 = new Date(m.created_at).getTime()
+      const t2 = new Date(incoming.created_at).getTime()
+      const sameTimeWindow = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
+
+      return sameSender && samePhone && sameText && sameTimeWindow
+    })
+
+    if (fuzzyIndex !== -1) {
+      const existingMsg = result[fuzzyIndex]
+      const incomingIsCanonical =
+        !incoming.id.startsWith("msg-") &&
+        !incoming.id.startsWith("local-") &&
+        !incoming.id.startsWith("admin-")
+      result[fuzzyIndex] = incomingIsCanonical ? incoming : existingMsg
+    } else {
+      result.push(incoming)
+    }
+  }
+
+  // Deduplicate any repeated messages with identical content in close proximity
+  const deduped: SupportMsg[] = []
+  for (const msg of result) {
+    const isDup = deduped.some((d) => {
+      if (d.id === msg.id) return true
+      const sameSender = d.sender === msg.sender
+      const p1 = (d.phone || "").replace(/\D/g, "").slice(-10)
+      const p2 = (msg.phone || "").replace(/\D/g, "").slice(-10)
+      const samePhone = !p1 || !p2 || p1 === p2
+      const sameText = d.message.trim() === msg.message.trim()
+      const t1 = new Date(d.created_at).getTime()
+      const t2 = new Date(msg.created_at).getTime()
+      const sameTime = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
+      return sameSender && samePhone && sameText && sameTime
+    })
+    if (!isDup) deduped.push(msg)
+  }
+
+  return deduped.sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
+}
+
 function SupportChatWidget({
   customerPhone = "",
   customerName = "",
@@ -2759,7 +2824,7 @@ function SupportChatWidget({
       if (p) {
         const clean = p.replace(/\D/g, "").slice(-10)
         const saved = localStorage.getItem(`messmate_chat_${clean}`)
-        if (saved) return JSON.parse(saved)
+        if (saved) return mergeSupportMessages([], JSON.parse(saved))
       }
     } catch {}
     return []
@@ -2791,7 +2856,9 @@ function SupportChatWidget({
   useEffect(() => {
     if (!supabase) return
 
-    const broadcastChannel = supabase.channel("messmate_support_broadcast")
+    const broadcastChannel = supabase.channel("messmate_support_broadcast", {
+      config: { broadcast: { self: false } },
+    })
 
     broadcastChannel
       .on("broadcast", { event: "support_msg" }, ({ payload }) => {
@@ -2802,16 +2869,7 @@ function SupportChatWidget({
 
         if (incomingPhone && currentPhone && incomingPhone === currentPhone) {
           setLiveMessages((prev) => {
-            if (
-              prev.some(
-                (m) =>
-                  m.id === incoming.id ||
-                  (m.created_at === incoming.created_at && m.message === incoming.message)
-              )
-            ) {
-              return prev
-            }
-            const next = [...prev, incoming]
+            const next = mergeSupportMessages(prev, [incoming])
             saveChatToLocal(currentPhone, next)
             return next
           })
@@ -2850,12 +2908,7 @@ function SupportChatWidget({
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
           setLiveMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id))
-            const incoming = (data as SupportMsg[]).filter((m) => !existingIds.has(m.id))
-            if (incoming.length === 0) return prev
-            const next = [...prev, ...incoming].sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            )
+            const next = mergeSupportMessages(prev, data as SupportMsg[])
             saveChatToLocal(clean, next)
             return next
           })
@@ -2876,8 +2929,7 @@ function SupportChatWidget({
           const newMsg = payload.new as SupportMsg
           if (newMsg.phone === clean) {
             setLiveMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev
-              const next = [...prev, newMsg]
+              const next = mergeSupportMessages(prev, [newMsg])
               saveChatToLocal(clean, next)
               return next
             })
@@ -2966,7 +3018,7 @@ function SupportChatWidget({
       created_at: new Date().toISOString(),
     }
 
-    const nextMsgs = [initialCustomerMsg, acknowledgmentMsg]
+    const nextMsgs = mergeSupportMessages([], [initialCustomerMsg, acknowledgmentMsg])
     setLiveMessages(nextMsgs)
     saveChatToLocal(activePhone, nextMsgs)
     setView("live")
@@ -3013,7 +3065,7 @@ function SupportChatWidget({
       message: text,
       created_at: new Date().toISOString(),
     }
-    const next = [...liveMessages, optimistic]
+    const next = mergeSupportMessages(liveMessages, [optimistic])
     setLiveMessages(next)
     saveChatToLocal(cleanPhone, next)
 
