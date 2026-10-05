@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
 import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
-import phonepeQrImg from "./assets/phonepe-qr.png"
+import { PHONEPE_QR_BASE64 } from "./assets/phonepeQrData"
 
 type Screen =
   | "home"
@@ -1769,9 +1769,6 @@ function Payment({
                     <span className="pe-symbol-small">पे</span>
                     <span>PhonePe Merchant</span>
                   </div>
-                  <span className="verified-pill">
-                    <Icon name="shield" size={12} /> Verified Merchant
-                  </span>
                 </div>
 
                 <div className="merchant-meta-row">
@@ -1789,14 +1786,9 @@ function Payment({
                 {/* The Official PhonePe QR Image */}
                 <div className="qr-container">
                   <img
-                    src={phonepeQrImg}
+                    src={PHONEPE_QR_BASE64}
                     alt="PhonePe QR Code - MessMate"
                     className="phonepe-qr-img"
-                    onError={(e) => {
-                      if (e.currentTarget.src !== "/phonepe-qr.png") {
-                        e.currentTarget.src = "/phonepe-qr.png"
-                      }
-                    }}
                   />
                   <div className="qr-scan-instruction">
                     <span>Scan with <strong>any UPI app</strong>: PhonePe, GPay, Paytm, CRED</span>
