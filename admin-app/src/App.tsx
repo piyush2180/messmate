@@ -35,11 +35,11 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true)
 
   // Filters
+  // Filters
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [fulfilmentFilter, setFulfilmentFilter] = useState<string>("all")
   const [slotFilter, setSlotFilter] = useState<string>("all")
-  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban")
 
   // Support thread state
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null)
@@ -300,26 +300,6 @@ export default function App() {
               <span>Analytics</span>
             </button>
           </nav>
-
-          {/* Header Actions */}
-          <div className="header-actions">
-            <div className="live-indicator">
-              <span className="live-dot" />
-              <span>Realtime Live</span>
-            </div>
-            <button
-              type="button"
-              className={`sound-toggle-btn ${soundEnabled ? "active" : ""}`}
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              title={soundEnabled ? "Sound Alert On" : "Sound Alert Off"}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                {soundEnabled && <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />}
-              </svg>
-              <span>{soundEnabled ? "Chime On" : "Chime Off"}</span>
-            </button>
-          </div>
         </div>
       </header>
 
@@ -367,6 +347,28 @@ export default function App() {
         {/* Tab 1: Live Orders */}
         {tab === "orders" && (
           <>
+            {/* Quick Status Filter Tabs Ribbon */}
+            <div className="status-tabs-ribbon">
+              {[
+                { id: "all", label: "All Orders", count: orders.length },
+                { id: "placed", label: "Placed", count: orders.filter((o) => o.status === "placed").length },
+                { id: "preparing", label: "Preparing", count: orders.filter((o) => o.status === "preparing").length },
+                { id: "ready", label: "Ready", count: orders.filter((o) => o.status === "ready").length },
+                { id: "delivered", label: "Delivered", count: orders.filter((o) => o.status === "delivered").length },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  className={`status-pill-btn ${statusFilter === pill.id ? "active" : ""}`}
+                  onClick={() => setStatusFilter(pill.id)}
+                >
+                  <span className={`status-dot ${pill.id}`} />
+                  <span>{pill.label}</span>
+                  <span className="status-pill-counter">{pill.count}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Filter and Search Bar */}
             <div className="controls-bar">
               <div className="search-input-wrap">
@@ -378,30 +380,26 @@ export default function App() {
                   onChange={(e) => setSearch(e.target.value)}
                   className="search-input"
                 />
+                {search && (
+                  <button
+                    type="button"
+                    className="search-clear-btn"
+                    onClick={() => setSearch("")}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
 
               <div className="filters-group">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="placed">Placed (New)</option>
-                  <option value="preparing">Preparing</option>
-                  <option value="ready">Ready</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-
                 <select
                   value={fulfilmentFilter}
                   onChange={(e) => setFulfilmentFilter(e.target.value)}
                   className="filter-select"
                 >
                   <option value="all">All Fulfilment</option>
-                  <option value="delivery">Hostel Room Delivery</option>
-                  <option value="pickup">Campus Pickup</option>
+                  <option value="delivery">Hostel Room Delivery (₹7)</option>
+                  <option value="pickup">Campus Pickup Table</option>
                 </select>
 
                 <select
@@ -414,231 +412,36 @@ export default function App() {
                   <option value="8:30–9:00 PM">8:30–9:00 PM</option>
                   <option value="9:00–9:30 PM">9:00–9:30 PM</option>
                 </select>
-
-                <div className="view-mode-toggle">
-                  <button
-                    type="button"
-                    className={`view-mode-btn ${viewMode === "kanban" ? "active" : ""}`}
-                    onClick={() => setViewMode("kanban")}
-                  >
-                    Kanban
-                  </button>
-                  <button
-                    type="button"
-                    className={`view-mode-btn ${viewMode === "table" ? "active" : ""}`}
-                    onClick={() => setViewMode("table")}
-                  >
-                    Table
-                  </button>
-                </div>
               </div>
             </div>
 
-            {/* Kanban View */}
-            {viewMode === "kanban" && (
-              <div className="kanban-board">
-                {/* Column 1: Placed (New Orders) */}
-                <div className="kanban-column">
-                  <div className="kanban-col-header">
-                    <div className="kanban-col-title">
-                      <span className="status-dot placed" />
-                      <span>Placed (New)</span>
-                    </div>
-                    <span className="kanban-badge-count">
-                      {filteredOrders.filter((o) => o.status === "placed").length}
-                    </span>
-                  </div>
-                  {filteredOrders
-                    .filter((o) => o.status === "placed")
-                    .map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
-                    ))}
-                  {filteredOrders.filter((o) => o.status === "placed").length === 0 && (
-                    <div className="empty-state">
-                      <p>No new orders pending prep</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Column 2: Preparing */}
-                <div className="kanban-column">
-                  <div className="kanban-col-header">
-                    <div className="kanban-col-title">
-                      <span className="status-dot preparing" />
-                      <span>Preparing in Kitchen</span>
-                    </div>
-                    <span className="kanban-badge-count">
-                      {filteredOrders.filter((o) => o.status === "preparing").length}
-                    </span>
-                  </div>
-                  {filteredOrders
-                    .filter((o) => o.status === "preparing")
-                    .map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
-                    ))}
-                  {filteredOrders.filter((o) => o.status === "preparing").length === 0 && (
-                    <div className="empty-state">
-                      <p>No orders currently in prep</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Column 3: Ready */}
-                <div className="kanban-column">
-                  <div className="kanban-col-header">
-                    <div className="kanban-col-title">
-                      <span className="status-dot ready" />
-                      <span>Ready for Pickup / Drop</span>
-                    </div>
-                    <span className="kanban-badge-count">
-                      {filteredOrders.filter((o) => o.status === "ready").length}
-                    </span>
-                  </div>
-                  {filteredOrders
-                    .filter((o) => o.status === "ready")
-                    .map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
-                    ))}
-                  {filteredOrders.filter((o) => o.status === "ready").length === 0 && (
-                    <div className="empty-state">
-                      <p>No orders waiting for delivery</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Column 4: Delivered / Completed */}
-                <div className="kanban-column">
-                  <div className="kanban-col-header">
-                    <div className="kanban-col-title">
-                      <span className="status-dot delivered" />
-                      <span>Delivered / Done</span>
-                    </div>
-                    <span className="kanban-badge-count">
-                      {filteredOrders.filter((o) => o.status === "delivered").length}
-                    </span>
-                  </div>
-                  {filteredOrders
-                    .filter((o) => o.status === "delivered")
-                    .slice(0, 10)
-                    .map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
-                    ))}
-                  {filteredOrders.filter((o) => o.status === "delivered").length === 0 && (
-                    <div className="empty-state">
-                      <p>No completed orders yet</p>
-                    </div>
-                  )}
-                </div>
+            {/* Orders Feed (Responsive Cards) */}
+            {filteredOrders.length === 0 ? (
+              <div className="empty-state">
+                <p>No orders found matching this filter.</p>
+                <button
+                  type="button"
+                  className="action-btn secondary"
+                  style={{ width: "auto", padding: "8px 20px" }}
+                  onClick={() => {
+                    setStatusFilter("all")
+                    setFulfilmentFilter("all")
+                    setSlotFilter("all")
+                    setSearch("")
+                  }}
+                >
+                  Reset All Filters
+                </button>
               </div>
-            )}
-
-            {/* Table View */}
-            {viewMode === "table" && (
-              <div className="orders-table-card">
-                <table className="orders-table">
-                  <thead>
-                    <tr>
-                      <th>Order</th>
-                      <th>Time & Slot</th>
-                      <th>Customer</th>
-                      <th>Fulfilment</th>
-                      <th>Items</th>
-                      <th>Payment / UTR</th>
-                      <th>Total</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order) => (
-                      <tr key={order.id}>
-                        <td>
-                          <strong>#{order.order_number}</strong>
-                        </td>
-                        <td>
-                          <div>{new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-                          <small style={{ color: "var(--muted)" }}>{order.slot}</small>
-                        </td>
-                        <td>
-                          <div><strong>{order.customer_name}</strong></div>
-                          <a href={`tel:${order.customer_phone}`} style={{ color: "var(--olive)", fontSize: 12 }}>
-                            {order.customer_phone}
-                          </a>
-                        </td>
-                        <td>
-                          <span className={`order-fulfilment-pill ${order.fulfilment}`}>
-                            {order.fulfilment === "delivery"
-                              ? `Room Drop (${order.hostel || "Hostel"}, ${order.room || "Room"})`
-                              : "Pickup (Hostel 3)"}
-                          </span>
-                        </td>
-                        <td>
-                          {(order.items || []).map((it, idx) => (
-                            <div key={idx} style={{ fontSize: 12 }}>
-                              {it.quantity}x {it.name}
-                            </div>
-                          ))}
-                        </td>
-                        <td>
-                          {order.payment_method?.includes("PhonePe") ? (
-                            <div className="table-payment-cell">
-                              <span className="table-badge phonepe">⚡ PhonePe UPI</span>
-                              {order.payment_method.includes("UTR:") && (
-                                <code className="table-utr-tag">
-                                  {order.payment_method.split("UTR:")[1]?.replace(")", "").trim()}
-                                </code>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="table-badge counter">{order.payment_method || "Counter"}</span>
-                          )}
-                        </td>
-                        <td>
-                          <strong>₹{order.total}</strong>
-                        </td>
-                        <td>
-                          <select
-                            value={order.status}
-                            onChange={(e) => handleUpdateStatus(order.id, e.target.value as OrderStatus)}
-                            className="filter-select"
-                            style={{ fontSize: 11, padding: "4px 8px" }}
-                          >
-                            <option value="placed">Placed</option>
-                            <option value="preparing">Preparing</option>
-                            <option value="ready">Ready</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </td>
-                        <td>
-                          <a
-                            href={`tel:${order.customer_phone}`}
-                            className="action-btn call"
-                            title="Call Student"
-                          >
-                            📞 Call
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            ) : (
+              <div className="orders-feed-grid">
+                {filteredOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onUpdateStatus={handleUpdateStatus}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -808,7 +611,7 @@ export default function App() {
   )
 }
 
-// Order Card Component for Kanban
+// Responsive Touch-Optimized Order Card
 function OrderCard({
   order,
   onUpdateStatus,
@@ -816,100 +619,167 @@ function OrderCard({
   order: OrderRecord
   onUpdateStatus: (id: string, next: OrderStatus) => void
 }) {
+  const [copiedUtr, setCopiedUtr] = useState(false)
+  const utrMatch = order.payment_method?.match(/UTR:\s*([A-Za-z0-9]+)/i)
+  const utrCode = utrMatch ? utrMatch[1] : null
+
+  const handleCopyUtr = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (utrCode && navigator.clipboard) {
+      navigator.clipboard.writeText(utrCode)
+      setCopiedUtr(true)
+      setTimeout(() => setCopiedUtr(false), 2000)
+    }
+  }
+
+  const statusMap: Record<OrderStatus, { label: string; icon: string; cls: string }> = {
+    placed: { label: "Placed (New)", icon: "🕒", cls: "placed" },
+    preparing: { label: "Preparing", icon: "🔥", cls: "preparing" },
+    ready: { label: "Ready", icon: "📦", cls: "ready" },
+    delivered: { label: "Delivered", icon: "✅", cls: "delivered" },
+    cancelled: { label: "Cancelled", icon: "❌", cls: "cancelled" },
+  }
+  const st = statusMap[order.status] || { label: order.status, icon: "•", cls: "placed" }
+
   return (
-    <div className="order-card">
-      <div className="order-card-top">
-        <span className="order-number-badge">#{order.order_number}</span>
-        <span className="order-time">
-          {new Date(order.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+    <div className={`order-card-mobile ${order.status}`}>
+      {/* Top Header Row */}
+      <div className="card-top-bar">
+        <div className="card-top-left">
+          <span className={`order-status-badge ${st.cls}`}>
+            <span>{st.icon}</span>
+            <span>{st.label}</span>
+          </span>
+          <span className="order-number-pill">#{order.order_number}</span>
+        </div>
+        <div className="order-time-slot">
+          <span className="order-time-text">
+            {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <span className="order-slot-pill">{order.slot}</span>
+        </div>
       </div>
 
-      <div className="order-customer-info">
-        <span className="customer-name">{order.customer_name || "Campus Student"}</span>
-        <span className="customer-location">
-          {order.fulfilment === "delivery" ? (
-            <>🚪 {order.hostel || "Hostel"}, Room {order.room || "—"}</>
-          ) : (
-            <>📍 Hostel 3 Pickup Table</>
-          )}
-        </span>
+      {/* Customer Info & Location */}
+      <div className="card-customer-row">
+        <div className="customer-info-block">
+          <span className="customer-name-heading">{order.customer_name || "Campus Student"}</span>
+          <span className="customer-location-desc">
+            {order.fulfilment === "delivery" ? (
+              <>🚪 {order.hostel || "Hostel"}, Room {order.room || "—"}</>
+            ) : (
+              <>📍 Hostel 3 Pickup Point</>
+            )}
+          </span>
+        </div>
+        <a
+          href={`tel:${order.customer_phone}`}
+          className="customer-call-action"
+          title={`Call ${order.customer_phone}`}
+        >
+          <span>📞</span>
+          <span>{order.customer_phone}</span>
+        </a>
       </div>
 
-      <div className={`order-fulfilment-pill ${order.fulfilment}`}>
-        {order.fulfilment === "delivery" ? "Room Delivery (₹7)" : "Free Pickup"}
+      <div className={`fulfilment-pill-row ${order.fulfilment}`}>
+        <span>{order.fulfilment === "delivery" ? "🚀 Hostel Room Delivery (₹7)" : "🛍️ Campus Pickup (Hostel 3)"}</span>
       </div>
 
-      <div className="order-items-box">
+      {/* Items List */}
+      <div className="card-items-block">
         {(order.items || []).map((item, idx) => (
-          <div key={idx}>
-            <div className="order-item-row">
-              <strong>{item.quantity}x {item.name}</strong>
-              <span>₹{item.price * item.quantity}</span>
-            </div>
-            {item.detail && <div className="order-item-detail">{item.detail}</div>}
+          <div key={idx} className="card-item-entry">
+            <span className="item-title">
+              <strong className="item-qty-tag">{item.quantity}×</strong>
+              <span>{item.name}</span>
+              {item.detail && <small className="item-subdetail">({item.detail})</small>}
+            </span>
+            <span className="item-price-tag">₹{item.price * item.quantity}</span>
           </div>
         ))}
       </div>
 
-      <div className="order-card-footer">
-        <span className="order-total-price">₹{order.total}</span>
-        {order.payment_method?.includes("PhonePe") ? (
-          <div className="phonepe-admin-badge" title="PhonePe UPI">
-            <span>⚡ {order.payment_method}</span>
-          </div>
-        ) : (
-          <span className="order-payment-method">{order.payment_method || "Counter"}</span>
-        )}
+      {/* Payment & Amount Row */}
+      <div className="card-payment-amount-row">
+        <div className="payment-badge-wrap">
+          {order.payment_method?.includes("PhonePe") ? (
+            <div className="phonepe-status-pill">
+              <span className="pe-bolt">⚡</span>
+              <span className="pe-brand">PhonePe UPI</span>
+              {utrCode && (
+                <button
+                  type="button"
+                  className="utr-inline-badge"
+                  onClick={handleCopyUtr}
+                  title="Click to copy UTR"
+                >
+                  <code>{utrCode}</code>
+                  <span className="utr-copy-state">{copiedUtr ? "✓" : "📋"}</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <span className="counter-status-pill">{order.payment_method || "Pay at Counter"}</span>
+          )}
+        </div>
+        <div className="amount-display-box">
+          <small>Total Amount</small>
+          <strong>₹{order.total}</strong>
+        </div>
       </div>
 
-      <div className="card-actions">
-        <a href={`tel:${order.customer_phone}`} className="action-btn call" title="Call Student">
-          📞
-        </a>
-
+      {/* Touch-Friendly Action Buttons */}
+      <div className="card-action-buttons">
         {order.status === "placed" && (
-          <button
-            type="button"
-            className="action-btn blue"
-            onClick={() => onUpdateStatus(order.id, "preparing")}
-          >
-            Start Prep →
-          </button>
+          <>
+            <button
+              type="button"
+              className="action-btn blue main-touch-btn"
+              onClick={() => onUpdateStatus(order.id, "preparing")}
+            >
+              🔥 Start Kitchen Prep →
+            </button>
+            <button
+              type="button"
+              className="action-btn secondary cancel-touch-btn"
+              onClick={() => onUpdateStatus(order.id, "cancelled")}
+            >
+              Cancel
+            </button>
+          </>
         )}
 
         {order.status === "preparing" && (
           <button
             type="button"
-            className="action-btn green"
+            className="action-btn green main-touch-btn"
             onClick={() => onUpdateStatus(order.id, "ready")}
           >
-            Mark Ready ✓
+            📦 Mark Ready for Pickup / Drop ✓
           </button>
         )}
 
         {order.status === "ready" && (
           <button
             type="button"
-            className="action-btn primary"
+            className="action-btn primary main-touch-btn"
             onClick={() => onUpdateStatus(order.id, "delivered")}
           >
-            Mark Delivered ✓
+            ✅ Complete & Mark Delivered ✓
           </button>
         )}
 
-        {order.status !== "cancelled" && order.status !== "delivered" && (
-          <button
-            type="button"
-            className="action-btn secondary"
-            onClick={() => onUpdateStatus(order.id, "cancelled")}
-            title="Cancel order"
-          >
-            Cancel
-          </button>
+        {order.status === "delivered" && (
+          <div className="order-closed-banner">
+            <span>✅ Completed & Delivered</span>
+          </div>
+        )}
+
+        {order.status === "cancelled" && (
+          <div className="order-cancelled-banner">
+            <span>❌ Order Cancelled</span>
+          </div>
         )}
       </div>
     </div>
