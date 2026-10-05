@@ -2774,6 +2774,17 @@ function getAutomatedAnswer(query: string): string {
     return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
   }
   if (
+    q.includes("track") ||
+    q.includes("status") ||
+    q.includes("where is my order") ||
+    q.includes("where is my food") ||
+    q.includes("where is my delivery") ||
+    q.includes("where is order") ||
+    q.includes("order progress")
+  ) {
+    return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
+  }
+  if (
     q.includes("delivery") ||
     q.includes("timing") ||
     q.includes("time") ||
@@ -2783,11 +2794,16 @@ function getAutomatedAnswer(query: string): string {
     return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and campus pickup is free!"
   }
   if (
-    q.includes("pickup") ||
-    q.includes("where") ||
+    q.includes("pickup point") ||
+    q.includes("pickup location") ||
+    q.includes("where to collect") ||
+    q.includes("where to pick") ||
+    q.includes("where is pickup") ||
+    q.includes("pickup station") ||
     q.includes("hostel 3") ||
-    q.includes("point") ||
-    q.includes("location")
+    q.includes("apj block") ||
+    q.includes("asima") ||
+    (q.includes("pickup") && !q.includes("pin"))
   ) {
     return "Pickups are available at Hostel 3 Entrance, APJ Abdul Kalam Block (Room 341), and Asima Hostel. Select your preferred station during checkout!"
   }
@@ -2810,9 +2826,6 @@ function getAutomatedAnswer(query: string): string {
     q.includes("expiry")
   ) {
     return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with cold-pressed oils."
-  }
-  if (q.includes("track") || q.includes("status") || q.includes("where is")) {
-    return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
   }
   if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
     return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our MessMate Support Team can update your order right away!"

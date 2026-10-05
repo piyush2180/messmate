@@ -27,6 +27,7 @@ export function getPickupPin(order: { pickup_code?: string; order_number?: numbe
   if (order.pickup_code && String(order.pickup_code).length >= 4) {
     return String(order.pickup_code)
   }
-  const num = Number(order.order_number) || 1048
-  return String(1000 + ((num * 73 + 49) % 9000))
+  const parsed = Number(order.order_number)
+  const rawNum = isNaN(parsed) ? 1048 : Math.floor(Math.abs(parsed))
+  return String(1000 + ((rawNum * 73 + 49) % 9000))
 }
