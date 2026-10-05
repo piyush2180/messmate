@@ -2049,29 +2049,73 @@ function OrderRatingWidget({
   initialRating?: number
   initialFeedback?: string
 }) {
-  const [rating, setRating] = useState(initialRating || 0)
+  const [rating, setRating] = useState(() => {
+    if (initialRating) return initialRating
+    try {
+      const saved = localStorage.getItem(`messmate_order_rating_${orderId}`)
+      if (saved) return JSON.parse(saved).rating || 0
+    } catch {}
+    return 0
+  })
   const [hovered, setHovered] = useState(0)
-  const [feedback, setFeedback] = useState(initialFeedback || "")
-  const [submitted, setSubmitted] = useState(Boolean(initialRating))
+  const [feedback, setFeedback] = useState(() => {
+    if (initialFeedback) return initialFeedback
+    try {
+      const saved = localStorage.getItem(`messmate_order_rating_${orderId}`)
+      if (saved) return JSON.parse(saved).feedback || ""
+    } catch {}
+    return ""
+  })
+  const [submitted, setSubmitted] = useState(() => {
+    if (initialRating) return true
+    try {
+      const saved = localStorage.getItem(`messmate_order_rating_${orderId}`)
+      if (saved && JSON.parse(saved).rating) return true
+    } catch {}
+    return false
+  })
   const [isSending, setIsSending] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!rating) return
     setIsSending(true)
+    const trimmed = feedback.trim()
+
+    // 1. Cache rating locally
     try {
-      if (supabase) {
+      localStorage.setItem(
+        `messmate_order_rating_${orderId}`,
+        JSON.stringify({ rating, feedback: trimmed })
+      )
+    } catch {}
+
+    // 2. Broadcast across Realtime channel so Admin receives it instantly
+    if (supabase) {
+      try {
+        const bc = supabase.channel("messmate_support_broadcast")
+        bc.send({
+          type: "broadcast",
+          event: "order_rating",
+          payload: { orderId, rating, feedback: trimmed },
+        })
+      } catch (err) {
+        console.warn("Rating broadcast notice:", err)
+      }
+
+      // 3. Save to Supabase DB table if column exists
+      try {
         await supabase
           .from("orders")
-          .update({ rating, rating_feedback: feedback.trim() })
+          .update({ rating, rating_feedback: trimmed })
           .eq("id", orderId)
+      } catch (err) {
+        console.warn("Rating save notice (run SQL migration to persist in database):", err)
       }
-    } catch (err) {
-      console.warn("Rating save notice:", err)
-    } finally {
-      setIsSending(false)
-      setSubmitted(true)
     }
+
+    setIsSending(false)
+    setSubmitted(true)
   }
 
   if (submitted) {

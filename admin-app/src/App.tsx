@@ -89,7 +89,22 @@ export default function App() {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!error && data) {
-          setOrders(data as OrderRecord[])
+          try {
+            const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
+            const merged = (data as OrderRecord[]).map((o) => {
+              if (cachedRatings[o.id]) {
+                return {
+                  ...o,
+                  rating: o.rating ?? cachedRatings[o.id].rating,
+                  rating_feedback: o.rating_feedback ?? cachedRatings[o.id].feedback,
+                }
+              }
+              return o
+            })
+            setOrders(merged)
+          } catch {
+            setOrders(data as OrderRecord[])
+          }
         }
       })
 
@@ -170,6 +185,22 @@ export default function App() {
         })
         if (soundEnabled && newMsg.sender === "customer") {
           playOrderChime()
+        }
+      })
+      .on("broadcast", { event: "order_rating" }, ({ payload }) => {
+        if (payload?.orderId && payload?.rating) {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === payload.orderId
+                ? { ...o, rating: payload.rating, rating_feedback: payload.feedback }
+                : o
+            )
+          )
+          try {
+            const cached = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
+            cached[payload.orderId] = { rating: payload.rating, feedback: payload.feedback }
+            localStorage.setItem("messmate_cached_ratings", JSON.stringify(cached))
+          } catch {}
         }
       })
       .on("broadcast", { event: "sync_history" }, ({ payload }) => {
@@ -687,7 +718,11 @@ export default function App() {
               </div>
             </div>
             <div className="kpi-value">{stats.avgRating} <small style={{ fontSize: 13, color: "var(--muted)" }}>/ 5.0</small></div>
-            <span className="kpi-subtext">{stats.ratedCount} delivered reviews</span>
+            <span className="kpi-subtext">
+              {stats.ratedCount === 0
+                ? "0 delivered reviews yet"
+                : `${stats.ratedCount} delivered review${stats.ratedCount > 1 ? "s" : ""}`}
+            </span>
           </div>
         </section>
 
