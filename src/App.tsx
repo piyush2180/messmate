@@ -1355,8 +1355,15 @@ function Checkout({
   setFulfilment: (value: "pickup" | "delivery") => void
   pickupPoint: string
 }) {
-  const set = (key: keyof CustomerDetails, value: string) =>
+  const set = (key: keyof CustomerDetails, value: string) => {
     setDetails({ ...details, [key]: value })
+    try {
+      if (key === "name") localStorage.setItem("messmate_customer_name", value)
+      if (key === "phone") localStorage.setItem("messmate_phone", value)
+      if (key === "hostel") localStorage.setItem("messmate_hostel", value)
+      if (key === "room") localStorage.setItem("messmate_room", value)
+    } catch {}
+  }
 
   const cleanPhone = details.phone.replace(/\D/g, "")
   const isPhoneValid = cleanPhone.length === 10
@@ -3453,10 +3460,10 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([])
 
   const [details, setDetails] = useState<CustomerDetails>(() => ({
-    name: "",
+    name: localStorage.getItem("messmate_customer_name") || "",
     phone: (localStorage.getItem("messmate_phone") || "").replace(/\D/g, "").slice(-10),
-    hostel: "",
-    room: "",
+    hostel: localStorage.getItem("messmate_hostel") || "",
+    room: localStorage.getItem("messmate_room") || "",
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
@@ -3682,8 +3689,15 @@ export default function App() {
           .select("order_number")
           .single()
 
-        // Fallback: If DB columns pickup_code or payment_status not yet added in Supabase
-        if (error && error.code === "42703") {
+        // Fallback: If DB columns pickup_code or payment_status not yet added in Supabase (PGRST204, 42703, or schema cache notice)
+        if (
+          error &&
+          (error.code === "PGRST204" ||
+            error.code === "42703" ||
+            error.message?.includes("schema cache") ||
+            error.message?.includes("column"))
+        ) {
+          console.warn("Retrying order insert with core schema columns:", error.message)
           delete payload.pickup_code
           delete payload.payment_status
           const retry = await supabase
@@ -3697,18 +3711,34 @@ export default function App() {
 
         if (error) {
           console.error("Supabase insert error:", error)
-        } else if (data?.order_number) {
+          alert("Could not place order: " + (error.message || "Please check connection and retry."))
+          return
+        }
+
+        if (data?.order_number) {
           setOrderNumber(data.order_number)
           if (details.phone) {
             localStorage.setItem("messmate_phone", details.phone)
           }
+          if (details.name) {
+            localStorage.setItem("messmate_customer_name", details.name)
+          }
+          if (details.hostel) {
+            localStorage.setItem("messmate_hostel", details.hostel)
+          }
+          if (details.room) {
+            localStorage.setItem("messmate_room", details.room)
+          }
+          // Clear cart so subsequent orders start fresh
+          setCart([])
+          go("confirmation")
         }
       }
     } catch (err) {
       console.error("Failed to place order:", err)
+      alert("Failed to place order. Please try again.")
     } finally {
       setIsSubmitting(false)
-      go("confirmation")
     }
   }
 
