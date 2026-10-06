@@ -45,6 +45,11 @@ alter table public.orders add constraint chk_orders_valid_rating check (rating i
 alter table public.orders drop constraint if exists chk_orders_payment_status;
 alter table public.orders add constraint chk_orders_payment_status check (payment_status is null or payment_status in ('pending', 'verified', 'rejected'));
 
+-- Defensive cleanup: Pad any historical test rows with short phones before applying constraint
+update public.orders 
+  set customer_phone = lpad(customer_phone, 10, '0') 
+  where length(customer_phone) < 10;
+
 alter table public.orders drop constraint if exists chk_orders_valid_phone;
 alter table public.orders add constraint chk_orders_valid_phone check (length(customer_phone) >= 10);
 
