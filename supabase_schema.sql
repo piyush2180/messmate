@@ -1,9 +1,9 @@
 -- MessMate Database Schema for Supabase
--- Fully Idempotent (Safe to run multiple times without errors)
+-- Fully Idempotent & Security Hardened
 -- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 
 -- ============================================================================
--- 1. Orders Table
+-- 1. Orders Table & Security Constraints
 -- ============================================================================
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
@@ -29,19 +29,68 @@ alter table public.orders add column if not exists payment_status text default '
 alter table public.orders add column if not exists rating integer;
 alter table public.orders add column if not exists rating_feedback text;
 
--- RLS & Policies for Orders
+-- PostgreSQL CHECK Constraints for Financial & Data Integrity (Anti-Tamper)
+alter table public.orders drop constraint if exists chk_orders_positive_total;
+alter table public.orders add constraint chk_orders_positive_total check (total >= 0);
+
+alter table public.orders drop constraint if exists chk_orders_positive_subtotal;
+alter table public.orders add constraint chk_orders_positive_subtotal check (subtotal >= 0);
+
+alter table public.orders drop constraint if exists chk_orders_delivery_fee;
+alter table public.orders add constraint chk_orders_delivery_fee check (delivery_fee in (0, 7));
+
+alter table public.orders drop constraint if exists chk_orders_valid_rating;
+alter table public.orders add constraint chk_orders_valid_rating check (rating is null or (rating >= 1 and rating <= 5));
+
+alter table public.orders drop constraint if exists chk_orders_payment_status;
+alter table public.orders add constraint chk_orders_payment_status check (payment_status is null or payment_status in ('pending', 'verified', 'rejected'));
+
+alter table public.orders drop constraint if exists chk_orders_valid_phone;
+alter table public.orders add constraint chk_orders_valid_phone check (length(customer_phone) >= 10);
+
+-- Trigger: Prevent altering financial details, order number, or items after order is placed
+create or replace function public.protect_order_immutability()
+returns trigger as $$
+begin
+  -- Block tampering with prices, items, or order numbers after creation
+  if new.total <> old.total or new.subtotal <> old.subtotal or new.items <> old.items or new.order_number <> old.order_number then
+    raise exception 'Security violation: Cannot alter order items, subtotal, total, or order number after placement';
+  end if;
+  -- Ensure status only moves through valid states
+  if new.status not in ('placed', 'preparing', 'ready', 'delivered', 'cancelled') then
+    raise exception 'Security violation: Invalid status transition';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_protect_order_immutability on public.orders;
+create trigger trg_protect_order_immutability
+  before update on public.orders
+  for each row
+  execute function public.protect_order_immutability();
+
+-- RLS & Hardened Policies for Orders
 alter table public.orders enable row level security;
 
+-- Policy 1 (Insert): Anyone can place an order, but initial status MUST be 'placed' with non-negative prices
 drop policy if exists "Anyone can place an order" on public.orders;
 create policy "Anyone can place an order"
   on public.orders for insert
-  with check (true);
+  with check (
+    status = 'placed'
+    and total >= 0
+    and subtotal >= 0
+    and length(customer_phone) >= 10
+  );
 
+-- Policy 2 (Select): Allow viewing orders
 drop policy if exists "Anyone can view orders" on public.orders;
 create policy "Anyone can view orders"
   on public.orders for select
   using (true);
 
+-- Policy 3 (Update): Allow updating order status and ratings
 drop policy if exists "Anyone can update orders" on public.orders;
 create policy "Anyone can update orders"
   on public.orders for update
@@ -49,7 +98,7 @@ create policy "Anyone can update orders"
   with check (true);
 
 -- ============================================================================
--- 2. Support Messages Table (Live Student Support Chat)
+-- 2. Support Messages Table & Security Constraints
 -- ============================================================================
 create table if not exists public.support_messages (
   id uuid primary key default gen_random_uuid(),
@@ -60,13 +109,22 @@ create table if not exists public.support_messages (
   created_at timestamptz default now()
 );
 
+-- CHECK constraints for support messages
+alter table public.support_messages drop constraint if exists chk_support_valid_phone;
+alter table public.support_messages add constraint chk_support_valid_phone check (length(phone) >= 10);
+
+alter table public.support_messages drop constraint if exists chk_support_message_length;
+alter table public.support_messages add constraint chk_support_message_length check (length(trim(message)) >= 1 and length(message) <= 2000);
+
 -- RLS & Policies for Support Messages
 alter table public.support_messages enable row level security;
 
 drop policy if exists "Anyone can insert support messages" on public.support_messages;
 create policy "Anyone can insert support messages"
   on public.support_messages for insert
-  with check (true);
+  with check (
+    length(phone) >= 10 and length(trim(message)) >= 1
+  );
 
 drop policy if exists "Anyone can view support messages" on public.support_messages;
 create policy "Anyone can view support messages"
