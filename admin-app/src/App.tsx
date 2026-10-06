@@ -101,6 +101,57 @@ function mergeSupportMessages(
   )
 }
 
+const SEED_SUPPORT_MESSAGES: SupportMessage[] = [
+  {
+    id: "seed-msg-1",
+    phone: "9876543210",
+    customer_name: "Rahul Sharma",
+    sender: "customer",
+    message: "Hi, I placed order #14. When will it be ready for pickup?",
+    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+  },
+  {
+    id: "seed-msg-2",
+    phone: "9876543210",
+    customer_name: "MessMate Support Team",
+    sender: "support",
+    message: "Hello Rahul! Kitchen has started prep, pickup PIN is 2071. Estimated in 12 mins.",
+    created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+  },
+  {
+    id: "seed-msg-3",
+    phone: "9812345678",
+    customer_name: "Priya Patel",
+    sender: "customer",
+    message: "Order #15 delivery to Hostel 4 Room 312: can delivery partner call upon arrival?",
+    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+  },
+  {
+    id: "seed-msg-4",
+    phone: "9812345678",
+    customer_name: "MessMate Support Team",
+    sender: "support",
+    message: "Hi Priya! Delivery runner has your note and will dial you outside Hostel 4.",
+    created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+  },
+  {
+    id: "seed-msg-5",
+    phone: "9898989898",
+    customer_name: "Amit Verma",
+    sender: "customer",
+    message: "Can I customize the fruit bowl with extra pomegranate?",
+    created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+  },
+  {
+    id: "seed-msg-6",
+    phone: "9898989898",
+    customer_name: "MessMate Support Team",
+    sender: "support",
+    message: "Hello Amit! Extra pomegranate is added at the fresh-cut counter at pickup.",
+    created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+  },
+]
+
 export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
@@ -120,12 +171,12 @@ export default function App() {
                   : m.customer_name || m.customerName || "Customer",
             }))
           : []
-        return mergeSupportMessages([], sanitized)
+        return mergeSupportMessages(SEED_SUPPORT_MESSAGES, sanitized)
       }
     } catch (e) {
       console.warn("Could not read local support cache", e)
     }
-    return []
+    return SEED_SUPPORT_MESSAGES
   })
   const [soundEnabled, setSoundEnabled] = useState(true)
 
@@ -155,8 +206,22 @@ export default function App() {
   const [revenuePeriod, setRevenuePeriod] = useState<"today" | "all">("today")
 
   // Support thread state
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 768
+    }
+    return false
+  })
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null)
   const [adminReplyText, setAdminReplyText] = useState("")
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   // Initial Fetch & Realtime for Orders
   useEffect(() => {
@@ -549,23 +614,31 @@ export default function App() {
     }
   }, [orders, supportMessages, inventory])
 
-  // Support Threads grouped by phone
+  // Support Threads grouped by clean 10-digit phone
   const supportThreads = useMemo(() => {
     const threads: Record<string, { customerName: string; messages: SupportMessage[]; latestAt: string }> = {}
     supportMessages.forEach((msg) => {
-      if (!threads[msg.phone]) {
-        threads[msg.phone] = {
+      const cleanPhone = get10DigitPhone(msg.phone) || msg.phone
+      if (!cleanPhone) return
+      if (!threads[cleanPhone]) {
+        threads[cleanPhone] = {
           customerName: msg.customer_name || "Student",
           messages: [],
           latestAt: msg.created_at,
         }
       }
-      threads[msg.phone].messages.push(msg)
-      if (msg.created_at > threads[msg.phone].latestAt) {
-        threads[msg.phone].latestAt = msg.created_at
+      threads[cleanPhone].messages.push(msg)
+      if (msg.created_at > threads[cleanPhone].latestAt) {
+        threads[cleanPhone].latestAt = msg.created_at
       }
-      if (msg.customer_name && msg.customer_name !== "Student") {
-        threads[msg.phone].customerName = msg.customer_name
+      if (
+        msg.customer_name &&
+        msg.customer_name !== "Student" &&
+        msg.customer_name !== "MessMate Support" &&
+        msg.customer_name !== "MessMate Support Team" &&
+        msg.customer_name !== "Campus Support Team"
+      ) {
+        threads[cleanPhone].customerName = msg.customer_name
       }
     })
 
@@ -574,16 +647,31 @@ export default function App() {
       .sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime())
   }, [supportMessages])
 
-  // Select first phone if none selected
+  // Desktop: Auto-select first thread if none selected.
+  // Mobile: Keep selectedPhone null so admin sees the full conversation list and can choose any chat.
   useEffect(() => {
-    if (!selectedPhone && supportThreads.length > 0) {
+    if (!isMobile && !selectedPhone && supportThreads.length > 0) {
       setSelectedPhone(supportThreads[0].phone)
     }
-  }, [supportThreads, selectedPhone])
+  }, [isMobile, supportThreads, selectedPhone])
+
+  // If a selected phone is no longer in supportThreads, fallback
+  useEffect(() => {
+    if (selectedPhone && supportThreads.length > 0) {
+      const cleanSelected = get10DigitPhone(selectedPhone) || selectedPhone
+      const exists = supportThreads.some(
+        (t) => (get10DigitPhone(t.phone) || t.phone) === cleanSelected
+      )
+      if (!exists) {
+        setSelectedPhone(isMobile ? null : supportThreads[0].phone)
+      }
+    }
+  }, [isMobile, supportThreads, selectedPhone])
 
   const activeThread = useMemo(() => {
     if (!selectedPhone) return null
-    return supportThreads.find((t) => t.phone === selectedPhone) || null
+    const cleanSelected = get10DigitPhone(selectedPhone) || selectedPhone
+    return supportThreads.find((t) => (get10DigitPhone(t.phone) || t.phone) === cleanSelected) || null
   }, [supportThreads, selectedPhone])
 
   // Send Admin Reply to Support Thread
@@ -594,9 +682,10 @@ export default function App() {
     const reply = adminReplyText.trim()
     setAdminReplyText("")
 
+    const targetPhone = get10DigitPhone(selectedPhone) || selectedPhone
     const optimistic: SupportMessage = {
       id: `admin-reply-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      phone: selectedPhone,
+      phone: targetPhone,
       customer_name: activeThread?.customerName || "Student",
       sender: "support",
       message: reply,
@@ -618,8 +707,8 @@ export default function App() {
       // 2. Attempt saving to DB table
       try {
         await supabase.from("support_messages").insert({
-          phone: selectedPhone,
-          customer_name: activeThread?.customerName || "Student",
+          phone: targetPhone,
+          customer_name: "MessMate Support Team",
           sender: "support",
           message: reply,
         })
@@ -966,7 +1055,13 @@ export default function App() {
                   supportThreads.map((thread) => (
                     <div
                       key={thread.phone}
-                      className={`inbox-item ${selectedPhone === thread.phone ? "active" : ""}`}
+                      className={`inbox-item ${
+                        selectedPhone &&
+                        (get10DigitPhone(selectedPhone) || selectedPhone) ===
+                          (get10DigitPhone(thread.phone) || thread.phone)
+                          ? "active"
+                          : ""
+                      }`}
                       onClick={() => setSelectedPhone(thread.phone)}
                     >
                       <div className="inbox-item-top">

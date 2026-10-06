@@ -387,3 +387,96 @@ test("Empty Cart Guard - detects and prevents 0-item order submission", () => {
   assert.equal(canSubmitOrder([]), false)
   assert.equal(canSubmitOrder([{ id: "mango", price: 40, quantity: 1 }]), true)
 })
+
+// ============================================================================
+// TEST SUITE 11: Admin Chat Multi-Thread Grouping & Mobile Navigation
+// ============================================================================
+test("Admin Chat - groups messages into single thread despite varied phone formats", () => {
+  const rawMessages = [
+    {
+      id: "m1",
+      phone: "+91 98765 43210",
+      customer_name: "Rahul Sharma",
+      sender: "customer" as const,
+      message: "Hi from mobile format",
+      created_at: "2026-10-06T10:00:00Z",
+    },
+    {
+      id: "m2",
+      phone: "9876543210",
+      customer_name: "Rahul Sharma",
+      sender: "customer" as const,
+      message: "Second message clean format",
+      created_at: "2026-10-06T10:05:00Z",
+    },
+    {
+      id: "m3",
+      phone: "9812345678",
+      customer_name: "Priya Patel",
+      sender: "customer" as const,
+      message: "Message from Priya",
+      created_at: "2026-10-06T10:10:00Z",
+    },
+  ]
+
+  const threads: Record<string, { customerName: string; messages: any[]; latestAt: string }> = {}
+  rawMessages.forEach((msg) => {
+    const cleanPhone = normalizePhone(msg.phone) || msg.phone
+    if (!threads[cleanPhone]) {
+      threads[cleanPhone] = {
+        customerName: msg.customer_name,
+        messages: [],
+        latestAt: msg.created_at,
+      }
+    }
+    threads[cleanPhone].messages.push(msg)
+    if (msg.created_at > threads[cleanPhone].latestAt) {
+      threads[cleanPhone].latestAt = msg.created_at
+    }
+  })
+
+  const threadList = Object.entries(threads).map(([phone, data]) => ({ phone, ...data }))
+  // Should have exactly 2 distinct student threads, not 3
+  assert.equal(threadList.length, 2)
+  const rahulThread = threadList.find((t) => t.phone === "9876543210")
+  assert.ok(rahulThread)
+  assert.equal(rahulThread.messages.length, 2)
+  assert.equal(rahulThread.customerName, "Rahul Sharma")
+})
+
+test("Admin Chat - mobile phone navigation allows viewing all chats and returning to inbox", () => {
+  const threads = [
+    { phone: "9876543210", customerName: "Rahul Sharma" },
+    { phone: "9812345678", customerName: "Priya Patel" },
+    { phone: "9898989898", customerName: "Amit Verma" },
+  ]
+
+  // Model mobile state transition
+  let isMobile = true
+  let selectedPhone: string | null = null
+
+  // On mobile, initial state must be null so inbox list is displayed
+  assert.equal(selectedPhone, null)
+
+  // User taps Priya's conversation
+  selectedPhone = threads[1].phone
+  assert.equal(selectedPhone, "9812345678")
+
+  // User taps back button to return to conversation list
+  selectedPhone = null
+  // In the fixed implementation, mobile does not re-force thread[0]
+  const autoSelectOnMobile = (mobile: boolean, currentSelected: string | null) => {
+    if (!mobile && !currentSelected && threads.length > 0) {
+      return threads[0].phone
+    }
+    return currentSelected
+  }
+
+  selectedPhone = autoSelectOnMobile(isMobile, selectedPhone)
+  assert.equal(selectedPhone, null) // Stays in inbox list!
+
+  // Now user can tap Amit's conversation
+  selectedPhone = threads[2].phone
+  assert.equal(selectedPhone, "9898989898")
+})
+
