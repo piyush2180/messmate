@@ -96,3 +96,11 @@ create policy "Anyone can update menu inventory"
   with check (true);
 
 alter publication supabase_realtime add table public.menu_inventory;
+
+-- 15. Performance Indexes for Real-time Queries & High Traffic
+create index if not exists idx_orders_customer_phone on public.orders (customer_phone);
+create index if not exists idx_orders_status on public.orders (status);
+create index if not exists idx_orders_created_at on public.orders (created_at desc);
+create index if not exists idx_support_messages_phone on public.support_messages (phone);
+create index if not exists idx_support_messages_created_at on public.support_messages (created_at asc);
+
