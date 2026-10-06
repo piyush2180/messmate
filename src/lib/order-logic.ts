@@ -272,3 +272,144 @@ export function mergeSupportMessages(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )
 }
+
+/**
+ * Safe localStorage access wrappers that never throw even if storage is full,
+ * quota is exceeded, disabled by browser privacy policy, or contains malformed JSON.
+ */
+export const safeStorage = {
+  getItem(key: string, fallback: string | null = null): string | null {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return fallback
+      return window.localStorage.getItem(key) ?? fallback
+    } catch {
+      return fallback
+    }
+  },
+
+  setItem(key: string, value: string): boolean {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return false
+      window.localStorage.setItem(key, value)
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  removeItem(key: string): boolean {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return false
+      window.localStorage.removeItem(key)
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  getJson<T>(key: string, fallback: T): T {
+    try {
+      const raw = this.getItem(key)
+      if (!raw) return fallback
+      const parsed = JSON.parse(raw)
+      return parsed ?? fallback
+    } catch {
+      return fallback
+    }
+  },
+
+  setJson<T>(key: string, value: T): boolean {
+    try {
+      return this.setItem(key, JSON.stringify(value))
+    } catch {
+      return false
+    }
+  },
+}
+
+/**
+ * Sanitizes user-entered text strings:
+ * - Strips HTML/script tags
+ * - Strips zero-width and non-printable ASCII control characters
+ * - Enforces max length boundary
+ */
+export function sanitizeInput(raw: unknown, maxLength: number = 255): string {
+  if (raw === null || raw === undefined) return ""
+  const str = String(raw)
+  return str
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") // Strip <script>...</script> with contents
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "") // Strip <style>...</style> with contents
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "") // Strip <iframe>...</iframe> with contents
+    .replace(/<[^>]*>?/gm, "") // Strip any remaining tags
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, "") // Strip control/zero-width chars
+    .trim()
+    .slice(0, maxLength)
+}
+
+/**
+ * Validates 12-digit UPI reference number (UTR).
+ * Returns { valid: boolean; reason?: string }
+ */
+export function validateUtr(raw: unknown): { valid: boolean; reason?: string } {
+  if (!raw) return { valid: false, reason: "UTR number is required" }
+  const clean = String(raw).replace(/\D/g, "")
+  if (clean.length !== 12) {
+    return { valid: false, reason: "UTR must be exactly 12 digits" }
+  }
+  // Check for dummy/fake repetitive sequences (e.g. 000000000000, 111111111111)
+  if (/^(\d)\1{11}$/.test(clean)) {
+    return { valid: false, reason: "Dummy/repetitive UTR sequence is not allowed" }
+  }
+  // Check for trivial incremental sequences (e.g. 123456789012)
+  if (clean === "123456789012" || clean === "012345678901") {
+    return { valid: false, reason: "Sequential test UTR is not valid" }
+  }
+  return { valid: true }
+}
+
+/**
+ * Generates an order idempotency fingerprint to block accidental double-submissions.
+ */
+export function generateOrderFingerprint(
+  phone: string,
+  items: OrderItemLike[],
+  total: number,
+  slot: string
+): string {
+  const cleanPhone = normalizePhone(phone)
+  const itemsSummary = items
+    .map((i) => `${Math.max(0, Math.floor(Number(i.quantity) || 0))}x${Math.round(Number(i.price) * 100)}`)
+    .sort()
+    .join(";")
+  return `${cleanPhone}:${itemsSummary}:${Math.round(total * 100)}:${slot.trim()}`
+}
+
+/**
+ * Validates chat message length and content:
+ * Must be between 1 and 1000 characters and free of script tags.
+ */
+export function validateSupportMessage(text: unknown): { valid: boolean; cleanText: string; error?: string } {
+  const sanitized = sanitizeInput(text, 1000)
+  if (!sanitized) {
+    return { valid: false, cleanText: "", error: "Message cannot be empty" }
+  }
+  if (sanitized.length < 2) {
+    return { valid: false, cleanText: sanitized, error: "Message is too short" }
+  }
+  return { valid: true, cleanText: sanitized }
+}
+
+/**
+ * Rate-limiting check for support chat messages:
+ * Returns true if the user sent more than `maxAllowed` messages within `windowMs`.
+ */
+export function isChatRateLimited(
+  timestamps: number[],
+  windowMs: number = 5000,
+  maxAllowed: number = 4
+): boolean {
+  const now = Date.now()
+  const recent = timestamps.filter((t) => now - t < windowMs)
+  return recent.length >= maxAllowed
+}
+

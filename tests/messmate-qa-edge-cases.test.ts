@@ -10,6 +10,12 @@ import {
   getFaqResponse,
   mergeSupportMessages,
   type SupportMsg,
+  safeStorage,
+  sanitizeInput,
+  validateUtr,
+  generateOrderFingerprint,
+  validateSupportMessage,
+  isChatRateLimited,
 } from "../src/lib/order-logic.ts"
 
 // ============================================================================
@@ -479,4 +485,136 @@ test("Admin Chat - mobile phone navigation allows viewing all chats and returnin
   selectedPhone = threads[2].phone
   assert.equal(selectedPhone, "9898989898")
 })
+
+// ============================================================================
+// TEST SUITE 12: Financial Integrity & Payload Tampering Defense
+// ============================================================================
+test("Financial Integrity - prevents negative prices and negative quantities", () => {
+  const tamperedCart = [
+    { price: -50, quantity: 2 },
+    { price: 40, quantity: -3 },
+    { price: 35, quantity: 1 },
+  ]
+  const result = calculateOrderTotals(tamperedCart, "pickup")
+  // First item has negative price -> coerced to 0
+  // Second item has negative quantity -> coerced to 0
+  // Third item: 35 * 1 = 35
+  assert.equal(result.subtotal, 35)
+  assert.equal(result.fee, 0)
+  assert.equal(result.total, 35)
+})
+
+test("Financial Integrity - handles fractional and non-numeric quantities safely", () => {
+  const weirdCart = [
+    { price: 50, quantity: 0.5 }, // Fractional quantity floored to 0
+    { price: 40, quantity: NaN as any }, // NaN floored to 0
+    { price: 30, quantity: "2" as any }, // String converted to number 2
+  ]
+  const result = calculateOrderTotals(weirdCart, "delivery")
+  assert.equal(result.subtotal, 60) // 0 + 0 + (30 * 2) = 60
+  assert.equal(result.fee, 7)
+  assert.equal(result.total, 67)
+})
+
+test("Financial Integrity - rounds float precision anomalies (0.1 + 0.2)", () => {
+  const precisionCart = [
+    { price: 0.1, quantity: 1 },
+    { price: 0.2, quantity: 1 },
+  ]
+  const result = calculateOrderTotals(precisionCart, "pickup")
+  assert.equal(result.subtotal, 0.3)
+  assert.equal(result.total, 0.3)
+})
+
+// ============================================================================
+// TEST SUITE 13: Strict UPI UTR Reference Verification
+// ============================================================================
+test("UTR Validation - accepts valid 12-digit reference numbers", () => {
+  assert.equal(validateUtr("409128381920").valid, true)
+  assert.equal(validateUtr("928371940182").valid, true)
+  assert.equal(validateUtr("  409128381920  ").valid, true)
+})
+
+test("UTR Validation - rejects incorrect lengths and non-numeric inputs", () => {
+  assert.equal(validateUtr("").valid, false)
+  assert.equal(validateUtr(null).valid, false)
+  assert.equal(validateUtr("12345").valid, false) // Too short
+  assert.equal(validateUtr("1234567890123").valid, false) // Too long
+  assert.equal(validateUtr("abcdefghijkl").valid, false) // Non-numeric
+})
+
+test("UTR Validation - rejects fake/dummy repeated or sequential numbers", () => {
+  assert.equal(validateUtr("000000000000").valid, false) // All zeros
+  assert.equal(validateUtr("111111111111").valid, false) // All ones
+  assert.equal(validateUtr("999999999999").valid, false) // All nines
+  assert.equal(validateUtr("123456789012").valid, false) // Trivial sequential
+  assert.equal(validateUtr("012345678901").valid, false) // Trivial sequential
+})
+
+// ============================================================================
+// TEST SUITE 14: Storage Resilience & Malformed JSON Recovery
+// ============================================================================
+test("Storage Resilience - safeStorage recovers gracefully from missing or broken storage", () => {
+  // In node environment without window, safeStorage must return fallback without throwing
+  assert.equal(safeStorage.getItem("non_existent_key", "default_val"), "default_val")
+  assert.equal(safeStorage.getJson("bad_json_key", { count: 0 }).count, 0)
+  assert.equal(safeStorage.setItem("key", "val"), false) // false when window is undefined, doesn't throw!
+})
+
+// ============================================================================
+// TEST SUITE 15: Input Sanitization & XSS Defense
+// ============================================================================
+test("Input Sanitization - strips script tags, HTML entities, and control characters", () => {
+  const maliciousName = "<script>alert('pwned')</script>Rahul Sharma"
+  assert.equal(sanitizeInput(maliciousName), "Rahul Sharma")
+
+  const iframeInjection = "<iframe src='javascript:bad()'></iframe>Priya Patel"
+  assert.equal(sanitizeInput(iframeInjection), "Priya Patel")
+
+  const zeroWidthSpam = "Amit\u200B\uFEFFVerma"
+  assert.equal(sanitizeInput(zeroWidthSpam), "AmitVerma")
+})
+
+test("Input Sanitization - enforces maximum string length boundary", () => {
+  const superLongString = "A".repeat(500)
+  const sanitized = sanitizeInput(superLongString, 50)
+  assert.equal(sanitized.length, 50)
+})
+
+// ============================================================================
+// TEST SUITE 16: Order Idempotency & Duplicate Submission Guard
+// ============================================================================
+test("Order Idempotency - generates deterministic fingerprint for identical orders", () => {
+  const items = [{ price: 40, quantity: 2 }]
+  const fp1 = generateOrderFingerprint("9876543210", items, 80, "8:30–9:00 PM")
+  const fp2 = generateOrderFingerprint("+91 98765 43210", items, 80, "8:30–9:00 PM")
+  assert.equal(fp1, fp2)
+
+  // Different slot produces different fingerprint
+  const fp3 = generateOrderFingerprint("9876543210", items, 80, "9:00–9:30 PM")
+  assert.notEqual(fp1, fp3)
+})
+
+// ============================================================================
+// TEST SUITE 17: Support Chat Rate Limiting & Message Content Guard
+// ============================================================================
+test("Support Chat - validates message content length and whitespace", () => {
+  assert.equal(validateSupportMessage("").valid, false)
+  assert.equal(validateSupportMessage("   ").valid, false)
+  assert.equal(validateSupportMessage("x").valid, false) // Too short
+  assert.equal(validateSupportMessage("Hello support team").valid, true)
+  assert.equal(validateSupportMessage("<script>evil</script>").valid, false) // Becomes empty after sanitization
+})
+
+test("Support Chat - detects rapid burst spamming", () => {
+  const now = Date.now()
+  // 4 rapid messages within last 2 seconds
+  const rapidBurst = [now - 1500, now - 1000, now - 500, now - 100]
+  assert.equal(isChatRateLimited(rapidBurst, 5000, 4), true)
+
+  // Messages spaced out outside window
+  const normalInterval = [now - 10000, now - 8000, now - 6000]
+  assert.equal(isChatRateLimited(normalInterval, 5000, 4), false)
+})
+
 

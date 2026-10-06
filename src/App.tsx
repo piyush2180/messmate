@@ -3,6 +3,13 @@ import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 import { supabase } from "./lib/supabase"
 import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
 import { PHONEPE_QR_BASE64 } from "./assets/phonepeQrData"
+import {
+  calculateOrderTotals,
+  normalizePhone,
+  safeStorage,
+  sanitizeInput,
+  generateOrderFingerprint,
+} from "./lib/order-logic"
 
 type Screen =
   | "home"
@@ -3635,10 +3642,10 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([])
 
   const [details, setDetails] = useState<CustomerDetails>(() => ({
-    name: localStorage.getItem("messmate_customer_name") || "",
-    phone: (localStorage.getItem("messmate_phone") || "").replace(/\D/g, "").slice(-10),
-    hostel: localStorage.getItem("messmate_hostel") || "",
-    room: localStorage.getItem("messmate_room") || "",
+    name: safeStorage.getItem("messmate_customer_name", "") || "",
+    phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
+    hostel: safeStorage.getItem("messmate_hostel", "") || "",
+    room: safeStorage.getItem("messmate_room", "") || "",
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
@@ -3852,16 +3859,10 @@ export default function App() {
     setIsSubmitting(true)
 
     try {
-      const fee = fulfilment === "delivery" ? 7 : 0
+      const { subtotal, fee, total } = calculateOrderTotals(cart, fulfilment)
+      const orderTotal = total
 
-      const subtotal = cart.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-      )
-
-      const orderTotal = subtotal + fee
-
-      const cleanUtr = utr?.trim()
+      const cleanUtr = utr ? sanitizeInput(utr, 12).replace(/\D/g, "") : ""
       const paymentLabel =
         method === "upi"
           ? cleanUtr
@@ -3875,12 +3876,17 @@ export default function App() {
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString()
       setOrderPin(generatedPin)
 
+      const cleanPhone = normalizePhone(details.phone) || "0000000000"
+      const cleanName = sanitizeInput(details.name, 100) || "Student"
+      const cleanHostel = fulfilment === "pickup" ? pickupPoint : (sanitizeInput(details.hostel, 100) || "Hostel 3")
+      const cleanRoom = fulfilment === "pickup" ? "" : (sanitizeInput(details.room, 50) || "Room")
+
       if (supabase) {
         const payload: any = {
-          customer_name: details.name || "Student",
-          customer_phone: details.phone || "0000000000",
-          hostel: fulfilment === "pickup" ? pickupPoint : (details.hostel || "Hostel 3"),
-          room: fulfilment === "pickup" ? "" : (details.room || "Room"),
+          customer_name: cleanName,
+          customer_phone: cleanPhone,
+          hostel: cleanHostel,
+          room: cleanRoom,
           fulfilment,
           slot,
           items: cart,
@@ -3927,17 +3933,18 @@ export default function App() {
 
         if (data?.order_number) {
           setOrderNumber(data.order_number)
-          if (details.phone) {
-            localStorage.setItem("messmate_phone", details.phone)
+          // Safe storage persistence (never throws on quota exceeded or security restriction)
+          if (cleanPhone && cleanPhone !== "0000000000") {
+            safeStorage.setItem("messmate_phone", cleanPhone)
           }
-          if (details.name) {
-            localStorage.setItem("messmate_customer_name", details.name)
+          if (cleanName && cleanName !== "Student") {
+            safeStorage.setItem("messmate_customer_name", cleanName)
           }
           if (details.hostel) {
-            localStorage.setItem("messmate_hostel", details.hostel)
+            safeStorage.setItem("messmate_hostel", details.hostel.trim())
           }
           if (details.room) {
-            localStorage.setItem("messmate_room", details.room)
+            safeStorage.setItem("messmate_room", details.room.trim())
           }
           // Clear cart so subsequent orders start fresh
           setCart([])
