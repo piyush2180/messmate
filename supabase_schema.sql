@@ -1,7 +1,10 @@
 -- MessMate Database Schema for Supabase
+-- Fully Idempotent (Safe to run multiple times without errors)
 -- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 
--- 1. Create the orders table
+-- ============================================================================
+-- 1. Orders Table
+-- ============================================================================
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number serial,
@@ -20,29 +23,34 @@ create table if not exists public.orders (
   created_at timestamptz default now()
 );
 
--- 2. Enable Row Level Security (RLS)
+-- Additional columns for payment verification, pickup PIN, and ratings
+alter table public.orders add column if not exists pickup_code text;
+alter table public.orders add column if not exists payment_status text default 'pending';
+alter table public.orders add column if not exists rating integer;
+alter table public.orders add column if not exists rating_feedback text;
+
+-- RLS & Policies for Orders
 alter table public.orders enable row level security;
 
--- 3. Policy: Allow anyone to place an order (no login required)
+drop policy if exists "Anyone can place an order" on public.orders;
 create policy "Anyone can place an order"
   on public.orders for insert
   with check (true);
 
--- 4. Policy: Allow anyone to read orders (to track their orders)
+drop policy if exists "Anyone can view orders" on public.orders;
 create policy "Anyone can view orders"
   on public.orders for select
   using (true);
 
--- 5. Policy: Allow updating order status (for kitchen/delivery updates)
+drop policy if exists "Anyone can update orders" on public.orders;
 create policy "Anyone can update orders"
   on public.orders for update
   using (true)
   with check (true);
 
--- 6. Enable Realtime on the orders table
-alter publication supabase_realtime add table public.orders;
-
--- 7. Create the support_messages table for student support chat
+-- ============================================================================
+-- 2. Support Messages Table (Live Student Support Chat)
+-- ============================================================================
 create table if not exists public.support_messages (
   id uuid primary key default gen_random_uuid(),
   phone text not null,
@@ -52,29 +60,22 @@ create table if not exists public.support_messages (
   created_at timestamptz default now()
 );
 
--- 8. Enable Row Level Security (RLS) on support_messages
+-- RLS & Policies for Support Messages
 alter table public.support_messages enable row level security;
 
--- 9. Policy: Allow anyone to insert support messages
+drop policy if exists "Anyone can insert support messages" on public.support_messages;
 create policy "Anyone can insert support messages"
   on public.support_messages for insert
   with check (true);
 
--- 10. Policy: Allow anyone to view support messages
+drop policy if exists "Anyone can view support messages" on public.support_messages;
 create policy "Anyone can view support messages"
   on public.support_messages for select
   using (true);
 
--- 11. Enable Realtime on the support_messages table
-alter publication supabase_realtime add table public.support_messages;
-
--- 12. Add columns for Payment Verification, Pickup PIN, and Order Ratings
-alter table public.orders add column if not exists pickup_code text;
-alter table public.orders add column if not exists payment_status text default 'pending';
-alter table public.orders add column if not exists rating integer;
-alter table public.orders add column if not exists rating_feedback text;
-
--- 13. Create menu_inventory table for real-time item stock management
+-- ============================================================================
+-- 3. Menu Inventory Table (Real-time Stock / Sold-out Management)
+-- ============================================================================
 create table if not exists public.menu_inventory (
   id text primary key,
   name text not null,
@@ -83,24 +84,62 @@ create table if not exists public.menu_inventory (
   updated_at timestamptz default now()
 );
 
--- 14. Enable RLS and policies for menu_inventory
+-- RLS & Policies for Menu Inventory
 alter table public.menu_inventory enable row level security;
 
+drop policy if exists "Anyone can view menu inventory" on public.menu_inventory;
 create policy "Anyone can view menu inventory"
   on public.menu_inventory for select
   using (true);
 
+drop policy if exists "Anyone can update menu inventory" on public.menu_inventory;
 create policy "Anyone can update menu inventory"
   on public.menu_inventory for all
   using (true)
   with check (true);
 
-alter publication supabase_realtime add table public.menu_inventory;
+-- Seed default menu items if not already present
+insert into public.menu_inventory (id, name, category, is_available)
+values
+  ('mango', 'Andhra Mango Pickle', 'pickles', true),
+  ('gongura', 'Gongura Leaf Pickle', 'pickles', true),
+  ('garlic', 'Spicy Garlic Pickle', 'pickles', true),
+  ('lemon', 'Tangy Lemon Pickle', 'pickles', true),
+  ('fruit_bowl', 'Custom Fruit Bowl', 'fruit', true)
+on conflict (id) do nothing;
 
--- 15. Performance Indexes for Real-time Queries & High Traffic
+-- ============================================================================
+-- 4. Enable Supabase Realtime Replication (Safe check)
+-- ============================================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
+  ) then
+    alter publication supabase_realtime add table public.orders;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'support_messages'
+  ) then
+    alter publication supabase_realtime add table public.support_messages;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'menu_inventory'
+  ) then
+    alter publication supabase_realtime add table public.menu_inventory;
+  end if;
+end $$;
+
+-- ============================================================================
+-- 5. Performance Indexes for Real-time Queries & High Traffic
+-- ============================================================================
 create index if not exists idx_orders_customer_phone on public.orders (customer_phone);
 create index if not exists idx_orders_status on public.orders (status);
 create index if not exists idx_orders_created_at on public.orders (created_at desc);
 create index if not exists idx_support_messages_phone on public.support_messages (phone);
 create index if not exists idx_support_messages_created_at on public.support_messages (created_at asc);
-
