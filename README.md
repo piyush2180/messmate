@@ -137,8 +137,9 @@ MessMate Monorepo
 │   ├── tsconfig.json                     # TypeScript configuration
 │   └── vite.config.ts                    # Vite bundler configuration
 │
-├── tests/                                # Automated QA Test Suite
-│   └── messmate-qa-edge-cases.test.ts    # 46 automated unit, financial, security, and edge-case tests
+├── tests/                                # Automated QA Test Suites
+│   ├── messmate-qa-edge-cases.test.ts    # 46 automated unit, financial, security, and edge-case tests
+│   └── messmate-live-db-integration.test.ts # 8 live Supabase integration & trigger verification tests
 │
 ├── supabase_schema.sql                   # Idempotent database migrations, RLS, triggers & indexes
 ├── index.html                            # Student Vite HTML shell with SEO meta tags & mobile viewports
@@ -418,14 +419,20 @@ Staff checks Soundbox / Bank App ──► Clicks "Verify Payment" ──► Ord
 
 ## 🧪 Automated QA & Testing Suite
 
-MessMate includes 46 automated unit, financial, security, and integration tests located in [`tests/messmate-qa-edge-cases.test.ts`](file:///c:/Users/Piyush/OneDrive/Desktop/fooododoo/tests/messmate-qa-edge-cases.test.ts):
+MessMate includes 54 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
 
 ```bash
-# Run the automated test suite
+# Run the entire test suite
 npm test
 ```
 
 ### Verified Test Suites
+1. **Live Supabase Ping & Latency Benchmark**: Verifies database connectivity and roundtrip latency (<1000ms).
+2. **Live Order Placement & Schema Contract**: Tests end-to-end order placement with auto-increment order numbers.
+3. **Database Check Constraints**: Verifies PostgreSQL blocks negative subtotals/totals and invalid phone numbers.
+4. **Anti-Tamper Order Immutability Trigger**: Validates PostgreSQL aborts tampering with prices, items, or order numbers.
+5. **Order State Machine Transitions**: Tests status progression (`placed` -> `preparing` -> `ready` -> `delivered` -> meal rating).
+6. **Support Messaging Lifecycle**: Tests bidirectional conversation threading and chronological message ordering.
 1. **Phone Normalization & Validation (6 Tests)**: Handles clean digits, strips `+91`/`91`, leading zeros, dashes, brackets, malicious script injections, and rejects malformed inputs.
 2. **Deterministic Pickup PIN Algorithm (6 Tests)**: Preserves explicit codes, calculates 4-digit PINs deterministically, tests zero/negative/undefined order numbers, and fuzzes 1,000 random order numbers.
 3. **Order Subtotals & Delivery Fees (4 Tests)**: Empty cart handling, ₹0 campus pickup, ₹7 room delivery, and negative quantity protections.
