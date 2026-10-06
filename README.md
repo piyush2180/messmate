@@ -95,7 +95,7 @@ Everything powering MessMate has been carefully chosen for performance, zero run
 - **Mobile UPI Intent Linking (`upi://pay`)**:
   - Native deep-linking schema allowing 1-tap mobile handoff directly into PhonePe, Google Pay, Paytm, or BHIM.
 - **Clipboard API (`navigator.clipboard.writeText`)**:
-  - 1-click merchant UPI ID copying with visual confirmation feedback.
+  - 1-click UPI ID copying with visual confirmation feedback.
 - **Telephony API (`tel:`)**:
   - Direct 1-tap calling link in the support inbox allowing kitchen staff to immediately dial students for delivery clarification.
 
@@ -115,7 +115,7 @@ The project is structured as a modular monorepo containing the student applicati
 ```
 MessMate Monorepo
 ├── src/                                  # Student Storefront Application
-│   ├── assets/                           # Brand assets, static SVGs, PhonePe QR graphics
+│   ├── assets/                           # Brand assets, static media, SVGs
 │   ├── lib/
 │   │   ├── inventory.ts                  # Menu items catalog, categories, pickup locations, slots
 │   │   ├── order-logic.ts                # Calculation engine, phone normalization, sanitization, validation
@@ -170,12 +170,11 @@ MessMate Monorepo
   - **Room Delivery (₹7 Runner Fee)**: Direct-to-door delivery with hostel block and room number inputs.
 - **Scheduled Evening Delivery Slots**:
   - Pre-order for dinner windows: *8:00–8:30 PM*, *8:30–9:00 PM*, or *9:00–9:30 PM*.
-- **PhonePe UPI & Cash Settlement**:
-  - On-screen PhonePe merchant QR code for mobile scanning.
-  - 1-tap mobile UPI intent link (`upi://pay`) to launch payment apps directly.
-  - 1-click UPI ID copy (`Q477490796@ybl`).
-  - Mandatory 12-digit bank UTR reference input with pattern validation.
-  - Option to choose *Pay at Counter* (cash or physical soundbox scan upon pickup).
+- **UPI & Cash Settlement**:
+  - 1-tap mobile UPI intent link (`upi://pay`) to launch payment apps directly (PhonePe, Google Pay, Paytm).
+  - 1-click UPI ID copy.
+  - 12-digit bank UTR reference input with pattern validation.
+  - Option to choose *Pay at Counter* (cash or counter scan upon pickup).
 - **Deterministic 4-Digit Pickup PIN**:
   - Generates a secure 4-digit verification code for counter collection.
 - **Real-Time Order Tracking**:
@@ -397,11 +396,10 @@ Student Cart (₹35)
        ▼
 Select Payment Method
  ├── Pay at Counter ──► Collect PIN ──► Pay cash or scan at counter pickup
- └── PhonePe UPI
+ └── UPI Payment
        │
-       ├── Option A: Scan dynamic on-screen PhonePe QR
-       ├── Option B: Tap 1-Click UPI Intent Link (PhonePe/GPay/Paytm)
-       └── Option C: Copy Merchant UPI ID (Q477490796@ybl)
+       ├── Option A: Tap 1-Click UPI Intent Link (PhonePe/GPay/Paytm)
+       └── Option B: Copy UPI ID
        │
        ▼
 Input 12-Digit UTR (Reference Number)
@@ -522,7 +520,3 @@ npm run dev
   - `VITE_SUPABASE_ANON_KEY`: Your production Supabase anonymous API key
 - **Security Recommendation**: Enable **Deployment Protection** (Password Protection or SSO) under *Project Settings → Deployment Protection* in Vercel to restrict kitchen dashboard access to authorized campus dining staff.
 
----
-
-## 📄 License
-Proprietary · Developed for campus dining and university mess operations.
