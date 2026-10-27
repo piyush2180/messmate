@@ -235,6 +235,8 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 .field input:focus, .field select:focus { border-color: var(--olive); outline-color: rgba(83,107,58,.14); }
 .privacy-note { justify-content: flex-start; margin: 15px 3px; color: var(--muted); font-weight: 500; }
 .receive-section { margin-top: 32px; }
+.delivery-fields { margin: 4px 0 10px; }
+.delivery-fields .field { grid-column: auto; }
 .fulfilment-card { width: 100%; border: 1px solid var(--line); background: var(--white); padding: 15px; border-radius: 19px; display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 10px; cursor: pointer; }
 .fulfilment-card.selected { border-color: var(--olive); background: #fcfdf9; box-shadow: 0 0 0 1px var(--olive); }
 .fulfilment-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; background: var(--olive-pale); color: var(--olive); }
@@ -1841,12 +1843,24 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 }
 
 @media (max-width: 768px) {
+  /* Phones: a compact round button so it covers less of the page */
   .support-fab {
     bottom: 84px;
     right: 16px;
-    padding: 10px 16px;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    justify-content: center;
     font-size: 13px;
     z-index: 9999;
+  }
+  .support-fab-label {
+    display: none;
+  }
+  .support-fab-dot {
+    position: absolute;
+    top: 9px;
+    right: 9px;
   }
 
   .support-chat-card {

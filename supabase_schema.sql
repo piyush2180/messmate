@@ -208,3 +208,44 @@ create index if not exists idx_orders_status on public.orders (status);
 create index if not exists idx_orders_created_at on public.orders (created_at desc);
 create index if not exists idx_support_messages_phone on public.support_messages (phone);
 create index if not exists idx_support_messages_created_at on public.support_messages (created_at asc);
+
+-- ============================================================================
+-- 6. Store Visitor Counter (admin Analytics → Store Visitors)
+-- One row per browser session with a random visitor id; no names, phones or IPs.
+-- ============================================================================
+create table if not exists public.site_visits (
+  id bigint generated always as identity primary key,
+  visitor_id text not null check (length(visitor_id) between 8 and 64),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_site_visits_created_at on public.site_visits (created_at desc);
+
+alter table public.site_visits enable row level security;
+
+drop policy if exists "Anyone can log a visit" on public.site_visits;
+create policy "Anyone can log a visit"
+  on public.site_visits for insert
+  with check (true);
+-- No select policy: raw rows stay private. The admin reads totals through visit_stats().
+
+create or replace function public.visit_stats()
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  -- "Today" starts at midnight India time, so it matches the kitchen's day
+  select json_build_object(
+    'today_visits', count(*) filter (where created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata')) at time zone 'Asia/Kolkata'),
+    'today_visitors', count(distinct visitor_id) filter (where created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata')) at time zone 'Asia/Kolkata'),
+    'week_visits', count(*) filter (where created_at >= now() - interval '7 days'),
+    'week_visitors', count(distinct visitor_id) filter (where created_at >= now() - interval '7 days'),
+    'total_visits', count(*),
+    'total_visitors', count(distinct visitor_id)
+  )
+  from public.site_visits;
+$$;
+
+revoke all on function public.visit_stats() from public;
+grant execute on function public.visit_stats() to anon, authenticated;

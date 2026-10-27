@@ -14,7 +14,8 @@ export type OrderStatus =
   | "delivered"
   | "cancelled"
 
-export type PaymentStatus = "pending" | "verified" | "failed"
+// Must match the orders.payment_status CHECK constraint in supabase_schema.sql
+export type PaymentStatus = "pending" | "verified" | "rejected"
 
 export type OrderRecord = {
   id: string
@@ -55,3 +56,13 @@ export type MenuItemStock = {
 }
 
 export type DashboardTab = "orders" | "inventory" | "support" | "analytics"
+
+// Shape returned by the visit_stats() SQL function (see supabase_schema.sql).
+export type VisitStats = {
+  today_visits: number
+  today_visitors: number
+  week_visits: number
+  week_visitors: number
+  total_visits: number
+  total_visitors: number
+}

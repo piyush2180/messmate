@@ -24,6 +24,17 @@ export function normalizePhone(raw: string | undefined | null): string {
 }
 
 /**
+ * Cleans a phone number as it is typed, pasted or autofilled: keeps digits, drops a leading
+ * +91 / 0 once the number runs past 10 digits, and caps the result at 10 digits.
+ * "+91 98765 43210" -> "9876543210", "09876543210" -> "9876543210".
+ */
+export function cleanPhoneInput(raw: string | undefined | null): string {
+  const digits = String(raw ?? "").replace(/\D/g, "")
+  const local = digits.length > 10 ? digits.replace(/^(?:91|0)/, "") : digits
+  return local.slice(0, 10)
+}
+
+/**
  * Validates whether a given phone number is a valid 10-digit Indian mobile number.
  * Valid Indian mobile numbers are 10 digits and start with 6, 7, 8, or 9.
  */
@@ -174,7 +185,7 @@ export function getFaqResponse(query: string): string {
     q.includes("lemon") ||
     q.includes("expiry")
   ) {
-    return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with cold-pressed oils."
+    return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
   }
 
   // 9. Reorder

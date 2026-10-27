@@ -18,6 +18,7 @@ import logoUrl from "./assets/happy-tummy-logo.webp"
 import {
   DELIVERY_FEE,
   calculateOrderTotals,
+  cleanPhoneInput,
   normalizePhone,
   safeStorage,
   sanitizeInput,
@@ -60,7 +61,7 @@ type OrderRecord = {
   status: "placed" | "preparing" | "ready" | "delivered" | "cancelled"
   created_at: string
   pickup_code?: string
-  payment_status?: "pending" | "verified" | "failed"
+  payment_status?: "pending" | "verified" | "rejected"
   rating?: number
   rating_feedback?: string
 }
@@ -1362,11 +1363,11 @@ function Checkout({
 
   const cleanPhone = details.phone.replace(/\D/g, "")
   const isPhoneValid = cleanPhone.length === 10
+  // Hostel and room only matter for room delivery; pickup uses the chosen pickup point.
   const isComplete = Boolean(
     details.name.trim() &&
     isPhoneValid &&
-    details.hostel.trim() &&
-    details.room.trim()
+    (fulfilment === "pickup" || (details.hostel.trim() && details.room.trim()))
   )
 
   return (
@@ -1399,27 +1400,9 @@ function Checkout({
                   label="Phone number"
                   placeholder="10-digit mobile number"
                   type="tel"
-                  maxLength={10}
                   hint={details.phone ? `${cleanPhone.length}/10 digits` : "10 digits required"}
                   value={details.phone}
-                  onChange={(v) => {
-                    const digits = v.replace(/\D/g, "").slice(0, 10)
-                    set("phone", digits)
-                  }}
-                />
-                <Field
-                  label="Hostel"
-                  placeholder="Select hostel"
-                  options={HOSTELS}
-                  value={details.hostel}
-                  onChange={(v) => set("hostel", v)}
-                />
-                <Field
-                  label="Room number"
-                  placeholder="e.g. 214"
-                  inputMode="numeric"
-                  value={details.room}
-                  onChange={(v) => set("room", v.replace(/\D/g, ""))}
+                  onChange={(v) => set("phone", cleanPhoneInput(v))}
                 />
               </div>
               <div className="privacy-note">
@@ -1447,7 +1430,7 @@ function Checkout({
                 <span>
                   <strong>Campus pickup</strong>
                   <small>Pick it up, nice and easy.</small>
-                  <em>FREE · 8:30–9:00 PM</em>
+                  <em>FREE · 8:00–9:30 PM</em>
                 </span>
                 <span className="radio">{fulfilment === "pickup" && <span />}</span>
               </button>
@@ -1469,6 +1452,24 @@ function Checkout({
                   {fulfilment === "delivery" && <span />}
                 </span>
               </button>
+              {fulfilment === "delivery" && (
+                <div className="form-grid delivery-fields">
+                  <Field
+                    label="Hostel"
+                    placeholder="Select hostel"
+                    options={HOSTELS}
+                    value={details.hostel}
+                    onChange={(v) => set("hostel", v)}
+                  />
+                  <Field
+                    label="Room number"
+                    placeholder="e.g. 214"
+                    inputMode="numeric"
+                    value={details.room}
+                    onChange={(v) => set("room", v.replace(/\D/g, ""))}
+                  />
+                </div>
+              )}
             </section>
           </div>
           <div className="checkout-right-col">
@@ -1538,6 +1539,25 @@ function Fulfilment({
 }) {
   const slots = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
 
+  const slotPicker = (heading: string) => (
+    <div className="time-section">
+      <h2>{heading}</h2>
+      <div className="slot-list">
+        {slots.map((item) => (
+          <button
+            key={item}
+            className={slot === item ? "selected" : ""}
+            onClick={() => setSlot(item)}
+          >
+            <Icon name="clock" size={18} />
+            {item}
+            <span className="radio">{slot === item && <span />}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
   const pickupPoints = PICKUP_POINTS
   const selectedPoint = pickupPoints.find(p => p.name === pickupPoint) || pickupPoints[0]
 
@@ -1561,7 +1581,7 @@ function Fulfilment({
           <p>
             {fulfilment === "pickup"
               ? "Choose a pickup point and time that works for you."
-              : "Fresh food, straight to your room."}
+              : "Fresh food, straight to your room. Pick a time that suits you."}
           </p>
         </section>
         <div className="fulfilment-layout">
@@ -1607,40 +1627,25 @@ function Fulfilment({
                     ))}
                   </div>
                 </div>
-                <div className="time-section">
-                  <h2>Choose a pickup time</h2>
-                  <div className="slot-list">
-                    {slots.map((item) => (
-                      <button
-                        key={item}
-                        className={slot === item ? "selected" : ""}
-                        onClick={() => setSlot(item)}
-                      >
-                        <Icon name="clock" size={18} />
-                        {item}
-                        <span className="radio">{slot === item && <span />}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {slotPicker("Choose a pickup time")}
               </>
             ) : (
-              <div className="delivery-card">
-                <span className="big-icon">
-                  <Icon name="bag" size={30} />
-                </span>
-                <div className="eyebrow">Room delivery · ₹{DELIVERY_FEE}</div>
-                <h2>
-                  {details.hostel}, Room {details.room}
-                </h2>
-                <p>
-                  We'll call you when your order is outside. Estimated arrival:
-                  8:30–9:00 PM.
-                </p>
-                <button onClick={() => go("checkout")}>
-                  <Icon name="edit" size={16} /> Edit room details
-                </button>
-              </div>
+              <>
+                <div className="delivery-card" style={{ marginBottom: "24px" }}>
+                  <span className="big-icon">
+                    <Icon name="bag" size={30} />
+                  </span>
+                  <div className="eyebrow">Room delivery · ₹{DELIVERY_FEE}</div>
+                  <h2>
+                    {details.hostel}, Room {details.room}
+                  </h2>
+                  <p>We'll call you when your order is outside your room.</p>
+                  <button onClick={() => go("checkout")}>
+                    <Icon name="edit" size={16} /> Edit room details
+                  </button>
+                </div>
+                {slotPicker("Choose a delivery time")}
+              </>
             )}
           </div>
           <div className="fulfilment-right-col">
@@ -1650,7 +1655,7 @@ function Fulfilment({
                 <strong>
                   {fulfilment === "pickup"
                     ? `Pickup Window: ${slot}`
-                    : "Room Delivery (8:30–9:00 PM)"}
+                    : `Room Delivery: ${slot}`}
                 </strong>
                 <p>Contact: {details.name} ({details.phone})</p>
               </div>
@@ -2382,9 +2387,8 @@ function OrdersPage({
           <div className="orders-search-row">
             <input
               type="tel"
-              maxLength={10}
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              onChange={(e) => setSearchInput(cleanPhoneInput(e.target.value))}
               placeholder="e.g. 9876543210"
               onKeyDown={(e) => {
                 if (e.key === "Enter") loadOrders(searchInput)
@@ -2628,7 +2632,7 @@ function OrdersPage({
                           </strong>
                           {order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]") ? (
                             <span className="pay-verify-badge success">Payment Verified</span>
-                          ) : order.payment_status === "failed" || order.payment_method?.includes("[FAILED]") ? (
+                          ) : order.payment_status === "rejected" || order.payment_method?.includes("[FAILED]") ? (
                             <span className="pay-verify-badge danger">Verification Issue</span>
                           ) : order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi") ? (
                             <span className="pay-verify-badge pending">UTR Under Verification</span>
@@ -2747,7 +2751,7 @@ const FAQ_ITEMS = [
     label: "Pickle shelf life & storage",
     question: "How long do the pickles stay fresh?",
     answer:
-      "Our homemade pickles are crafted in small batches with cold-pressed oil and authentic spices. They stay fresh for 3–6 months in a dry, room-temperature spot.",
+      "Our homemade pickles are crafted in small batches with cold-pressed oil and authentic spices. Veg pickles stay fresh for 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon.",
   },
 ]
 
@@ -2820,7 +2824,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("lemon") ||
     q.includes("expiry")
   ) {
-    return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with cold-pressed oils."
+    return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
   }
   if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
     return `Orders can be modified before prep starts. Please click 'Talk to Team' below so the ${SUPPORT_NAME} can update your order right away!`
@@ -3010,9 +3014,11 @@ function SupportChatWidget({
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [faqHistory, liveMessages, view])
 
+  // Follow the latest checkout details, unless a live chat is already running on a number.
   useEffect(() => {
-    if (customerPhone && !phone) setPhone(customerPhone)
-    if (customerName && !name) setName(customerName)
+    if (liveMessagesRef.current.length > 0) return
+    if (customerPhone.length === 10) setPhone(customerPhone)
+    if (customerName.trim()) setName(customerName)
   }, [customerPhone, customerName])
 
   // Realtime Broadcast Channel & History Sync
@@ -3168,7 +3174,7 @@ function SupportChatWidget({
       setFormError("Please enter your name.")
       return
     }
-    const cleanPhone = phone.replace(/\D/g, "").slice(0, 10)
+    const cleanPhone = cleanPhoneInput(phone)
     if (cleanPhone.length !== 10) {
       setFormError("Please enter a valid 10-digit mobile number.")
       return
@@ -3281,7 +3287,7 @@ function SupportChatWidget({
       >
         <span className="support-fab-dot" />
         <Icon name={isOpen ? "close" : "chat"} size={19} />
-        <span>{isOpen ? "Close" : "Support Team"}</span>
+        <span className="support-fab-label">{isOpen ? "Close" : "Support Team"}</span>
         {!isOpen && unreadCount > 0 && (
           <span className="support-fab-badge">{unreadCount}</span>
         )}
@@ -3465,10 +3471,9 @@ function SupportChatWidget({
                   </div>
                   <input
                     type="tel"
-                    maxLength={10}
                     placeholder="10-digit mobile number"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    onChange={(e) => setPhone(cleanPhoneInput(e.target.value))}
                     required
                   />
                 </div>
@@ -3642,6 +3647,28 @@ export default function App() {
   const [dismissedReadyIds, setDismissedReadyIds] = useState<Set<string>>(new Set())
   const [activeCancelledOrder, setActiveCancelledOrder] = useState<any>(null)
   const [dismissedCancelledIds, setDismissedCancelledIds] = useState<Set<string>>(new Set())
+
+  // Count one anonymous visit per browser session for the admin's Store Visitors card (random id, no personal data).
+  useEffect(() => {
+    if (!supabase) return
+    try {
+      if (sessionStorage.getItem("ht_visit_logged")) return
+      sessionStorage.setItem("ht_visit_logged", "1")
+    } catch {
+      return
+    }
+    let visitorId = safeStorage.getItem("ht_visitor_id")
+    if (!visitorId) {
+      visitorId = crypto.randomUUID()
+      safeStorage.setItem("ht_visitor_id", visitorId)
+    }
+    supabase
+      .from("site_visits")
+      .insert({ visitor_id: visitorId })
+      .then(({ error }) => {
+        if (error) console.warn("Visit not logged:", error.message)
+      })
+  }, [])
 
   // Sync inventory with Supabase realtime & broadcast
   useEffect(() => {

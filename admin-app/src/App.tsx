@@ -7,8 +7,10 @@ import type {
   SupportMessage,
   DashboardTab,
   MenuItemStock,
+  VisitStats,
 } from "./types"
 import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
+import { computeStats } from "./lib/stats"
 import logoUrl from "./assets/happy-tummy-logo.webp"
 
 // Support replies are stored under this name. Older names stay recognised so past chats still read as support.
@@ -33,6 +35,16 @@ function playOrderChime() {
   } catch (err) {
     console.warn("Audio chime not allowed yet:", err)
   }
+}
+
+// "Today, 05:03 PM" / "Yesterday, …" / "6 Oct, …" so older orders and chats don't look like today's.
+function formatWhen(iso: string): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86400000)
+  if (days === 0) return `Today, ${time}`
+  if (days === 1) return `Yesterday, ${time}`
+  return `${d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`
 }
 
 function get10DigitPhone(raw: string | null | undefined): string {
@@ -106,57 +118,6 @@ function mergeSupportMessages(
   )
 }
 
-const SEED_SUPPORT_MESSAGES: SupportMessage[] = [
-  {
-    id: "seed-msg-1",
-    phone: "9876543210",
-    customer_name: "Rahul Sharma",
-    sender: "customer",
-    message: "Hi, I placed order #14. When will it be ready for pickup?",
-    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    id: "seed-msg-2",
-    phone: "9876543210",
-    customer_name: SUPPORT_NAME,
-    sender: "support",
-    message: "Hello Rahul! Kitchen has started prep, pickup PIN is 2071. Estimated in 12 mins.",
-    created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-  },
-  {
-    id: "seed-msg-3",
-    phone: "9812345678",
-    customer_name: "Priya Patel",
-    sender: "customer",
-    message: "Order #15 delivery to Kalam Room 312: can delivery partner call upon arrival?",
-    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-  },
-  {
-    id: "seed-msg-4",
-    phone: "9812345678",
-    customer_name: SUPPORT_NAME,
-    sender: "support",
-    message: "Hi Priya! Delivery runner has your note and will dial you outside Kalam.",
-    created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-  },
-  {
-    id: "seed-msg-5",
-    phone: "9898989898",
-    customer_name: "Amit Verma",
-    sender: "customer",
-    message: "Can I customize the fruit bowl with extra pomegranate?",
-    created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-  },
-  {
-    id: "seed-msg-6",
-    phone: "9898989898",
-    customer_name: SUPPORT_NAME,
-    sender: "support",
-    message: "Hello Amit! Extra pomegranate is added at the fresh-cut counter at pickup.",
-    created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-  },
-]
-
 export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
@@ -174,14 +135,25 @@ export default function App() {
                   : m.customer_name || m.customerName || "Customer",
             }))
           : []
-        return mergeSupportMessages(SEED_SUPPORT_MESSAGES, sanitized)
+        // Older dashboards cached demo chats (ids "seed-msg-…"); never show them.
+        return mergeSupportMessages([], sanitized.filter((m: SupportMessage) => !String(m.id).startsWith("seed-msg-")))
       }
     } catch (e) {
       console.warn("Could not read local support cache", e)
     }
-    return SEED_SUPPORT_MESSAGES
+    return []
   })
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
+
+  // Store visitor totals from the visit_stats() SQL function; refreshed whenever Analytics opens.
+  useEffect(() => {
+    if (!supabase || tab !== "analytics") return
+    supabase.rpc("visit_stats").then(({ data, error }) => {
+      if (error) console.warn("Visitor stats unavailable:", error.message)
+      setVisitStats(error ? null : (data as VisitStats))
+    })
+  }, [tab])
 
   const saveAdminSupportToLocal = (msgs: SupportMessage[]) => {
     try {
@@ -297,9 +269,14 @@ export default function App() {
       .select("*")
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           setSupportMessages((prev) => {
-            const next = mergeSupportMessages(prev, data as SupportMessage[])
+            // The database is the source of truth, so deleted chats disappear; keep only
+            // messages from the last few minutes that may not have been saved yet.
+            const unsaved = prev.filter(
+              (m) => /^(admin-reply|msg|local|ack)-/.test(m.id) && Date.now() - new Date(m.created_at).getTime() < 5 * 60 * 1000,
+            )
+            const next = mergeSupportMessages(unsaved, data as SupportMessage[])
             saveAdminSupportToLocal(next)
             return next
           })
@@ -491,7 +468,7 @@ export default function App() {
 
   // Verify or Flag Payment Status
   const handleVerifyPayment = async (orderId: string, verified: boolean) => {
-    const targetStatus: PaymentStatus = verified ? "verified" : "failed"
+    const targetStatus: PaymentStatus = verified ? "verified" : "rejected"
     const orderToUpdate = orders.find((o) => o.id === orderId)
     if (!orderToUpdate) return
 
@@ -517,9 +494,14 @@ export default function App() {
             .from("orders")
             .update({ payment_method: updatedMethod })
             .eq("id", orderId)
+        } else if (error) {
+          throw error
         }
       } catch (err) {
         console.error("Failed to update payment verification:", err)
+        // Put the card back so it never shows a payment status the database doesn't have
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? orderToUpdate : o)))
+        alert("Couldn't save the payment status. Please try again.")
       }
     }
   }
@@ -549,77 +531,7 @@ export default function App() {
   }, [orders, statusFilter, fulfilmentFilter, slotFilter, search])
 
   // KPI Calculations & Analytics Breakdown
-  const stats = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0]
-    const todayOrders = orders.filter((o) => (o.created_at || "").startsWith(today))
-    const nonCancelledToday = todayOrders.filter((o) => o.status !== "cancelled")
-    const nonCancelledAllTime = orders.filter((o) => o.status !== "cancelled")
-
-    const revenue = nonCancelledToday.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const allTimeRevenue = nonCancelledAllTime.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-
-    const active = orders.filter((o) => ["placed", "preparing", "ready"].includes(o.status)).length
-    const deliveries = todayOrders.filter((o) => o.fulfilment === "delivery").length
-    const pickups = todayOrders.filter((o) => o.fulfilment === "pickup").length
-    const pendingCallbacks = new Set(
-      supportMessages.filter((m) => m.sender === "customer").map((m) => m.phone)
-    ).size
-
-    // Today Financial Breakdown
-    const todayUpiOrders = nonCancelledToday.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
-    const todayUpiRevenue = todayUpiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const todayCashOrders = nonCancelledToday.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
-    const todayCashRevenue = todayCashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const todayDeliveryFees = nonCancelledToday.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
-
-    // All Time Financial Breakdown
-    const allTimeUpiOrders = nonCancelledAllTime.filter((o) => o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi"))
-    const allTimeUpiRevenue = allTimeUpiOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const allTimeCashOrders = nonCancelledAllTime.filter((o) => !o.payment_method?.includes("PhonePe") && !o.payment_method?.toLowerCase().includes("upi"))
-    const allTimeCashRevenue = allTimeCashOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
-    const allTimeDeliveryFees = nonCancelledAllTime.reduce((sum, o) => sum + (Number(o.delivery_fee) || 0), 0)
-
-    const pendingUtrs = orders.filter(
-      (o) =>
-        (o.payment_method?.includes("PhonePe") || o.payment_method?.toLowerCase().includes("upi")) &&
-        o.payment_status !== "verified" &&
-        !o.payment_method?.includes("[VERIFIED]") &&
-        o.status !== "cancelled"
-    ).length
-
-    // Ratings
-    const ratedOrders = orders.filter((o) => typeof o.rating === "number" && o.rating > 0)
-    const avgRating =
-      ratedOrders.length > 0
-        ? (ratedOrders.reduce((acc, o) => acc + (o.rating || 0), 0) / ratedOrders.length).toFixed(1)
-        : "5.0"
-
-    const soldOutCount = inventory.filter((i) => !i.is_available).length
-
-    return {
-      revenue,
-      allTimeRevenue,
-      active,
-      deliveries,
-      pickups,
-      pendingCallbacks,
-      todayUpiRevenue,
-      todayUpiCount: todayUpiOrders.length,
-      todayCashRevenue,
-      todayCashCount: todayCashOrders.length,
-      todayDeliveryFees,
-      allTimeUpiRevenue,
-      allTimeUpiCount: allTimeUpiOrders.length,
-      allTimeCashRevenue,
-      allTimeCashCount: allTimeCashOrders.length,
-      allTimeDeliveryFees,
-      allTimeTotalOrders: nonCancelledAllTime.length,
-      pendingUtrs,
-      ratedCount: ratedOrders.length,
-      avgRating,
-      soldOutCount,
-    }
-  }, [orders, supportMessages, inventory])
+  const stats = useMemo(() => computeStats(orders, supportMessages, inventory), [orders, supportMessages, inventory])
 
   // Support Threads grouped by clean 10-digit phone
   const supportThreads = useMemo(() => {
@@ -799,7 +711,7 @@ export default function App() {
           <div className="kpi-card">
             <div className="kpi-header">
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <span>{revenuePeriod === "all" ? "All-Time Complete Revenue" : "Today's Revenue"}</span>
+                <span>{revenuePeriod === "all" ? "Collected (All Time)" : "Collected Today"}</span>
                 <div className="revenue-toggle-group">
                   <button
                     type="button"
@@ -824,8 +736,8 @@ export default function App() {
             </div>
             <span className="kpi-subtext">
               {revenuePeriod === "all"
-                ? `₹${stats.allTimeUpiRevenue.toLocaleString()} UPI · ₹${stats.allTimeCashRevenue.toLocaleString()} Cash (${stats.allTimeTotalOrders} orders)`
-                : `₹${stats.todayUpiRevenue.toLocaleString()} UPI · ₹${stats.todayCashRevenue.toLocaleString()} Cash (${stats.todayUpiCount + stats.todayCashCount} orders)`}
+                ? `₹${stats.allTimeUpiRevenue.toLocaleString()} UPI · ₹${stats.allTimeCashRevenue.toLocaleString()} counter · ₹${stats.toCollectAllTime.toLocaleString()} still to collect`
+                : `₹${stats.todayUpiRevenue.toLocaleString()} UPI · ₹${stats.todayCashRevenue.toLocaleString()} counter · ₹${stats.toCollectToday.toLocaleString()} still to collect`}
             </span>
           </div>
 
@@ -865,10 +777,12 @@ export default function App() {
                 </svg>
               </div>
             </div>
-            <div className="kpi-value">{stats.avgRating} <small style={{ fontSize: 13, color: "var(--muted)" }}>/ 5.0</small></div>
+            <div className="kpi-value">
+              {stats.avgRating} {stats.ratedCount > 0 && <small style={{ fontSize: 13, color: "var(--muted)" }}>/ 5.0</small>}
+            </div>
             <span className="kpi-subtext">
               {stats.ratedCount === 0
-                ? "0 delivered reviews yet"
+                ? "No reviews yet"
                 : `${stats.ratedCount} delivered review${stats.ratedCount > 1 ? "s" : ""}`}
             </span>
           </div>
@@ -1067,7 +981,7 @@ export default function App() {
                       <div className="inbox-item-top">
                         <span className="inbox-item-name">{thread.customerName}</span>
                         <span className="inbox-item-time">
-                          {new Date(thread.latestAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatWhen(thread.latestAt)}
                         </span>
                       </div>
                       <span className="inbox-item-phone">{get10DigitPhone(thread.phone)}</span>
@@ -1123,7 +1037,7 @@ export default function App() {
                         </div>
                         <div>{m.message}</div>
                         <div style={{ fontSize: 10, textAlign: "right", marginTop: 4, opacity: 0.7 }}>
-                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatWhen(m.created_at)}
                         </div>
                       </div>
                     ))}
@@ -1159,6 +1073,41 @@ export default function App() {
         {/* Tab 4: Analytics */}
         {tab === "analytics" && (
           <div className="analytics-grid">
+            {/* Store visitors: anonymous, one visit per browser session */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <div>
+                  <span>Store Visitors</span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    People who opened the student website (one visit per browser session)
+                  </div>
+                </div>
+              </div>
+              {visitStats ? (
+                <div className="analytics-financial-grid">
+                  <div className="fin-metric-box">
+                    <small>Today</small>
+                    <strong>{visitStats.today_visitors}</strong>
+                    <span>people · {visitStats.today_visits} visits</span>
+                  </div>
+                  <div className="fin-metric-box">
+                    <small>Last 7 Days</small>
+                    <strong>{visitStats.week_visitors}</strong>
+                    <span>people · {visitStats.week_visits} visits</span>
+                  </div>
+                  <div className="fin-metric-box highlight">
+                    <small>All Time</small>
+                    <strong>{visitStats.total_visitors}</strong>
+                    <span>people · {visitStats.total_visits} visits</span>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>
+                  Visitor counts appear once the site_visits SQL has been run in Supabase.
+                </p>
+              )}
+            </div>
+
             {/* Financial Settlement Breakdown */}
             <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
               <div className="analytics-card-title">
@@ -1196,35 +1145,42 @@ export default function App() {
               </div>
               <div className="analytics-financial-grid">
                 <div className="fin-metric-box">
-                  <small>PhonePe UPI Collections</small>
+                  <small>PhonePe UPI (verified)</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeUpiRevenue : stats.todayUpiRevenue).toLocaleString()}
                   </strong>
-                  <span>{revenuePeriod === "all" ? stats.allTimeUpiCount : stats.todayUpiCount} orders</span>
+                  <span>{revenuePeriod === "all" ? stats.allTimeUpiCount : stats.todayUpiCount} verified orders</span>
                 </div>
                 <div className="fin-metric-box">
-                  <small>Counter Cash Collections</small>
+                  <small>Paid at Counter</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeCashRevenue : stats.todayCashRevenue).toLocaleString()}
                   </strong>
-                  <span>{revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount} orders</span>
+                  <span>{revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount} handed-over orders</span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Delivery Fees</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeDeliveryFees : stats.todayDeliveryFees).toLocaleString()}
                   </strong>
-                  <span>{stats.deliveries} room deliveries</span>
+                  <span>{revenuePeriod === "all" ? stats.allTimePaidDeliveries : stats.todayPaidDeliveries} paid room deliveries</span>
+                </div>
+                <div className="fin-metric-box">
+                  <small>Still to Collect</small>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.toCollectAllTime : stats.toCollectToday).toLocaleString()}
+                  </strong>
+                  <span>Unverified UPI + counter orders not handed over</span>
                 </div>
                 <div className="fin-metric-box highlight">
-                  <small>Total Gross Revenue</small>
+                  <small>Total Collected</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeRevenue : stats.revenue).toLocaleString()}
                   </strong>
                   <span>
                     {revenuePeriod === "all"
-                      ? `${stats.allTimeTotalOrders} total completed orders (All Time)`
-                      : `${stats.todayUpiCount + stats.todayCashCount} total orders today`}
+                      ? `${stats.allTimeTotalOrders} paid orders (all time)`
+                      : `${stats.todayUpiCount + stats.todayCashCount} paid orders today`}
                   </span>
                 </div>
               </div>
@@ -1271,7 +1227,7 @@ export default function App() {
                 <span>Evening Slots Volume</span>
               </div>
               {["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"].map((slotName) => {
-                const count = orders.filter((o) => o.slot === slotName).length
+                const count = orders.filter((o) => o.slot === slotName && o.status !== "cancelled").length
                 const pct = (count / Math.max(orders.length, 1)) * 100
                 return (
                   <div key={slotName} className="analytics-bar-row">
@@ -1309,7 +1265,7 @@ function OrderCard({
 
   const isUpi = order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi")
   const isVerified = order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]")
-  const isFailed = order.payment_status === "failed" || order.payment_method?.includes("[FAILED]")
+  const isFailed = order.payment_status === "rejected" || order.payment_method?.includes("[FAILED]")
 
   const pin = getPickupPin(order)
 
@@ -1347,7 +1303,7 @@ function OrderCard({
         </div>
         <div className="order-time-slot">
           <span className="order-time-text">
-            {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {formatWhen(order.created_at)}
           </span>
           <span className="order-slot-pill">{order.slot}</span>
         </div>

@@ -2,6 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {
   normalizePhone,
+  cleanPhoneInput,
   isValidIndianPhone,
   calculateOrderTotals,
   getPickupPin,
@@ -56,6 +57,18 @@ test("Phone Normalization - handles malicious strings & script tags", () => {
   const evilInput = "<script>alert('xss')</script>9876543210"
   assert.equal(normalizePhone(evilInput), "9876543210")
   assert.equal(isValidIndianPhone(evilInput), true)
+})
+
+test("Phone Input - strips +91 / leading 0 from typed, pasted or autofilled numbers", () => {
+  assert.equal(cleanPhoneInput("+919876543210"), "9876543210")
+  assert.equal(cleanPhoneInput("+91 98765 43210"), "9876543210")
+  assert.equal(cleanPhoneInput("09876543210"), "9876543210")
+  assert.equal(cleanPhoneInput("98765-43210"), "9876543210")
+  assert.equal(cleanPhoneInput("9123456789"), "9123456789") // a real number starting with 91 is left alone
+  assert.equal(cleanPhoneInput("98765"), "98765") // partial input stays as typed
+  assert.equal(cleanPhoneInput("98765432109"), "9876543210") // an extra digit after a full number is ignored
+  assert.equal(cleanPhoneInput(""), "")
+  assert.equal(cleanPhoneInput(null), "")
 })
 
 test("Phone Normalization - rejects incomplete or malformed inputs", () => {
@@ -350,6 +363,7 @@ test("FAQ Bot - resolves fruit bowl pricing", () => {
 test("FAQ Bot - resolves pickle shelf life and ingredients", () => {
   const reply = getFaqResponse("How long does mango pickle last?")
   assert.match(reply, /3–6 months/)
+  assert.match(reply, /chicken pickle within 3 months/)
   assert.match(reply, /cold-pressed oils/)
 })
 
