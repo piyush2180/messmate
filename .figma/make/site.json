@@ -1,5 +1,6 @@
 {
-  "description": "A mobile-first food ordering platform for college students, offering authentic homemade pickles and customizable fruit bowls, designed for quick and easy access to fresh meals.",
+  "title": "Happy Tummy Co. · Fruit Bowls & Homemade Pickles",
+  "description": "Fresh-cut fruit bowls & homemade pickles delivered right to your hostel. Freshness. Flavour. Happiness.",
   "robots": {
     "index": false
   },
