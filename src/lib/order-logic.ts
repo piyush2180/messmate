@@ -1,3 +1,5 @@
+import { FRUIT_BOWL_PRICE } from "./inventory.ts"
+
 export type SupportMsg = {
   id: string
   phone: string
@@ -30,9 +32,12 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
   return /^[6-9]\d{9}$/.test(clean)
 }
 
+// Room delivery fee in ₹ (campus pickup is free). The orders.delivery_fee CHECK constraint must allow it.
+export const DELIVERY_FEE = 5
+
 /**
  * Calculates subtotal, delivery fee, and final total for an order.
- * delivery fee is ₹7 for room delivery, and ₹0 for campus pickup.
+ * Room delivery adds DELIVERY_FEE; campus pickup is free.
  */
 export function calculateOrderTotals(
   items: OrderItemLike[],
@@ -44,7 +49,7 @@ export function calculateOrderTotals(
     return sum + price * qty
   }, 0)
 
-  const fee = fulfilment === "delivery" ? 7 : 0
+  const fee = fulfilment === "delivery" ? DELIVERY_FEE : 0
   const total = subtotal + fee
 
   // Guard against float precision issues (e.g. 0.1 + 0.2)
@@ -53,17 +58,6 @@ export function calculateOrderTotals(
     fee,
     total: Math.round(total * 100) / 100,
   }
-}
-
-/**
- * Calculates custom fruit bowl price.
- * Base bowl is ₹35, plus ₹7 per portion of fruit selected.
- */
-export function calculateFruitBowlPrice(portionsCount: number): number {
-  const validPortions = Math.max(0, Math.floor(Number(portionsCount) || 0))
-  const BASE_PRICE = 35
-  const PORTION_PRICE = 7
-  return BASE_PRICE + validPortions * PORTION_PRICE
 }
 
 /**
@@ -142,7 +136,7 @@ export function getFaqResponse(query: string): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and campus pickup is free!"
+    return `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
   }
 
   // 6. Pickup station / location queries (precise matching, avoiding naked 'where')
@@ -167,7 +161,7 @@ export function getFaqResponse(query: string): string {
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return "Custom fruit bowls are ₹35 base + ₹7 per portion. Choose from 10 fresh fruits including Apple, Banana, Papaya, Watermelon, and Pomegranate."
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, including Apple, Banana, Papaya, Watermelon, and Pomegranate. You can leave out any fruit you don't want.`
   }
 
   // 8. Homemade South Indian Pickles

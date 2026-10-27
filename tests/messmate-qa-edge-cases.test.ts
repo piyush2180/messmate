@@ -4,7 +4,6 @@ import {
   normalizePhone,
   isValidIndianPhone,
   calculateOrderTotals,
-  calculateFruitBowlPrice,
   getPickupPin,
   canCancelOrder,
   getFaqResponse,
@@ -17,6 +16,14 @@ import {
   validateSupportMessage,
   isChatRateLimited,
 } from "../src/lib/order-logic.ts"
+import {
+  pickleProducts,
+  packOptions,
+  pickleCartItem,
+  fruitBowlCartItem,
+  repriceForReorder,
+  type CartItem,
+} from "../src/lib/inventory.ts"
 
 // ============================================================================
 // TEST SUITE 1: Phone Normalization & Indian Mobile Number Validation
@@ -128,8 +135,8 @@ test("Order Totals - empty cart yields zero subtotal", () => {
 
   const deliveryTotals = calculateOrderTotals([], "delivery")
   assert.equal(deliveryTotals.subtotal, 0)
-  assert.equal(deliveryTotals.fee, 7)
-  assert.equal(deliveryTotals.total, 7)
+  assert.equal(deliveryTotals.fee, 5)
+  assert.equal(deliveryTotals.total, 5)
 })
 
 test("Order Totals - standard items pricing with campus pickup (₹0 fee)", () => {
@@ -143,14 +150,14 @@ test("Order Totals - standard items pricing with campus pickup (₹0 fee)", () =
   assert.equal(totals.total, 145)
 })
 
-test("Order Totals - standard items pricing with room delivery (₹7 fee)", () => {
+test("Order Totals - standard items pricing with room delivery (₹5 fee)", () => {
   const items = [
     { price: 50, quantity: 3 }, // 150
   ]
   const totals = calculateOrderTotals(items, "delivery")
   assert.equal(totals.subtotal, 150)
-  assert.equal(totals.fee, 7)
-  assert.equal(totals.total, 157)
+  assert.equal(totals.fee, 5)
+  assert.equal(totals.total, 155)
 })
 
 test("Order Totals - protects against negative quantities and float anomalies", () => {
@@ -163,12 +170,48 @@ test("Order Totals - protects against negative quantities and float anomalies", 
   assert.equal(totals.total, 39.98)
 })
 
-test("Fruit Bowl Price - calculates base ₹35 + ₹7 per portion", () => {
-  assert.equal(calculateFruitBowlPrice(0), 35) // Base with 0 portions
-  assert.equal(calculateFruitBowlPrice(1), 42) // 35 + 7
-  assert.equal(calculateFruitBowlPrice(3), 56) // 35 + 21
-  assert.equal(calculateFruitBowlPrice(5), 70) // 35 + 35
-  assert.equal(calculateFruitBowlPrice(-2), 35) // Negative clamped to 0
+test("Menu Pricing - pickles are ₹40 per 50g (chicken ₹70) and the fruit bowl is a fixed ₹60", () => {
+  const prices = Object.fromEntries(
+    pickleProducts.map((product) => [product.name, packOptions.map((pack) => pickleCartItem(product, pack).price)])
+  )
+  assert.deepEqual(prices, {
+    "Mango Pickle (Avakaya)": [40, 80, 160],
+    "Gongura Pickle": [40, 80, 160],
+    "Gongura Pandu Mirchi": [40, 80, 160],
+    "Tomato Pickle": [40, 80, 160],
+    "Chicken Pickle with Bone": [70, 140, 280],
+  })
+
+  // Same pack of different pickles must be separate cart lines
+  const [mango, , , , chicken] = pickleProducts
+  assert.notEqual(pickleCartItem(mango, packOptions[0]).id, pickleCartItem(chicken, packOptions[0]).id)
+
+  const fullBowl = fruitBowlCartItem([])
+  assert.equal(fullBowl.price, 60)
+  assert.equal(fullBowl.detail, "All fruits")
+  const pickyBowl = fruitBowlCartItem(["Papaya", "Banana"])
+  assert.equal(pickyBowl.price, 60)
+  assert.equal(pickyBowl.detail, "Without Banana, Papaya")
+  assert.notEqual(pickyBowl.id, fullBowl.id)
+  assert.equal(fruitBowlCartItem(["Banana", "Papaya"]).id, pickyBowl.id) // Order of exclusions doesn't matter
+})
+
+test("Reorder - re-prices past items at today's menu and drops discontinued ones", () => {
+  const pastOrder: CartItem[] = [
+    { id: "pickle-50g", name: "Chicken Pickle with Bone", detail: "50g", price: 35, quantity: 2, kind: "pickle" },
+    { id: "pickle-50g", name: "Garlic Pickle", detail: "50g", price: 35, quantity: 1, kind: "pickle" },
+    { id: "pickle-Trial Pack", name: "Tomato Pickle", detail: "Trial Pack", price: 20, quantity: 1, kind: "pickle" },
+    { id: "fruit-bowl", name: "Custom Fruit Bowl", detail: "5 fruits · 350–450g", price: 70, quantity: 1, kind: "fruit" },
+    { id: "fruit-bowl-no-Papaya", name: "Fresh Fruit Bowl", detail: "Without Papaya", price: 45, quantity: 0, kind: "fruit" },
+  ]
+  const reordered = repriceForReorder(pastOrder)
+  assert.deepEqual(
+    reordered.map((item) => [item.name, item.detail, item.price, item.quantity]),
+    [
+      ["Chicken Pickle with Bone", "50g", 70, 2],
+      ["Fresh Fruit Bowl", "Without Papaya", 60, 1], // Bad quantity from the database is clamped to 1
+    ]
+  )
 })
 
 // ============================================================================
@@ -285,7 +328,7 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
   assert.match(reply1, /8:00 PM and 9:30 PM/)
-  assert.match(reply1, /₹7/)
+  assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
   assert.match(reply2, /8:00 PM and 9:30 PM/)
@@ -299,7 +342,7 @@ test("FAQ Bot - resolves pickup location queries", () => {
 
 test("FAQ Bot - resolves fruit bowl pricing", () => {
   const reply = getFaqResponse("How much does fruit bowl cost?")
-  assert.match(reply, /₹35 base \+ ₹7 per portion/)
+  assert.match(reply, /fixed ₹60/)
 })
 
 test("FAQ Bot - resolves pickle shelf life and ingredients", () => {
@@ -512,8 +555,8 @@ test("Financial Integrity - handles fractional and non-numeric quantities safely
   ]
   const result = calculateOrderTotals(weirdCart, "delivery")
   assert.equal(result.subtotal, 60) // 0 + 0 + (30 * 2) = 60
-  assert.equal(result.fee, 7)
-  assert.equal(result.total, 67)
+  assert.equal(result.fee, 5)
+  assert.equal(result.total, 65)
 })
 
 test("Financial Integrity - rounds float precision anomalies (0.1 + 0.2)", () => {

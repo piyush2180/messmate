@@ -1,11 +1,13 @@
 import type { MenuItemStock } from "../types"
 
 export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
-  { id: "mango", name: "Andhra Mango Pickle", category: "Pickles", is_available: true },
+  // Keep ids and names in sync with src/lib/inventory.ts in the student app.
+  { id: "mango", name: "Mango Pickle (Avakaya)", category: "Pickles", is_available: true },
   { id: "gongura", name: "Gongura Pickle", category: "Pickles", is_available: true },
-  { id: "lemon", name: "Lemon Pickle", category: "Pickles", is_available: true },
-  { id: "garlic", name: "Garlic Pickle", category: "Pickles", is_available: true },
-  { id: "fruit-bowl", name: "Custom Fresh Fruit Bowl", category: "Bowls", is_available: true },
+  { id: "gongura-pandu-mirchi", name: "Gongura Pandu Mirchi", category: "Pickles", is_available: true },
+  { id: "tomato", name: "Tomato Pickle", category: "Pickles", is_available: true },
+  { id: "chicken", name: "Chicken Pickle with Bone", category: "Pickles", is_available: true },
+  { id: "fruit-bowl", name: "Fresh Fruit Bowl", category: "Bowls", is_available: true },
   { id: "fruit-apple", name: "Fresh Apple", category: "Fruits", is_available: true },
   { id: "fruit-banana", name: "Robusta Banana", category: "Fruits", is_available: true },
   { id: "fruit-papaya", name: "Sweet Papaya", category: "Fruits", is_available: true },

@@ -21,7 +21,7 @@
    - [Phone Normalization & Indian Mobile Validation](#phone-normalization--indian-mobile-validation)
    - [Deterministic 4-Digit Pickup PIN Generation](#deterministic-4-digit-pickup-pin-generation)
    - [Financial Arithmetic & Tampering Protection](#financial-arithmetic--tampering-protection)
-   - [Dynamic Fruit Bowl Pricing Formula](#dynamic-fruit-bowl-pricing-formula)
+   - [Fixed Fruit Bowl Price](#fixed-fruit-bowl-price)
    - [UPI UTR Reference Validation](#upi-utr-reference-validation)
    - [Order Idempotency Fingerprinting](#order-idempotency-fingerprinting)
    - [Fuzzy Chat Deduplication & Anti-Spam Rate Limiting](#fuzzy-chat-deduplication--anti-spam-rate-limiting)
@@ -42,7 +42,7 @@
 
 ## 🚀 Overview
 
-**MessMate** solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, custom fresh fruit bowls, and evening dinner deliveries directly to their hostel blocks or pickup gates.
+**MessMate** solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, and evening dinner deliveries directly to their hostel blocks or pickup gates.
 
 The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live kitchen sound alerts, live item availability toggling, and two-way in-app support chat without page reloads.
 
@@ -138,7 +138,7 @@ MessMate Monorepo
 │   └── vite.config.ts                    # Vite bundler configuration
 │
 ├── tests/                                # Automated QA Test Suites
-│   ├── messmate-qa-edge-cases.test.ts    # 46 automated unit, financial, security, and edge-case tests
+│   ├── messmate-qa-edge-cases.test.ts    # 47 automated unit, financial, security, and edge-case tests
 │   └── messmate-live-db-integration.test.ts # 8 live Supabase integration & trigger verification tests
 │
 ├── supabase_schema.sql                   # Idempotent database migrations, RLS, triggers & indexes
@@ -154,12 +154,13 @@ MessMate Monorepo
 
 ### 1. Student Storefront
 - **Artisanal Pickle Catalog**:
-  - Interactive cards featuring Andhra Mango (*Avakaya*), Gongura Leaf (*Ambadi*), Spicy Garlic, and Tangy Lemon pickles.
+  - Interactive cards featuring Mango (*Avakaya*), Gongura, Gongura Pandu Mirchi, Tomato, and bone-in Chicken pickles, with product photos from our supplier, Food On Farm Pickles.
   - Each item displays a visual spice meter (1 to 3 chillies), diet tags (Vegetarian, Vegan, Gluten-Free), and detailed shelf-life guidance.
-  - Dynamic weight selector allows switching between **50g**, **100g**, **250g**, and **500g** portion sizes with instant price calculation.
-- **Interactive Fruit Bowl Customizer**:
-  - Real-time custom fresh fruit bowl builder.
-  - Base portion starts at ₹35, with optional add-on fruits (Apple, Banana, Papaya, Watermelon, Pineapple, Pomegranate, Muskmelon) dynamically calculated at ₹7 per portion.
+  - Pack selector offers **50g**, **100g**, and **200g** packs at ₹40 per 50g (₹70 per 50g for chicken).
+- **Fixed-Price Fruit Bowl**:
+  - One ₹60 bowl with 10 fresh-cut fruits (Apple, Banana, Papaya, Watermelon, Pomegranate, Orange, Guava, Grapes, Pineapple, Seasonal).
+  - Students tap any fruit to leave it out; sold-out fruits are left out automatically. The price stays ₹60.
+  - Shows the 8:00–9:30 PM delivery/pickup window and a call/WhatsApp contact number.
 - **Slide-Out Cart Drawer**:
   - Quantity increment/decrement controls with automatic zero-item removal guards.
   - Subtotal calculation shielded against floating-point precision errors.
@@ -168,7 +169,7 @@ MessMate Monorepo
     - *Hostel 3 Main Entrance*
     - *APJ Block Mess Gate*
     - *Asima Hostel Foyer*
-  - **Room Delivery (₹7 Runner Fee)**: Direct-to-door delivery with hostel block and room number inputs.
+  - **Room Delivery (₹5 Runner Fee)**: Direct-to-door delivery with hostel and room number inputs (room number is digits only).
 - **Scheduled Evening Delivery Slots**:
   - Pre-order for dinner windows: *8:00–8:30 PM*, *8:30–9:00 PM*, or *9:00–9:30 PM*.
 - **UPI & Cash Settlement**:
@@ -235,7 +236,7 @@ MessMate Monorepo
 
 ## 🧠 Core Algorithms & Business Logic
 
-All core business logic resides in [`src/lib/order-logic.ts`](file:///c:/Users/Piyush/OneDrive/Desktop/fooododoo/src/lib/order-logic.ts) and is thoroughly tested by 46 automated test suites:
+All core business logic resides in [`src/lib/order-logic.ts`](file:///c:/Users/Piyush/OneDrive/Desktop/fooododoo/src/lib/order-logic.ts) and is thoroughly tested by 47 automated test suites:
 
 ### Phone Normalization & Indian Mobile Validation
 Standardizes Indian mobile numbers into clean 10-digit formats regardless of how the user formats their input:
@@ -265,7 +266,7 @@ export function calculateOrderTotals(items: Array<{ price: number; quantity: num
     const price = Math.max(0, Number(item.price) || 0);
     subtotal += price * qty;
   }
-  const deliveryFee = fulfillmentType === 'delivery' ? 7 : 0;
+  const deliveryFee = fulfillmentType === 'delivery' ? 5 : 0;
   return {
     subtotal: Math.round(subtotal * 100) / 100,
     deliveryFee,
@@ -274,9 +275,8 @@ export function calculateOrderTotals(items: Array<{ price: number; quantity: num
 }
 ```
 
-### Dynamic Fruit Bowl Pricing Formula
-$$P_{\text{bowl}} = ₹35 + (N_{\text{extra fruits}} \times ₹7)$$
-Guarantees consistent base pricing while allowing unlimited combinations of fresh fruits.
+### Fixed Fruit Bowl Price
+Every bowl costs a flat ₹60 (`FRUIT_BOWL_PRICE` in `src/lib/inventory.ts`). Leaving fruits out doesn't change the price; each distinct set of left-out fruits becomes its own cart line so the kitchen sees exactly what goes in.
 
 ### UPI UTR Reference Validation
 Validates that customer-provided UPI transaction references match official NPCI / bank standards:
@@ -318,7 +318,7 @@ All database structures and security rules are defined in [`supabase_schema.sql`
    - `time_slot`: Selected delivery window.
    - `items`: JSONB array storing items, portions, and unit prices.
    - `subtotal`: Cart subtotal in INR.
-   - `delivery_fee`: Fulfillment fee (`0` for pickup, `7` for delivery).
+   - `delivery_fee`: Fulfillment fee (`0` for pickup, `5` for delivery; older orders may show `7`).
    - `total`: Total payable amount in INR.
    - `payment_method`: `'upi'` or `'counter'`.
    - `payment_status`: `'pending'`, `'verified'`, or `'failed'`.
@@ -347,7 +347,7 @@ Enforced directly at the database engine level, making it impossible for malicio
 ```sql
 ALTER TABLE public.orders ADD CONSTRAINT chk_orders_positive_total CHECK (total >= 0);
 ALTER TABLE public.orders ADD CONSTRAINT chk_orders_positive_subtotal CHECK (subtotal >= 0);
-ALTER TABLE public.orders ADD CONSTRAINT chk_orders_delivery_fee CHECK (delivery_fee IN (0, 7));
+ALTER TABLE public.orders ADD CONSTRAINT chk_orders_delivery_fee CHECK (delivery_fee IN (0, 5, 7));
 ALTER TABLE public.orders ADD CONSTRAINT chk_orders_valid_rating CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5));
 ALTER TABLE public.orders ADD CONSTRAINT chk_orders_payment_status CHECK (payment_status IN ('pending', 'verified', 'failed'));
 ALTER TABLE public.orders ADD CONSTRAINT chk_orders_valid_phone CHECK (length(customer_phone) >= 10);
@@ -419,7 +419,7 @@ Staff checks Soundbox / Bank App ──► Clicks "Verify Payment" ──► Ord
 
 ## 🧪 Automated QA & Testing Suite
 
-MessMate includes 54 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
+MessMate includes 55 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
 
 ```bash
 # Run the entire test suite
@@ -435,8 +435,8 @@ npm test
 6. **Support Messaging Lifecycle**: Tests bidirectional conversation threading and chronological message ordering.
 1. **Phone Normalization & Validation (6 Tests)**: Handles clean digits, strips `+91`/`91`, leading zeros, dashes, brackets, malicious script injections, and rejects malformed inputs.
 2. **Deterministic Pickup PIN Algorithm (6 Tests)**: Preserves explicit codes, calculates 4-digit PINs deterministically, tests zero/negative/undefined order numbers, and fuzzes 1,000 random order numbers.
-3. **Order Subtotals & Delivery Fees (4 Tests)**: Empty cart handling, ₹0 campus pickup, ₹7 room delivery, and negative quantity protections.
-4. **Fruit Bowl Formula (1 Test)**: Validates base price ₹35 + ₹7 per portion.
+3. **Order Subtotals & Delivery Fees (4 Tests)**: Empty cart handling, ₹0 campus pickup, ₹5 room delivery, and negative quantity protections.
+4. **Menu Pricing & Reorder (2 Tests)**: ₹40/50g pickles (₹70 chicken), fixed ₹60 fruit bowl, separate cart lines per pickle, and reorders re-priced at today's menu.
 5. **Order Cancellation Policy (1 Test)**: Restricts cancellation strictly to pending orders.
 6. **Support Message Deduplication & Sorting (4 Tests)**: Exact ID deduplication, optimistic-to-server merging, chronological ascending order sorting, and rapid double-click filtering.
 7. **Automated FAQ Intelligence Bot (7 Tests)**: Tests delivery timing, pickup spots, fruit pricing, shelf life, order tracking, cancellation queries, and fallback routing.

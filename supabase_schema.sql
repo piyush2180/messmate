@@ -36,8 +36,9 @@ alter table public.orders add constraint chk_orders_positive_total check (total 
 alter table public.orders drop constraint if exists chk_orders_positive_subtotal;
 alter table public.orders add constraint chk_orders_positive_subtotal check (subtotal >= 0);
 
+-- 5 is the current room delivery fee (DELIVERY_FEE in src/lib/order-logic.ts); 7 stays valid for older orders.
 alter table public.orders drop constraint if exists chk_orders_delivery_fee;
-alter table public.orders add constraint chk_orders_delivery_fee check (delivery_fee in (0, 7));
+alter table public.orders add constraint chk_orders_delivery_fee check (delivery_fee in (0, 5, 7));
 
 alter table public.orders drop constraint if exists chk_orders_valid_rating;
 alter table public.orders add constraint chk_orders_valid_rating check (rating is null or (rating >= 1 and rating <= 5));
@@ -161,14 +162,15 @@ create policy "Anyone can update menu inventory"
   using (true)
   with check (true);
 
--- Seed default menu items if not already present
+-- Seed default menu items if not already present (ids and names match DEFAULT_MENU_ITEMS in the apps)
 insert into public.menu_inventory (id, name, category, is_available)
 values
-  ('mango', 'Andhra Mango Pickle', 'pickles', true),
-  ('gongura', 'Gongura Leaf Pickle', 'pickles', true),
-  ('garlic', 'Spicy Garlic Pickle', 'pickles', true),
-  ('lemon', 'Tangy Lemon Pickle', 'pickles', true),
-  ('fruit_bowl', 'Custom Fruit Bowl', 'fruit', true)
+  ('mango', 'Mango Pickle (Avakaya)', 'Pickles', true),
+  ('gongura', 'Gongura Pickle', 'Pickles', true),
+  ('gongura-pandu-mirchi', 'Gongura Pandu Mirchi', 'Pickles', true),
+  ('tomato', 'Tomato Pickle', 'Pickles', true),
+  ('chicken', 'Chicken Pickle with Bone', 'Pickles', true),
+  ('fruit-bowl', 'Fresh Fruit Bowl', 'Bowls', true)
 on conflict (id) do nothing;
 
 -- ============================================================================

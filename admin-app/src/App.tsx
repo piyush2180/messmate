@@ -190,7 +190,11 @@ export default function App() {
   const [inventory, setInventory] = useState<MenuItemStock[]>(() => {
     try {
       const saved = localStorage.getItem("messmate_menu_inventory")
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        // The cache only restores stock flags; the item list always comes from DEFAULT_MENU_ITEMS so menu changes show up.
+        const cached = new Map((JSON.parse(saved) as MenuItemStock[]).map((i) => [i.id, i.is_available]))
+        return DEFAULT_MENU_ITEMS.map((item) => ({ ...item, is_available: cached.get(item.id) ?? item.is_available }))
+      }
     } catch (e) {
       console.warn("Could not read local inventory cache", e)
     }
@@ -935,7 +939,7 @@ export default function App() {
                   className="filter-select"
                 >
                   <option value="all">All Fulfilment</option>
-                  <option value="delivery">Hostel Room Delivery (₹7)</option>
+                  <option value="delivery">Hostel Room Delivery</option>
                   <option value="pickup">Campus Pickup Table</option>
                 </select>
 
@@ -1213,7 +1217,7 @@ export default function App() {
                   <span>{revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount} orders</span>
                 </div>
                 <div className="fin-metric-box">
-                  <small>Delivery Fees (₹7/drop)</small>
+                  <small>Delivery Fees</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeDeliveryFees : stats.todayDeliveryFees).toLocaleString()}
                   </strong>
@@ -1239,7 +1243,7 @@ export default function App() {
               </div>
               <div className="analytics-bar-row">
                 <div className="analytics-bar-header">
-                  <span>Hostel Room Delivery (₹7)</span>
+                  <span>Hostel Room Delivery</span>
                   <span>{stats.deliveries} orders</span>
                 </div>
                 <div className="analytics-progress-track">
@@ -1393,7 +1397,7 @@ function OrderCard({
       </div>
 
       <div className={`fulfilment-pill-row ${order.fulfilment}`}>
-        <span>{order.fulfilment === "delivery" ? "Hostel Room Delivery (₹7)" : (order.hostel || "Campus Pickup")}</span>
+        <span>{order.fulfilment === "delivery" ? `Hostel Room Delivery (₹${order.delivery_fee})` : (order.hostel || "Campus Pickup")}</span>
       </div>
 
       {/* Items List */}

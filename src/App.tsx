@@ -1,9 +1,21 @@
 import { useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 
 import { supabase } from "./lib/supabase"
-import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
+import {
+  DEFAULT_MENU_ITEMS,
+  FRUIT_BOWL_NAME,
+  FRUIT_BOWL_PRICE,
+  fruitBowlCartItem,
+  getPickupPin,
+  packOptions,
+  pickleCartItem,
+  pickleProducts,
+  repriceForReorder,
+  type CartItem,
+} from "./lib/inventory"
 import { PHONEPE_QR_BASE64 } from "./assets/phonepeQrData"
 import {
+  DELIVERY_FEE,
   calculateOrderTotals,
   normalizePhone,
   safeStorage,
@@ -22,15 +34,6 @@ type Screen =
   | "payment"
   | "confirmation"
   | "orders"
-
-type CartItem = {
-  id: string
-  name: string
-  detail: string
-  price: number
-  quantity: number
-  kind: "pickle" | "fruit"
-}
 
 type CustomerDetails = {
   name: string
@@ -97,75 +100,9 @@ const pickleImage =
 const fruitImage =
   "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&w=1200&q=88"
 
-const lemonImage =
-  "https://images.unsplash.com/photo-1576920803950-3f066b308938?auto=format&fit=crop&w=800&q=86"
-
-const garlicImage =
-  "https://images.unsplash.com/photo-1593329344473-6a9dfc15dc3d?auto=format&fit=crop&w=800&q=86"
-
-const chickenPickleImage =
-  "https://images.unsplash.com/photo-1603496987351-f84a3ba5ec85?auto=format&fit=crop&w=800&q=86"
-
-const pickleProducts = [
-  {
-    name: "Andhra Mango Pickle",
-    desc: "Bold, spicy & tangy",
-    spice: "Hot",
-    price: 10,
-    image: pickleImage,
-    diet: "veg" as const,
-  },
-
-  {
-    name: "Gongura Pickle",
-    desc: "Authentic South Indian tang",
-    spice: "Medium",
-    price: 15,
-    image: garlicImage,
-    diet: "veg" as const,
-  },
-
-  {
-    name: "Lemon Pickle",
-    desc: "Zesty, spicy & homemade",
-    spice: "Medium",
-    price: 10,
-    image: lemonImage,
-    diet: "veg" as const,
-  },
-
-  {
-    name: "Garlic Pickle",
-    desc: "Rich, bold & flavourful",
-    spice: "Mild",
-    price: 15,
-    image: garlicImage,
-    diet: "veg" as const,
-  },
-
-  {
-    name: "Chicken Pickle",
-    desc: "Rich, spicy & flavourful",
-    spice: "Medium",
-    price: 60,
-    image: chickenPickleImage,
-    diet: "non_veg" as const,
-  },
-]
-
-const packOptions = [
-  {
-    label: "Trial Pack",
-    note: "Try it. You might never look back.",
-    price: 20,
-  },
-
-  { label: "50g", note: "Just enough to start a new habit.", price: 35 },
-
-  { label: "100g", note: "The everyday favourite.", price: 60 },
-
-  { label: "200g", note: "For serious pickle lovers.", price: 110 },
-]
+// Students can call or WhatsApp this number about fruit bowls.
+const CONTACT_PHONE = "+91 83091 22630"
+const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 
 const fruits = [
   { name: "Apple", color: "#D9644A", emoji: "A" },
@@ -697,7 +634,7 @@ function Home({
                 className="hero-secondary-btn"
                 onClick={() => go("fruit-builder")}
               >
-                <span>Build Fresh Fruit Bowl</span>
+                <span>Order Fresh Fruit Bowl</span>
                 <Icon name="leaf" size={18} />
               </button>
             </div>
@@ -725,7 +662,7 @@ function Home({
                     <small>Small batch</small>
                   </div>
                   <div className="stat-item">
-                    <strong>₹7</strong>
+                    <strong>₹{DELIVERY_FEE}</strong>
                     <small>Room Drop</small>
                   </div>
                   <div className="stat-item">
@@ -752,10 +689,10 @@ function Home({
             type="fruit"
             title="Fresh Fruit Bowls"
             punchline="Skip the junk, not the meal."
-            line="Fresh, customizable & made your way."
+            line={`${fruits.length} fresh-cut fruits, one fixed price.`}
             image={fruitImage}
-            labels={["Fresh", "Customizable", "Made to order"]}
-            cta="Build your bowl"
+            labels={["Fresh", `₹${FRUIT_BOWL_PRICE} fixed`, "Made to order"]}
+            cta="Order a bowl"
             onClick={() => go("fruit-builder")}
           />
         </section>
@@ -876,18 +813,13 @@ function PickleDetail({
 }) {
   const [selected, setSelected] = useState(0)
 
+  const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
   const pack = packOptions[selected]
+  const item = pickleCartItem(product, pack)
 
   const handleAdd = () => {
     if (isSoldOut) return
-    add({
-      id: `pickle-${pack.label}`,
-      name: productName,
-      detail: pack.label,
-      price: pack.price,
-      quantity: 1,
-      kind: "pickle",
-    })
+    add(item)
   }
 
   return (
@@ -905,7 +837,7 @@ function PickleDetail({
         <div className="detail-layout">
           <div className="detail-left-col">
             <div className="detail-image">
-              <img src={pickleImage} alt={productName} />
+              <img src={product.image} alt={product.name} />
               <span className="image-badge">
                 <Icon name="heart" size={16} /> Student favourite
               </span>
@@ -922,15 +854,8 @@ function PickleDetail({
           </div>
           <section className="detail-copy">
             <div className="eyebrow">Homemade · Andhra style</div>
-            <h1>
-              {productName === "Andhra Mango Pickle"
-                ? "Authentic Andhra Mango Pickle"
-                : productName}
-            </h1>
-            <p>
-              Homemade in small batches. Bold South Indian flavour, made to rescue
-              even the most boring mess meal.
-            </p>
+            <h1>{product.name}</h1>
+            <p>{product.about}</p>
             <div className="highlights">
               {[
                 "Homemade with care",
@@ -974,7 +899,7 @@ function PickleDetail({
                     <strong>{option.label}</strong>
                     <small>{option.note}</small>
                   </span>
-                  <strong>₹{option.price}</strong>
+                  <strong>₹{pickleCartItem(product, option).price}</strong>
                 </button>
               ))}
             </div>
@@ -982,7 +907,7 @@ function PickleDetail({
               <div className="desktop-pack-price-row">
                 <div>
                   <small>Selected pack</small>
-                  <strong>{pack.label} (₹{pack.price})</strong>
+                  <strong>{pack.label} (₹{item.price})</strong>
                 </div>
                 <div
                   className="desktop-pack-tag"
@@ -1001,7 +926,7 @@ function PickleDetail({
       <BottomBar>
         <div className="dock-price">
           <small>Selected pack</small>
-          <strong>₹{pack.price}</strong>
+          <strong>₹{item.price}</strong>
         </div>
         <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
           {isSoldOut ? "Currently Sold Out" : "Add to cart"}
@@ -1022,43 +947,46 @@ function FruitBuilder({
   cartCount: number
   soldOutItems?: Set<string>
 }) {
-  const [counts, setCounts] = useState<Record<string, number>>({
-    Apple: 1,
-    Banana: 1,
-    Papaya: 1,
-    Watermelon: 1,
-    Pomegranate: 1,
-  })
+  const [leftOut, setLeftOut] = useState<string[]>([])
 
-  const selectedCount = Object.values(counts).filter(Boolean).length
+  const isFruitSoldOut = (name: string) =>
+    Boolean(
+      soldOutItems?.has(name) ||
+        soldOutItems?.has(`Fresh ${name}`) ||
+        soldOutItems?.has(`Sweet ${name}`) ||
+        soldOutItems?.has(`Crisp ${name}`) ||
+        soldOutItems?.has(`Robusta ${name}`) ||
+        (name === "Pomegranate" && soldOutItems?.has("Pomegranate Pearls")) ||
+        (name === "Orange" && soldOutItems?.has("Nagpur Orange")) ||
+        (name === "Guava" && soldOutItems?.has("Pink Guava")) ||
+        (name === "Grapes" && soldOutItems?.has("Black Grapes")) ||
+        (name === "Pineapple" && soldOutItems?.has("Queen Pineapple")) ||
+        (name === "Seasonal" && soldOutItems?.has("Seasonal Special")),
+    )
 
-  const totalPortions = Object.values(counts).reduce(
-    (sum, count) => sum + count,
-    0,
-  )
+  // Sold-out fruits count as left out, so the order tells the kitchen exactly what goes in.
+  const skipped = fruits
+    .map((fruit) => fruit.name)
+    .filter((name) => leftOut.includes(name) || isFruitSoldOut(name))
+  const includedCount = fruits.length - skipped.length
+  const bowlSoldOut = Boolean(soldOutItems?.has(FRUIT_BOWL_NAME))
+  const canAdd = includedCount > 0 && !bowlSoldOut
 
-  const price = 35 + totalPortions * 7
-
-  const update = (name: string, value: number) =>
-    setCounts((current) => ({ ...current, [name]: value }))
+  const toggle = (name: string) =>
+    setLeftOut((current) =>
+      current.includes(name)
+        ? current.filter((n) => n !== name)
+        : [...current, name],
+    )
 
   const handleAdd = () => {
-    add({
-      id: "fruit-bowl",
-      name: "Custom Fruit Bowl",
-      detail: `${selectedCount} fruits · ${
-        totalPortions > 6 ? "450–550g" : "350–450g"
-      }`,
-      price,
-      quantity: 1,
-      kind: "fruit",
-    })
+    if (canAdd) add(fruitBowlCartItem(skipped))
   }
 
   return (
     <>
       <Header
-        title="Build Your Bowl"
+        title="Fresh Fruit Bowl"
         onBack={() => go("home")}
         cartCount={cartCount}
         onCart={cartCount ? () => go("cart") : undefined}
@@ -1071,46 +999,59 @@ function FruitBuilder({
           <div className="builder-left-col">
             <section className="builder-hero">
               <div>
-                <div className="eyebrow">Freshly cut · Made to order</div>
+                <div className="eyebrow">Freshly cut · Fixed price</div>
                 <h1>
-                  Pick your fruits.
+                  One fresh bowl.
                   <br />
-                  <em>Build your bowl.</em>
+                  <em>₹{FRUIT_BOWL_PRICE}, every time.</em>
                 </h1>
-                <p>Your bowl, your fruits, your choice.</p>
+                <p>{fruits.length} fruits in every bowl. Tap any fruit you'd rather skip.</p>
               </div>
               <div className="bowl-thumb">
                 <img src={fruitImage} alt="Fresh mixed fruit bowl" />
               </div>
             </section>
             <div className="builder-note">
-              <Icon name="leaf" size={18} />
-              <span>We've started you with our favourite mix. Make it yours.</span>
+              <Icon name="clock" size={18} />
+              <span>
+                Delivery & pickup every evening, 8:00–9:30 PM. Pickup is free,
+                room delivery ₹{DELIVERY_FEE}.
+              </span>
+            </div>
+            <div className="bowl-contact">
+              <span>
+                <small>Questions about your bowl?</small>
+                <strong>{CONTACT_PHONE}</strong>
+              </span>
+              <a
+                href={`https://wa.me/${contactDigits}?text=${encodeURIComponent("Hi MessMate, I have a question about the fruit bowl.")}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Icon name="chat" size={15} /> WhatsApp
+              </a>
+              <a href={`tel:+${contactDigits}`}>
+                <Icon name="phone" size={15} /> Call
+              </a>
             </div>
             <div className="fruit-grid">
               {fruits.map((fruit) => {
-                const count = counts[fruit.name] || 0
-                const isSoldOut =
-                  soldOutItems?.has(fruit.name) ||
-                  soldOutItems?.has(`Fresh ${fruit.name}`) ||
-                  soldOutItems?.has(`Sweet ${fruit.name}`) ||
-                  soldOutItems?.has(`Crisp ${fruit.name}`) ||
-                  soldOutItems?.has(`Robusta ${fruit.name}`) ||
-                  (fruit.name === "Pomegranate" && soldOutItems?.has("Pomegranate Pearls")) ||
-                  (fruit.name === "Orange" && soldOutItems?.has("Nagpur Orange")) ||
-                  (fruit.name === "Guava" && soldOutItems?.has("Pink Guava")) ||
-                  (fruit.name === "Grapes" && soldOutItems?.has("Black Grapes")) ||
-                  (fruit.name === "Pineapple" && soldOutItems?.has("Queen Pineapple")) ||
-                  (fruit.name === "Seasonal" && soldOutItems?.has("Seasonal Special"))
+                const isSoldOut = isFruitSoldOut(fruit.name)
+                const included = !skipped.includes(fruit.name)
 
                 return (
-                  <article
-                    className={`fruit-card ${isSoldOut ? "sold-out" : ""} ${count ? "selected" : ""}`}
+                  <button
+                    type="button"
+                    className={`fruit-card ${isSoldOut ? "sold-out" : ""} ${included ? "selected" : "left-out"}`}
                     key={fruit.name}
+                    aria-pressed={included}
+                    disabled={isSoldOut}
+                    onClick={() => toggle(fruit.name)}
                   >
                     <div
                       className="fruit-orb"
                       style={{ backgroundColor: fruit.color }}
+                      aria-hidden="true"
                     >
                       {fruit.emoji}
                     </div>
@@ -1118,22 +1059,16 @@ function FruitBuilder({
                       <strong>{fruit.name}</strong>
                       <small className={isSoldOut ? "sold-out-text" : ""}>
                         {isSoldOut
-                          ? "Sold out"
-                          : count
-                            ? `${count} portion${count > 1 ? "s" : ""}`
-                            : "Tap + to add"}
+                          ? "Sold out today"
+                          : included
+                            ? "In your bowl · tap to leave out"
+                            : "Left out · tap to add back"}
                       </small>
                     </div>
-                    {!isSoldOut ? (
-                      <Quantity
-                        value={count}
-                        onChange={(value) => update(fruit.name, value)}
-                        small
-                      />
-                    ) : (
-                      <span style={{ fontSize: "10px", color: "#d90429", fontWeight: 700 }}>Out of Stock</span>
-                    )}
-                  </article>
+                    <span className="fruit-check" aria-hidden="true">
+                      <Icon name={included ? "check" : "plus"} size={14} />
+                    </span>
+                  </button>
                 )
               })}
             </div>
@@ -1143,39 +1078,33 @@ function FruitBuilder({
               <div className="summary-top">
                 <div>
                   <small>YOUR BOWL</small>
-                  <strong>{selectedCount} fruits selected</strong>
+                  <strong>
+                    {includedCount} of {fruits.length} fruits
+                  </strong>
                 </div>
                 <span>
                   <Icon name="check" size={16} />
                 </span>
               </div>
               <div className="summary-row">
-                <span>Total Portions</span>
-                <strong>{totalPortions} portions</strong>
+                <span>Leaving out</span>
+                <strong>{skipped.length ? skipped.join(", ") : "Nothing"}</strong>
               </div>
               <div className="summary-row">
-                <span>Approx. weight</span>
-                <strong>{totalPortions > 6 ? "450–550g" : "350–450g"}</strong>
-              </div>
-              <div className="summary-row">
-                <span>Base bowl</span>
-                <strong>₹35</strong>
-              </div>
-              <div className="summary-row">
-                <span>Portions ({totalPortions} × ₹7)</span>
-                <strong>₹{totalPortions * 7}</strong>
+                <span>Delivery & pickup</span>
+                <strong>8:00–9:30 PM</strong>
               </div>
               <div className="summary-row" style={{ paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.2)", fontSize: 13 }}>
-                <span>Estimated total</span>
-                <strong>₹{price}</strong>
+                <span>Fixed price</span>
+                <strong>₹{FRUIT_BOWL_PRICE}</strong>
               </div>
               <div className="desktop-builder-cta">
                 <PrimaryButton
                   tone="fruit"
-                  disabled={!selectedCount}
+                  disabled={!canAdd}
                   onClick={handleAdd}
                 >
-                  Add bowl to cart (₹{price})
+                  {bowlSoldOut ? "Sold out today" : `Add bowl to cart (₹${FRUIT_BOWL_PRICE})`}
                 </PrimaryButton>
               </div>
             </div>
@@ -1184,15 +1113,15 @@ function FruitBuilder({
       </main>
       <BottomBar>
         <div className="dock-price">
-          <small>{selectedCount} fruits</small>
-          <strong>₹{price}</strong>
+          <small>{includedCount} fruits</small>
+          <strong>₹{FRUIT_BOWL_PRICE}</strong>
         </div>
         <PrimaryButton
           tone="fruit"
-          disabled={!selectedCount}
+          disabled={!canAdd}
           onClick={handleAdd}
         >
-          Add bowl to cart
+          {bowlSoldOut ? "Sold out today" : "Add bowl to cart"}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -1272,7 +1201,11 @@ function Cart({
                 {items.map((item) => (
                   <article className="cart-card" key={item.id}>
                     <img
-                      src={item.kind === "pickle" ? pickleImage : fruitImage}
+                      src={
+                        item.kind === "pickle"
+                          ? pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage
+                          : fruitImage
+                      }
                       alt=""
                     />
                     <div className="cart-item-copy">
@@ -1369,6 +1302,7 @@ function Field({
   value,
   onChange,
   type = "text",
+  inputMode,
   maxLength,
   hint,
 }: {
@@ -1377,6 +1311,7 @@ function Field({
   value: string
   onChange: (value: string) => void
   type?: string
+  inputMode?: "numeric"
   maxLength?: number
   hint?: string
 }) {
@@ -1388,6 +1323,7 @@ function Field({
       </div>
       <input
         type={type}
+        inputMode={inputMode}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -1471,15 +1407,16 @@ function Checkout({
                 />
                 <Field
                   label="Hostel"
-                  placeholder="e.g. Hostel 3"
+                  placeholder="e.g. Kalam"
                   value={details.hostel}
                   onChange={(v) => set("hostel", v)}
                 />
                 <Field
                   label="Room number"
                   placeholder="e.g. 214"
+                  inputMode="numeric"
                   value={details.room}
-                  onChange={(v) => set("room", v)}
+                  onChange={(v) => set("room", v.replace(/\D/g, ""))}
                 />
               </div>
               <div className="privacy-note">
@@ -1523,7 +1460,7 @@ function Checkout({
                 <span>
                   <strong>Room delivery</strong>
                   <small>Right to your hostel room.</small>
-                  <em>+₹7 delivery fee</em>
+                  <em>+₹{DELIVERY_FEE} delivery fee</em>
                 </span>
                 <span className="radio">
                   {fulfilment === "delivery" && <span />}
@@ -1538,7 +1475,7 @@ function Checkout({
                 <strong>
                   {fulfilment === "pickup"
                     ? "Hostel Pickup (Free)"
-                    : "Room Delivery (+₹7)"}
+                    : `Room Delivery (+₹${DELIVERY_FEE})`}
                 </strong>
                 <p>
                   {fulfilment === "pickup"
@@ -1693,7 +1630,7 @@ function Fulfilment({
                 <span className="big-icon">
                   <Icon name="bag" size={30} />
                 </span>
-                <div className="eyebrow">Room delivery · ₹7</div>
+                <div className="eyebrow">Room delivery · ₹{DELIVERY_FEE}</div>
                 <h2>
                   {details.hostel}, Room {details.room}
                 </h2>
@@ -1749,13 +1686,8 @@ function Payment({
   onPay: (method: "upi" | "counter", utr?: string) => void
   isSubmitting: boolean
 }) {
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  )
-
-  const fee = fulfilment === "delivery" ? 7 : 0
-  const total = subtotal + fee
+  // Same calculation handlePay uses, so the amount shown is the amount saved.
+  const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
   const [method, setMethod] = useState<"upi" | "counter">("upi")
   const [utr, setUtr] = useState("")
@@ -2772,7 +2704,7 @@ const FAQ_ITEMS = [
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance (or your selected counter) is free, and room delivery is ₹7.",
+      `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance (or your selected counter) is free, and room delivery is ₹${DELIVERY_FEE}.`,
   },
   {
     id: "pickup",
@@ -2790,10 +2722,10 @@ const FAQ_ITEMS = [
   },
   {
     id: "fruit",
-    label: "Fruit bowl customization",
-    question: "How does the fruit bowl builder work?",
+    label: "Fruit bowl price & fruits",
+    question: "How does the fruit bowl work?",
     answer:
-      "Start with a fresh base bowl for ₹35, then choose any combination from 10 fruits for ₹7 per portion! Generous, fresh-cut fruit bowls made right before evening pickup.",
+      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl. Questions? Call or WhatsApp ${CONTACT_PHONE}.`,
   },
   {
     id: "pickle",
@@ -2839,7 +2771,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return "Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹7, and campus pickup is free!"
+    return `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
   }
   if (
     q.includes("pickup point") ||
@@ -2862,7 +2794,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("cost") ||
     q.includes("portion")
   ) {
-    return "Custom fruit bowls are ₹35 base + ₹7 per portion. Choose from 10 fresh fruits including Apple, Banana, Papaya, Watermelon, and Pomegranate."
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, and you can leave out any fruit you don't want. Questions? Call or WhatsApp ${CONTACT_PHONE}.`
   }
   if (
     q.includes("pickle") ||
@@ -3637,7 +3569,7 @@ function SupportChatWidget({
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
 
-  const [selectedProduct, setSelectedProduct] = useState("Andhra Mango Pickle")
+  const [selectedProduct, setSelectedProduct] = useState(pickleProducts[0].name)
 
   const [cart, setCart] = useState<CartItem[]>([])
 
@@ -3645,7 +3577,7 @@ export default function App() {
     name: safeStorage.getItem("messmate_customer_name", "") || "",
     phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
     hostel: safeStorage.getItem("messmate_hostel", "") || "",
-    room: safeStorage.getItem("messmate_room", "") || "",
+    room: (safeStorage.getItem("messmate_room", "") || "").replace(/\D/g, ""),
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
@@ -3692,7 +3624,8 @@ export default function App() {
         if (!error && data) {
           const out = new Set<string>()
           data.forEach((row: any) => {
-            if (!row.is_available) out.add(row.name)
+            // Match by id so a renamed menu item keeps its stock flag.
+            if (!row.is_available) out.add(DEFAULT_MENU_ITEMS.find((i) => i.id === row.id)?.name ?? row.name)
           })
           setSoldOutItems(out)
         }
@@ -3845,7 +3778,16 @@ export default function App() {
   // 1-Click Reorder Handler
   const handleReorder = (items: CartItem[]) => {
     if (!Array.isArray(items) || items.length === 0) return
-    setCart(items)
+    const current = repriceForReorder(items)
+    if (current.length < items.length) {
+      alert(
+        current.length
+          ? "Some items from this order are no longer on the menu, so they were skipped."
+          : "None of the items from this order are on the menu anymore.",
+      )
+    }
+    if (current.length === 0) return
+    setCart(current)
     go("cart")
   }
 
