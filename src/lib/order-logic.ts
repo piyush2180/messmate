@@ -90,7 +90,7 @@ export function canCancelOrder(status: string | undefined | null): boolean {
 export function getFaqResponse(query: string): string {
   const q = (query || "").toLowerCase().trim()
   if (!q) {
-    return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the MessMate Support Team."
+    return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the Happy Tummy Co. Support Team."
   }
 
   // 1. PIN & pickup code queries
@@ -124,7 +124,7 @@ export function getFaqResponse(query: string): string {
 
   // 4. Cancellation & refund
   if (q.includes("cancel") || q.includes("refund") || q.includes("change order")) {
-    return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our MessMate Support Team can update your order right away!"
+    return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our Happy Tummy Co. Support Team can update your order right away!"
   }
 
   // 5. Delivery slot and timings
@@ -147,12 +147,12 @@ export function getFaqResponse(query: string): string {
     q.includes("where to pick") ||
     q.includes("where is pickup") ||
     q.includes("pickup station") ||
-    q.includes("hostel 3") ||
+    q.includes("kalam") ||
     q.includes("apj block") ||
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return "Pickups are available at Hostel 3 Entrance, APJ Abdul Kalam Block (Room 341), and Asima Hostel. Select your preferred station during checkout!"
+    return "Pickups are available at Kalam (Room 341) and Asima (Room 110). Select your preferred spot during checkout!"
   }
 
   // 7. Custom fruit bowl
@@ -161,7 +161,7 @@ export function getFaqResponse(query: string): string {
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, including Apple, Banana, Papaya, Watermelon, and Pomegranate. You can leave out any fruit you don't want.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 8 fresh-cut fruits, including Apple, Banana, Papaya, Pomegranate, and Pineapple. You can leave out any fruit you don't want.`
   }
 
   // 8. Homemade South Indian Pickles
@@ -193,7 +193,7 @@ export function getFaqResponse(query: string): string {
   }
 
   // Fallback
-  return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the MessMate Support Team."
+  return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the Happy Tummy Co. Support Team."
 }
 
 /**

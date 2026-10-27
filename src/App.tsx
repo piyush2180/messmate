@@ -14,6 +14,7 @@ import {
   type CartItem,
 } from "./lib/inventory"
 import { PHONEPE_QR_BASE64 } from "./assets/phonepeQrData"
+import logoUrl from "./assets/happy-tummy-logo.webp"
 import {
   DELIVERY_FEE,
   calculateOrderTotals,
@@ -93,16 +94,32 @@ type IconName =
   | "key"
   | "bell"
   | "zap"
+  | "whatsapp"
 
+// Our supplier's (Food On Farm Pickles) mango pickle photo.
 const pickleImage =
-  "https://images.unsplash.com/photo-1601702538934-efffab67ab65?auto=format&fit=crop&w=1200&q=88"
+  "https://cdn.shopify.com/s/files/1/0722/3872/7323/files/mango-pickle-scaled_f383ec5b-be63-4988-81c1-f2f381d76f8e.webp?width=1000"
 
+// A real bowl of cut fruit; free to use under the Unsplash License.
 const fruitImage =
-  "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&w=1200&q=88"
+  "https://images.unsplash.com/photo-1760881592698-abbf44a47872?auto=format&fit=crop&w=1200&q=85"
 
-// Students can call or WhatsApp this number about fruit bowls.
+const BRAND = "Happy Tummy Co."
+
+// Call/WhatsApp number; shown only on the order confirmation and in the support chat header.
 const CONTACT_PHONE = "+91 83091 22630"
 const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
+
+// Our only hostels; the pickup counters are inside them.
+const HOSTELS = ["Kalam", "Asima"]
+const PICKUP_POINTS = [
+  { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block" },
+  { name: "Asima - 110", desc: "Asima Hostel Ground Floor" },
+]
+
+// Support messages are stored under this name. Older names stay recognised so past chats still read as support.
+const SUPPORT_NAME = `${BRAND} Support Team`
+const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
 
 const fruits = [
   { name: "Apple", color: "#D9644A", emoji: "A" },
@@ -110,8 +127,6 @@ const fruits = [
   { name: "Banana", color: "#D9A441", emoji: "B" },
 
   { name: "Papaya", color: "#F4A261", emoji: "P" },
-
-  { name: "Watermelon", color: "#E76F51", emoji: "W" },
 
   { name: "Pomegranate", color: "#B94A42", emoji: "P" },
 
@@ -122,8 +137,6 @@ const fruits = [
   { name: "Grapes", color: "#76608A", emoji: "G" },
 
   { name: "Pineapple", color: "#D9A441", emoji: "P" },
-
-  { name: "Seasonal", color: "#4F8A5B", emoji: "S" },
 ]
 
 function Icon({
@@ -302,6 +315,15 @@ function Icon({
     zap: (
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     ),
+
+    // WhatsApp glyph (Simple Icons, CC0): a filled shape, unlike the stroked icons above.
+    whatsapp: (
+      <path
+        fill="currentColor"
+        stroke="none"
+        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+      />
+    ),
   }
 
   return (
@@ -328,12 +350,9 @@ function Brand({ onClick }: { onClick?: () => void }) {
       onClick={
         onClick || (() => window.scrollTo({ top: 0, behavior: "smooth" }))
       }
-      aria-label="MessMate home"
+      aria-label={`${BRAND} home`}
     >
-      <span className="brand-mark">
-        <Icon name="leaf" size={18} />
-      </span>
-      <span>MESSMATE</span>
+      <img className="brand-logo" src={logoUrl} alt={BRAND} />
     </button>
   )
 }
@@ -381,7 +400,7 @@ function Header({
 
       {title && (
         <div className="header-heading">
-          <span>MESSMATE</span>
+          <span>HAPPY TUMMY CO.</span>
           <div className="header-title">{title}</div>
         </div>
       )}
@@ -611,7 +630,7 @@ function Home({
         <section className="hero">
           <div className="hero-left">
             <div className="hero-kicker">
-              <span></span>Made for campus life
+              <span></span>Freshness. Flavour. Happiness.
             </div>
             <h1>
               Good food.
@@ -779,7 +798,7 @@ function PickleList({
                   <p>{product.desc}</p>
                   <div className="product-bottom">
                     <div>
-                      <small>{isSoldOut ? "Status" : "Starts at"}</small>
+                      <small>{isSoldOut ? "Status" : `${packOptions[0].label} pack`}</small>
                       <strong style={isSoldOut ? { color: "#d90429", fontSize: "11px" } : {}}>
                         {isSoldOut ? "Sold Out" : `₹${product.price}`}
                       </strong>
@@ -811,10 +830,8 @@ function PickleDetail({
   cartCount?: number
   isSoldOut?: boolean
 }) {
-  const [selected, setSelected] = useState(0)
-
   const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
-  const pack = packOptions[selected]
+  const pack = packOptions[0]
   const item = pickleCartItem(product, pack)
 
   const handleAdd = () => {
@@ -838,9 +855,6 @@ function PickleDetail({
           <div className="detail-left-col">
             <div className="detail-image">
               <img src={product.image} alt={product.name} />
-              <span className="image-badge">
-                <Icon name="heart" size={16} /> Student favourite
-              </span>
             </div>
             <aside className="love-note desktop-love-note">
               <span>
@@ -853,7 +867,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
-            <div className="eyebrow">Homemade · Andhra style</div>
+            <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
             <div className="highlights">
@@ -881,33 +895,24 @@ function PickleDetail({
             </aside>
             <div className="section-heading">
               <div>
-                <h2>Choose your pack</h2>
-                <p>Start small. Come back for more.</p>
+                <h2>Pack size</h2>
+                <p>Every pickle comes in one {pack.label} pack.</p>
               </div>
             </div>
             <div className="option-list">
-              {packOptions.map((option, index) => (
-                <button
-                  className={`pack-option ${
-                    selected === index ? "selected" : ""
-                  }`}
-                  onClick={() => setSelected(index)}
-                  key={option.label}
-                >
-                  <span className="radio">{selected === index && <span />}</span>
-                  <span className="pack-copy">
-                    <strong>{option.label}</strong>
-                    <small>{option.note}</small>
-                  </span>
-                  <strong>₹{pickleCartItem(product, option).price}</strong>
-                </button>
-              ))}
+              <div className="pack-option selected">
+                <span className="pack-copy">
+                  <strong>{pack.label}</strong>
+                  <small>{pack.note}</small>
+                </span>
+                <strong>₹{item.price}</strong>
+              </div>
             </div>
             <div className="desktop-pack-cta">
               <div className="desktop-pack-price-row">
                 <div>
-                  <small>Selected pack</small>
-                  <strong>{pack.label} (₹{item.price})</strong>
+                  <small>{pack.label} pack</small>
+                  <strong>₹{item.price}</strong>
                 </div>
                 <div
                   className="desktop-pack-tag"
@@ -925,7 +930,7 @@ function PickleDetail({
       </main>
       <BottomBar>
         <div className="dock-price">
-          <small>Selected pack</small>
+          <small>{pack.label} pack</small>
           <strong>₹{item.price}</strong>
         </div>
         <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
@@ -954,14 +959,12 @@ function FruitBuilder({
       soldOutItems?.has(name) ||
         soldOutItems?.has(`Fresh ${name}`) ||
         soldOutItems?.has(`Sweet ${name}`) ||
-        soldOutItems?.has(`Crisp ${name}`) ||
         soldOutItems?.has(`Robusta ${name}`) ||
         (name === "Pomegranate" && soldOutItems?.has("Pomegranate Pearls")) ||
         (name === "Orange" && soldOutItems?.has("Nagpur Orange")) ||
         (name === "Guava" && soldOutItems?.has("Pink Guava")) ||
         (name === "Grapes" && soldOutItems?.has("Black Grapes")) ||
-        (name === "Pineapple" && soldOutItems?.has("Queen Pineapple")) ||
-        (name === "Seasonal" && soldOutItems?.has("Seasonal Special")),
+        (name === "Pineapple" && soldOutItems?.has("Queen Pineapple")),
     )
 
   // Sold-out fruits count as left out, so the order tells the kitchen exactly what goes in.
@@ -1017,22 +1020,6 @@ function FruitBuilder({
                 Delivery & pickup every evening, 8:00–9:30 PM. Pickup is free,
                 room delivery ₹{DELIVERY_FEE}.
               </span>
-            </div>
-            <div className="bowl-contact">
-              <span>
-                <small>Questions about your bowl?</small>
-                <strong>{CONTACT_PHONE}</strong>
-              </span>
-              <a
-                href={`https://wa.me/${contactDigits}?text=${encodeURIComponent("Hi MessMate, I have a question about the fruit bowl.")}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Icon name="chat" size={15} /> WhatsApp
-              </a>
-              <a href={`tel:+${contactDigits}`}>
-                <Icon name="phone" size={15} /> Call
-              </a>
             </div>
             <div className="fruit-grid">
               {fruits.map((fruit) => {
@@ -1305,6 +1292,7 @@ function Field({
   inputMode,
   maxLength,
   hint,
+  options,
 }: {
   label: string
   placeholder: string
@@ -1314,6 +1302,7 @@ function Field({
   inputMode?: "numeric"
   maxLength?: number
   hint?: string
+  options?: string[]
 }) {
   return (
     <label className="field">
@@ -1321,14 +1310,27 @@ function Field({
         <span>{label}</span>
         {hint && <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 500 }}>{hint}</span>}
       </div>
-      <input
-        type={type}
-        inputMode={inputMode}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        maxLength={maxLength}
-      />
+      {options ? (
+        <select required value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="" disabled>
+            {placeholder}
+          </option>
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={type}
+          inputMode={inputMode}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+        />
+      )}
     </label>
   )
 }
@@ -1407,7 +1409,8 @@ function Checkout({
                 />
                 <Field
                   label="Hostel"
-                  placeholder="e.g. Kalam"
+                  placeholder="Select hostel"
+                  options={HOSTELS}
                   value={details.hostel}
                   onChange={(v) => set("hostel", v)}
                 />
@@ -1535,11 +1538,7 @@ function Fulfilment({
 }) {
   const slots = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
 
-  const pickupPoints = [
-    { name: "Hostel 3 Entrance", desc: "Next to the main security desk" },
-    { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block" },
-    { name: "Asima - 110", desc: "Asima Hostel Ground Floor" }
-  ]
+  const pickupPoints = PICKUP_POINTS
   const selectedPoint = pickupPoints.find(p => p.name === pickupPoint) || pickupPoints[0]
 
   return (
@@ -1694,8 +1693,8 @@ function Payment({
   const [copiedUpi, setCopiedUpi] = useState(false)
 
   const merchantUpiId = "Q477490796@ybl"
-  const merchantName = "MessMate"
-  const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=MessMate&am=${total}&cu=INR&tn=MessMate%20Food%20Order`
+  const merchantName = BRAND
+  const upiIntentUri = `upi://pay?pa=${merchantUpiId}&pn=${encodeURIComponent(BRAND)}&am=${total}&cu=INR&tn=${encodeURIComponent(`${BRAND} order`)}`
 
   const handleCopyUpi = () => {
     const copySuccessful = () => {
@@ -1810,7 +1809,7 @@ function Payment({
                 <div className="qr-container">
                   <img
                     src={PHONEPE_QR_BASE64}
-                    alt="PhonePe QR Code - MessMate"
+                    alt={`PhonePe QR code for ${BRAND}`}
                     className="phonepe-qr-img"
                   />
                   <div className="qr-scan-instruction">
@@ -1991,7 +1990,7 @@ function Confirmation({
             <Icon name="close" size={18} />
             <div>
               <strong>Order #{orderNumber} has been Cancelled</strong>
-              <p>The kitchen cancelled this order. If you paid via UPI, please reach out to the MessMate Support Team.</p>
+              <p>The kitchen cancelled this order. If you paid via UPI, please reach out to the {SUPPORT_NAME}.</p>
             </div>
           </div>
         )}
@@ -2066,6 +2065,22 @@ function Confirmation({
             We'll send order details and live updates to{" "}
             <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
           </span>
+        </div>
+        <div className="contact-card">
+          <span>
+            <small>Questions about your order?</small>
+            <strong>{CONTACT_PHONE}</strong>
+          </span>
+          <a
+            href={`https://wa.me/${contactDigits}?text=${encodeURIComponent(`Hi ${BRAND}, I have a question about order #${orderNumber}.`)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="whatsapp" size={15} /> WhatsApp
+          </a>
+          <a href={`tel:+${contactDigits}`}>
+            <Icon name="phone" size={15} /> Call
+          </a>
         </div>
         <div className="confirm-actions">
           <PrimaryButton onClick={() => go("home")}>Back to home</PrimaryButton>
@@ -2503,7 +2518,7 @@ function OrdersPage({
                       </div>
                       <div className="cancelled-card-refund">
                         <span>
-                          If you transferred payment via UPI, your refund will be processed or you can contact the <strong>MessMate Support Team</strong> for instant verification.
+                          If you transferred payment via UPI, your refund will be processed or you can contact the <strong>{SUPPORT_NAME}</strong> for instant verification.
                         </span>
                         <button
                           type="button"
@@ -2704,14 +2719,14 @@ const FAQ_ITEMS = [
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Campus pickup at Hostel 3 Entrance (or your selected counter) is free, and room delivery is ₹${DELIVERY_FEE}.`,
+      `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Pickup at Kalam or Asima is free, and room delivery is ₹${DELIVERY_FEE}.`,
   },
   {
     id: "pickup",
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      "Our primary campus pickup point is at Hostel 3 Entrance beside the security desk. We also offer pickup at APJ Abdul Kalam Block (Room 341) and Asima Hostel Ground Floor!",
+      "Pick up from Kalam (Room 341, APJ Abdul Kalam Block) or Asima (Room 110, ground floor). Choose your spot at checkout!",
   },
   {
     id: "sold_out",
@@ -2725,14 +2740,14 @@ const FAQ_ITEMS = [
     label: "Fruit bowl price & fruits",
     question: "How does the fruit bowl work?",
     answer:
-      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl. Questions? Call or WhatsApp ${CONTACT_PHONE}.`,
+      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl.`,
   },
   {
     id: "pickle",
     label: "Pickle shelf life & storage",
     question: "How long do the pickles stay fresh?",
     answer:
-      "Our homemade Andhra pickles are crafted in small batches with cold-pressed oil and authentic spices. They stay fresh for 3–6 months in a dry, room-temperature spot.",
+      "Our homemade pickles are crafted in small batches with cold-pressed oil and authentic spices. They stay fresh for 3–6 months in a dry, room-temperature spot.",
   },
 ]
 
@@ -2780,12 +2795,12 @@ function getAutomatedAnswer(query: string): string {
     q.includes("where to pick") ||
     q.includes("where is pickup") ||
     q.includes("pickup station") ||
-    q.includes("hostel 3") ||
+    q.includes("kalam") ||
     q.includes("apj block") ||
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return "Pickups are available at Hostel 3 Entrance, APJ Abdul Kalam Block (Room 341), and Asima Hostel. Select your preferred station during checkout!"
+    return "Pickups are available at Kalam (Room 341) and Asima (Room 110). Select your preferred spot during checkout!"
   }
   if (
     q.includes("fruit") ||
@@ -2794,7 +2809,7 @@ function getAutomatedAnswer(query: string): string {
     q.includes("cost") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 10 fresh-cut fruits, and you can leave out any fruit you don't want. Questions? Call or WhatsApp ${CONTACT_PHONE}.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits, and you can leave out any fruit you don't want.`
   }
   if (
     q.includes("pickle") ||
@@ -2808,9 +2823,9 @@ function getAutomatedAnswer(query: string): string {
     return "Our South Indian homemade pickles last 3–6 months at room temperature. Made small-batch with cold-pressed oils."
   }
   if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
-    return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our MessMate Support Team can update your order right away!"
+    return `Orders can be modified before prep starts. Please click 'Talk to Team' below so the ${SUPPORT_NAME} can update your order right away!`
   }
-  return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the MessMate Support Team."
+  return `Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the ${SUPPORT_NAME}.`
 }
 
 function mergeSupportMessages(
@@ -2900,10 +2915,8 @@ function SupportChatWidget({
             ? parsed.map((m: any) => ({
                 ...m,
                 customer_name:
-                  m.customer_name === "MessMate Support" ||
-                  m.customer_name === "Campus Support Team" ||
-                  m.sender === "support"
-                    ? "MessMate Support Team"
+                  SUPPORT_NAMES.includes(m.customer_name) || m.sender === "support"
+                    ? SUPPORT_NAME
                     : m.customer_name,
               }))
             : []
@@ -2973,7 +2986,7 @@ function SupportChatWidget({
     {
       id: "init-1",
       sender: "bot",
-      text: "Hello! How can we help you today with your MessMate order?",
+      text: `Hello! How can we help you today with your ${BRAND} order?`,
     },
   ])
   const [faqInput, setFaqInput] = useState("")
@@ -3166,7 +3179,7 @@ function SupportChatWidget({
     localStorage.setItem("messmate_phone", activePhone)
     localStorage.setItem("messmate_customer_name", name.trim())
 
-    const issueText = issue.trim() || "Requested MessMate Support Team callback."
+    const issueText = issue.trim() || `Requested ${SUPPORT_NAME} callback.`
 
     const initialCustomerMsg: SupportMsg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -3180,7 +3193,7 @@ function SupportChatWidget({
     const acknowledgmentMsg: SupportMsg = {
       id: `ack-${Date.now() + 1}-${Math.random().toString(36).slice(2, 6)}`,
       phone: activePhone,
-      customer_name: "MessMate Support Team",
+      customer_name: SUPPORT_NAME,
       sender: "support",
       message: `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`,
       created_at: new Date().toISOString(),
@@ -3264,7 +3277,7 @@ function SupportChatWidget({
         className={`support-fab ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open support chat"
-        title="MessMate Support Team"
+        title={SUPPORT_NAME}
       >
         <span className="support-fab-dot" />
         <Icon name={isOpen ? "close" : "chat"} size={19} />
@@ -3282,19 +3295,39 @@ function SupportChatWidget({
                 <Icon name="chat" size={17} />
               </div>
               <div className="support-header-text">
-                <strong>MessMate Support Team</strong>
+                <strong>{SUPPORT_NAME}</strong>
                 <small>
-                  <span className="support-header-dot" /> Online
+                  <span className="support-header-dot" /> {CONTACT_PHONE}
                 </small>
               </div>
             </div>
-            <button
-              className="support-close-btn"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close support chat"
-            >
-              <Icon name="close" size={18} />
-            </button>
+            <div className="support-header-actions">
+              <a
+                className="support-header-btn"
+                href={`https://wa.me/${contactDigits}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`WhatsApp ${CONTACT_PHONE}`}
+                title={`WhatsApp ${CONTACT_PHONE}`}
+              >
+                <Icon name="whatsapp" size={16} />
+              </a>
+              <a
+                className="support-header-btn"
+                href={`tel:+${contactDigits}`}
+                aria-label={`Call ${CONTACT_PHONE}`}
+                title={`Call ${CONTACT_PHONE}`}
+              >
+                <Icon name="phone" size={16} />
+              </a>
+              <button
+                className="support-close-btn"
+                onClick={() => setIsOpen(false)}
+                aria-label="Close support chat"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="support-subnav">
@@ -3332,7 +3365,7 @@ function SupportChatWidget({
                     className={`chat-bubble ${item.sender}`}
                   >
                     <span className="chat-bubble-sender">
-                      {item.sender === "bot" ? "MessMate Bot" : "You"}
+                      {item.sender === "bot" ? "Happy Tummy Bot" : "You"}
                     </span>
                     <div>{item.text}</div>
                     {item.showEscalate && (
@@ -3350,7 +3383,7 @@ function SupportChatWidget({
                           }}
                         >
                           <Icon name="chat" size={13} />
-                          {liveMessages.length > 0 ? "Resume Live Chat" : "Talk to MessMate Support Team"}
+                          {liveMessages.length > 0 ? "Resume Live Chat" : "Talk to our Support Team"}
                         </button>
                       </div>
                     )}
@@ -3399,9 +3432,9 @@ function SupportChatWidget({
                 onSubmit={handleStartLiveChat}
               >
                 <div className="support-request-intro">
-                  <h4>Talk to MessMate Support Team</h4>
+                  <h4>Talk to our Support Team</h4>
                   <p>
-                    Submit your name and phone number. Our MessMate Support Team will
+                    Submit your name and phone number. Our support team will
                     contact you shortly!
                   </p>
                 </div>
@@ -3486,7 +3519,7 @@ function SupportChatWidget({
                 </div>
                 <div className="support-status-copy">
                   <strong>We will contact you shortly!</strong>
-                  <span>MessMate Support Team reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
+                  <span>{SUPPORT_NAME} reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
                 </div>
                 <button
                   type="button"
@@ -3502,7 +3535,7 @@ function SupportChatWidget({
                 {liveMessages.length === 0 ? (
                   <div className="empty-state" style={{ padding: 20 }}>
                     <Icon name="chat" size={24} />
-                    <p>No messages yet. Send a message below to start chatting with the MessMate Support Team.</p>
+                    <p>No messages yet. Send a message below to start chatting with the {SUPPORT_NAME}.</p>
                   </div>
                 ) : (
                   liveMessages.map((msg) => (
@@ -3517,14 +3550,11 @@ function SupportChatWidget({
                       }`}
                     >
                       <span className="chat-bubble-sender">
-                        {msg.sender === "customer" &&
-                        msg.customer_name !== "MessMate Support" &&
-                        msg.customer_name !== "Campus Support Team" &&
-                        msg.customer_name !== "MessMate Support Team"
+                        {msg.sender === "customer" && !SUPPORT_NAMES.includes(msg.customer_name)
                           ? msg.customer_name || "You"
                           : msg.sender === "bot"
-                            ? "MessMate Bot"
-                            : "MessMate Support Team"}
+                            ? "Happy Tummy Bot"
+                            : SUPPORT_NAME}
                       </span>
                       <div>{msg.message}</div>
                       <span className="chat-bubble-time">
@@ -3576,12 +3606,13 @@ export default function App() {
   const [details, setDetails] = useState<CustomerDetails>(() => ({
     name: safeStorage.getItem("messmate_customer_name", "") || "",
     phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
-    hostel: safeStorage.getItem("messmate_hostel", "") || "",
+    // Only keep a saved hostel that is one of ours (older saves were free text).
+    hostel: HOSTELS.find((h) => h.toLowerCase() === (safeStorage.getItem("messmate_hostel", "") || "").trim().toLowerCase()) ?? "",
     room: (safeStorage.getItem("messmate_room", "") || "").replace(/\D/g, ""),
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
-  const [pickupPoint, setPickupPoint] = useState("Hostel 3 Entrance")
+  const [pickupPoint, setPickupPoint] = useState(PICKUP_POINTS[0].name)
 
   const [slot, setSlot] = useState("8:30–9:00 PM")
 
@@ -3820,7 +3851,7 @@ export default function App() {
 
       const cleanPhone = normalizePhone(details.phone) || "0000000000"
       const cleanName = sanitizeInput(details.name, 100) || "Student"
-      const cleanHostel = fulfilment === "pickup" ? pickupPoint : (sanitizeInput(details.hostel, 100) || "Hostel 3")
+      const cleanHostel = fulfilment === "pickup" ? pickupPoint : sanitizeInput(details.hostel, 100)
       const cleanRoom = fulfilment === "pickup" ? "" : (sanitizeInput(details.room, 50) || "Room")
 
       if (supabase) {

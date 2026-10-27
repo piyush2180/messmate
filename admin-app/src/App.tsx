@@ -9,6 +9,11 @@ import type {
   MenuItemStock,
 } from "./types"
 import { DEFAULT_MENU_ITEMS, getPickupPin } from "./lib/inventory"
+import logoUrl from "./assets/happy-tummy-logo.webp"
+
+// Support replies are stored under this name. Older names stay recognised so past chats still read as support.
+const SUPPORT_NAME = "Happy Tummy Co. Support Team"
+const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
 
 // Web Audio API Ding chime for incoming orders
 function playOrderChime() {
@@ -113,7 +118,7 @@ const SEED_SUPPORT_MESSAGES: SupportMessage[] = [
   {
     id: "seed-msg-2",
     phone: "9876543210",
-    customer_name: "MessMate Support Team",
+    customer_name: SUPPORT_NAME,
     sender: "support",
     message: "Hello Rahul! Kitchen has started prep, pickup PIN is 2071. Estimated in 12 mins.",
     created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
@@ -123,15 +128,15 @@ const SEED_SUPPORT_MESSAGES: SupportMessage[] = [
     phone: "9812345678",
     customer_name: "Priya Patel",
     sender: "customer",
-    message: "Order #15 delivery to Hostel 4 Room 312: can delivery partner call upon arrival?",
+    message: "Order #15 delivery to Kalam Room 312: can delivery partner call upon arrival?",
     created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
   },
   {
     id: "seed-msg-4",
     phone: "9812345678",
-    customer_name: "MessMate Support Team",
+    customer_name: SUPPORT_NAME,
     sender: "support",
-    message: "Hi Priya! Delivery runner has your note and will dial you outside Hostel 4.",
+    message: "Hi Priya! Delivery runner has your note and will dial you outside Kalam.",
     created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
   },
   {
@@ -145,7 +150,7 @@ const SEED_SUPPORT_MESSAGES: SupportMessage[] = [
   {
     id: "seed-msg-6",
     phone: "9898989898",
-    customer_name: "MessMate Support Team",
+    customer_name: SUPPORT_NAME,
     sender: "support",
     message: "Hello Amit! Extra pomegranate is added at the fresh-cut counter at pickup.",
     created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
@@ -164,10 +169,8 @@ export default function App() {
           ? parsed.map((m: any) => ({
               ...m,
               customer_name:
-                m.customer_name === "MessMate Support" ||
-                m.customer_name === "Campus Support Team" ||
-                m.sender === "support"
-                  ? "MessMate Support Team"
+                SUPPORT_NAMES.includes(m.customer_name) || m.sender === "support"
+                  ? SUPPORT_NAME
                   : m.customer_name || m.customerName || "Customer",
             }))
           : []
@@ -638,9 +641,7 @@ export default function App() {
       if (
         msg.customer_name &&
         msg.customer_name !== "Student" &&
-        msg.customer_name !== "MessMate Support" &&
-        msg.customer_name !== "MessMate Support Team" &&
-        msg.customer_name !== "Campus Support Team"
+        !SUPPORT_NAMES.includes(msg.customer_name)
       ) {
         threads[cleanPhone].customerName = msg.customer_name
       }
@@ -712,7 +713,7 @@ export default function App() {
       try {
         await supabase.from("support_messages").insert({
           phone: targetPhone,
-          customer_name: "MessMate Support Team",
+          customer_name: SUPPORT_NAME,
           sender: "support",
           message: reply,
         })
@@ -734,15 +735,10 @@ export default function App() {
       <header className="admin-header">
         <div className="admin-header-inner">
           <div className="brand-section">
-            <div className="brand-badge">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 4C11 4 5 8 5 15c0 2 1 4 3 5 7-1 11-6 12-16Z" />
-                <path d="M4 21c3-6 7-9 13-12" />
-              </svg>
-            </div>
+            <img className="brand-logo" src={logoUrl} alt="Happy Tummy Co." />
             <div className="brand-text">
               <div className="brand-title">
-                MessMate <span className="brand-pill">Kitchen & Ops</span>
+                Happy Tummy Co. <span className="brand-pill">Kitchen & Ops</span>
               </div>
               <span className="brand-subtitle">Campus Order Management Console</span>
             </div>
@@ -1121,12 +1117,9 @@ export default function App() {
                         className={`thread-bubble ${m.sender === "customer" ? "customer" : "support"}`}
                       >
                         <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, opacity: 0.8 }}>
-                          {m.sender === "customer" &&
-                          m.customer_name !== "MessMate Support" &&
-                          m.customer_name !== "Campus Support Team" &&
-                          m.customer_name !== "MessMate Support Team"
+                          {m.sender === "customer" && !SUPPORT_NAMES.includes(m.customer_name)
                             ? activeThread.customerName
-                            : "MessMate Support Team"}
+                            : SUPPORT_NAME}
                         </div>
                         <div>{m.message}</div>
                         <div style={{ fontSize: 10, textAlign: "right", marginTop: 4, opacity: 0.7 }}>

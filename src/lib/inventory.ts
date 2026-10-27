@@ -20,7 +20,7 @@ export const pickleProducts = [
     name: "Mango Pickle (Avakaya)",
     desc: "Raw mango, mustard & Guntur chilli",
     about:
-      "Andhra's classic avakaya: farm-fresh raw mango cured with freshly ground mustard, Guntur red chilli, fenugreek and rock salt in cold-pressed groundnut oil. No preservatives. Best with hot rice and ghee, curd rice or dosa.",
+      "Classic avakaya: farm-fresh raw mango cured with freshly ground mustard, Guntur red chilli, fenugreek and rock salt in cold-pressed groundnut oil. No preservatives. Best with hot rice and ghee, curd rice or dosa.",
     spice: "Hot",
     price: 40, // ₹ per 50g
     image:
@@ -29,7 +29,7 @@ export const pickleProducts = [
   },
   {
     name: "Gongura Pickle",
-    desc: "Tangy sorrel leaves, Andhra style",
+    desc: "Tangy sorrel leaves & red chilli",
     about:
       "Fresh gongura (sorrel) leaves with Guntur red chilli and mustard seeds in groundnut oil. All the sourness comes from the leaves themselves, with no added souring agents. Stir it into hot rice with ghee, curd rice or dal.",
     spice: "Medium",
@@ -53,7 +53,7 @@ export const pickleProducts = [
     name: "Tomato Pickle",
     desc: "Chunky, tangy tomato pachadi",
     about:
-      "Traditional Andhra tomato pachadi made from whole fresh tomatoes slow-cooked with spices, not paste, so it stays chunky. Cold-pressed groundnut oil, no preservatives. Goes with rice, dosa, upma or chapati, or spread on toast.",
+      "Traditional tomato pachadi made from whole fresh tomatoes slow-cooked with spices, not paste, so it stays chunky. Cold-pressed groundnut oil, no preservatives. Goes with rice, dosa, upma or chapati, or spread on toast.",
     spice: "Medium",
     price: 40,
     image:
@@ -64,7 +64,7 @@ export const pickleProducts = [
     name: "Chicken Pickle with Bone",
     desc: "Bone-in chicken, slow-cooked & spicy",
     about:
-      "Bone-in chicken pieces slow-cooked with freshly ground spices and curry leaves in cold-pressed groundnut oil, the Andhra village way. The bone keeps the masala rich. No preservatives. Best with hot rice and ghee or roti.",
+      "Bone-in chicken pieces slow-cooked with freshly ground spices and curry leaves in cold-pressed groundnut oil, the traditional village way. The bone keeps the masala rich. No preservatives. Best with hot rice and ghee or roti.",
     spice: "Hot",
     price: 70,
     image:
@@ -75,12 +75,8 @@ export const pickleProducts = [
 
 export type PickleProduct = (typeof pickleProducts)[number]
 
-// Pack price = product's 50g price × units.
-export const packOptions = [
-  { label: "50g", units: 1, note: "Just enough to start a new habit." },
-  { label: "100g", units: 2, note: "The everyday favourite." },
-  { label: "200g", units: 4, note: "For serious pickle lovers." },
-]
+// Every pickle is sold in a single 50g pack. Pack price = product's 50g price × units.
+export const packOptions = [{ label: "50g", units: 1, note: "Just enough to start a new habit." }]
 
 export type PackOption = (typeof packOptions)[number]
 
@@ -137,13 +133,11 @@ export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
   { id: "fruit-apple", name: "Fresh Apple", category: "Fruits", is_available: true },
   { id: "fruit-banana", name: "Robusta Banana", category: "Fruits", is_available: true },
   { id: "fruit-papaya", name: "Sweet Papaya", category: "Fruits", is_available: true },
-  { id: "fruit-watermelon", name: "Crisp Watermelon", category: "Fruits", is_available: true },
   { id: "fruit-pomegranate", name: "Pomegranate Pearls", category: "Fruits", is_available: true },
   { id: "fruit-orange", name: "Nagpur Orange", category: "Fruits", is_available: true },
   { id: "fruit-guava", name: "Pink Guava", category: "Fruits", is_available: true },
   { id: "fruit-grapes", name: "Black Grapes", category: "Fruits", is_available: true },
   { id: "fruit-pineapple", name: "Queen Pineapple", category: "Fruits", is_available: true },
-  { id: "fruit-seasonal", name: "Seasonal Special", category: "Fruits", is_available: true },
 ]
 
 export function getPickupPin(order: { pickup_code?: string; order_number?: number | string }): string {

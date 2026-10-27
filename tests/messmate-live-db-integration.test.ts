@@ -49,12 +49,12 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
     const payload = {
       customer_name: "QA Live Test Bot",
       customer_phone: testPhone,
-      hostel: "Hostel 3 Entrance",
+      hostel: "Kalam Room-341",
       room: "",
       fulfilment: "pickup",
       slot: "8:00 - 8:30 PM",
       items: [
-        { id: "mango", name: "Andhra Mango Pickle", weight: "100g", price: 65, quantity: 1 }
+        { id: "mango", name: "Mango Pickle (Avakaya)", weight: "100g", price: 65, quantity: 1 }
       ],
       subtotal: 65,
       delivery_fee: 0,
@@ -86,7 +86,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
       room: "0",
       fulfilment: "pickup",
       slot: "8:00 - 8:30 PM",
-      items: [{ id: "mango", name: "Andhra Mango Pickle", price: -100, quantity: 1 }],
+      items: [{ id: "mango", name: "Mango Pickle (Avakaya)", price: -100, quantity: 1 }],
       subtotal: -100,
       delivery_fee: 0,
       total: -100,
@@ -104,7 +104,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
     const shortPhonePayload = {
       customer_name: "Invalid Phone",
       customer_phone: "123", // Short phone (< 10 digits)
-      hostel: "Hostel 3",
+      hostel: "Kalam",
       room: "101",
       fulfilment: "delivery",
       slot: "8:00 - 8:30 PM",
@@ -197,7 +197,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
         phone: testPhone,
         customer_name: "Mess Support Team",
         sender: "support",
-        message: "Please collect from Hostel 3 Entrance counter!"
+        message: "Please collect from the Kalam Room-341 counter!"
       })
       .select()
       .single()

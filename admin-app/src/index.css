@@ -88,15 +88,9 @@ button, input, select, textarea {
   gap: 12px;
 }
 
-.brand-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--olive);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.brand-logo {
+  width: auto;
+  height: 52px;
 }
 
 .brand-text {

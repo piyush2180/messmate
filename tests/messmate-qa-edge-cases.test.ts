@@ -170,16 +170,16 @@ test("Order Totals - protects against negative quantities and float anomalies", 
   assert.equal(totals.total, 39.98)
 })
 
-test("Menu Pricing - pickles are ₹40 per 50g (chicken ₹70) and the fruit bowl is a fixed ₹60", () => {
+test("Menu Pricing - pickles come only in 50g packs at ₹40 (chicken ₹70) and the fruit bowl is a fixed ₹60", () => {
   const prices = Object.fromEntries(
-    pickleProducts.map((product) => [product.name, packOptions.map((pack) => pickleCartItem(product, pack).price)])
+    pickleProducts.map((product) => [product.name, packOptions.map((pack) => `${pack.label}=${pickleCartItem(product, pack).price}`)])
   )
   assert.deepEqual(prices, {
-    "Mango Pickle (Avakaya)": [40, 80, 160],
-    "Gongura Pickle": [40, 80, 160],
-    "Gongura Pandu Mirchi": [40, 80, 160],
-    "Tomato Pickle": [40, 80, 160],
-    "Chicken Pickle with Bone": [70, 140, 280],
+    "Mango Pickle (Avakaya)": ["50g=40"],
+    "Gongura Pickle": ["50g=40"],
+    "Gongura Pandu Mirchi": ["50g=40"],
+    "Tomato Pickle": ["50g=40"],
+    "Chicken Pickle with Bone": ["50g=70"],
   })
 
   // Same pack of different pickles must be separate cart lines
@@ -201,6 +201,7 @@ test("Reorder - re-prices past items at today's menu and drops discontinued ones
     { id: "pickle-50g", name: "Chicken Pickle with Bone", detail: "50g", price: 35, quantity: 2, kind: "pickle" },
     { id: "pickle-50g", name: "Garlic Pickle", detail: "50g", price: 35, quantity: 1, kind: "pickle" },
     { id: "pickle-Trial Pack", name: "Tomato Pickle", detail: "Trial Pack", price: 20, quantity: 1, kind: "pickle" },
+    { id: "pickle-Gongura Pickle-100g", name: "Gongura Pickle", detail: "100g", price: 80, quantity: 1, kind: "pickle" },
     { id: "fruit-bowl", name: "Custom Fruit Bowl", detail: "5 fruits · 350–450g", price: 70, quantity: 1, kind: "fruit" },
     { id: "fruit-bowl-no-Papaya", name: "Fresh Fruit Bowl", detail: "Without Papaya", price: 45, quantity: 0, kind: "fruit" },
   ]
@@ -242,7 +243,7 @@ test("Support Messages - deduplicates exact ID matches", () => {
       phone: "9876543210",
       customer_name: "Rahul",
       sender: "customer",
-      message: "Hello MessMate",
+      message: "Hello Happy Tummy",
       created_at: "2026-10-06T00:00:00Z",
     },
   ]
@@ -252,13 +253,13 @@ test("Support Messages - deduplicates exact ID matches", () => {
       phone: "9876543210",
       customer_name: "Rahul",
       sender: "customer",
-      message: "Hello MessMate Updated",
+      message: "Hello Happy Tummy Updated",
       created_at: "2026-10-06T00:00:00Z",
     },
   ]
   const merged = mergeSupportMessages(existing, incoming)
   assert.equal(merged.length, 1)
-  assert.equal(merged[0].message, "Hello MessMate Updated")
+  assert.equal(merged[0].message, "Hello Happy Tummy Updated")
 })
 
 test("Support Messages - merges optimistic local message with canonical server message", () => {
@@ -335,9 +336,10 @@ test("FAQ Bot - resolves delivery and timing queries", () => {
 })
 
 test("FAQ Bot - resolves pickup location queries", () => {
-  const reply = getFaqResponse("Where is the pickup location at Hostel 3?")
-  assert.match(reply, /Hostel 3 Entrance/)
-  assert.match(reply, /APJ Abdul Kalam Block/)
+  const reply = getFaqResponse("Where is the pickup location at Kalam?")
+  assert.match(reply, /Kalam \(Room 341\)/)
+  assert.match(reply, /Asima \(Room 110\)/)
+  assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
 })
 
 test("FAQ Bot - resolves fruit bowl pricing", () => {
@@ -358,13 +360,13 @@ test("FAQ Bot - resolves order tracking queries", () => {
 
 test("FAQ Bot - resolves cancellation and refund queries", () => {
   const reply = getFaqResponse("How do I cancel order or get refund?")
-  assert.match(reply, /MessMate Support Team/)
+  assert.match(reply, /Happy Tummy Co\. Support Team/)
 })
 
 test("FAQ Bot - falls back gracefully with official Support Team branding", () => {
   const reply = getFaqResponse("Do you sell umbrellas?")
-  assert.match(reply, /MessMate Support Team/)
-  assert.equal(reply.includes("MessMate Support Team"), true)
+  assert.match(reply, /Happy Tummy Co\. Support Team/)
+  assert.equal(reply.includes("Happy Tummy Co. Support Team"), true)
   assert.equal(reply.includes("Campus Support Team"), false)
 })
 

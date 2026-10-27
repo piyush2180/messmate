@@ -1,4 +1,4 @@
-# MessMate · Campus Food Ordering & Kitchen Operations System
+# Happy Tummy Co. · Campus Food Ordering & Kitchen Operations System
 
 > A high-performance, mobile-first campus food delivery and artisanal pickle ordering web application tailored for university hostels, featuring real-time kitchen tracking, PhonePe UPI verification, and live two-way support chat.
 
@@ -42,7 +42,7 @@
 
 ## 🚀 Overview
 
-**MessMate** solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, and evening dinner deliveries directly to their hostel blocks or pickup gates.
+**Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, and evening dinner deliveries directly to their hostel blocks or pickup gates.
 
 The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live kitchen sound alerts, live item availability toggling, and two-way in-app support chat without page reloads.
 
@@ -50,7 +50,7 @@ The system connects students with kitchen staff through **Supabase Realtime WebS
 
 ## 🛠 Complete Technology Stack
 
-Everything powering MessMate has been carefully chosen for performance, zero runtime bloat, security, and mobile ergonomics:
+Everything powering Happy Tummy Co. has been carefully chosen for performance, zero runtime bloat, security, and mobile ergonomics:
 
 ### Frontend & UI Framework
 - **React 19 (`react` & `react-dom` v19.0.0)**:
@@ -113,7 +113,7 @@ Everything powering MessMate has been carefully chosen for performance, zero run
 The project is structured as a modular monorepo containing the student application, kitchen operations dashboard, database migrations, and QA test suites:
 
 ```
-MessMate Monorepo
+Happy Tummy Co. Monorepo
 ├── src/                                  # Student Storefront Application
 │   ├── assets/                           # Brand assets, static media, SVGs
 │   ├── lib/
@@ -156,19 +156,18 @@ MessMate Monorepo
 - **Artisanal Pickle Catalog**:
   - Interactive cards featuring Mango (*Avakaya*), Gongura, Gongura Pandu Mirchi, Tomato, and bone-in Chicken pickles, with product photos from our supplier, Food On Farm Pickles.
   - Each item displays a visual spice meter (1 to 3 chillies), diet tags (Vegetarian, Vegan, Gluten-Free), and detailed shelf-life guidance.
-  - Pack selector offers **50g**, **100g**, and **200g** packs at ₹40 per 50g (₹70 per 50g for chicken).
+  - Every pickle comes in a single **50g** pack: ₹40 (₹70 for chicken).
 - **Fixed-Price Fruit Bowl**:
-  - One ₹60 bowl with 10 fresh-cut fruits (Apple, Banana, Papaya, Watermelon, Pomegranate, Orange, Guava, Grapes, Pineapple, Seasonal).
+  - One ₹60 bowl with 8 fresh-cut fruits (Apple, Banana, Papaya, Pomegranate, Orange, Guava, Grapes, Pineapple).
   - Students tap any fruit to leave it out; sold-out fruits are left out automatically. The price stays ₹60.
-  - Shows the 8:00–9:30 PM delivery/pickup window and a call/WhatsApp contact number.
+  - Shows the 8:00–9:30 PM delivery/pickup window.
 - **Slide-Out Cart Drawer**:
   - Quantity increment/decrement controls with automatic zero-item removal guards.
   - Subtotal calculation shielded against floating-point precision errors.
 - **Flexible Campus Fulfillment**:
   - **Campus Pickup (₹0 Free)**: Choose from predefined campus hubs:
-    - *Hostel 3 Main Entrance*
-    - *APJ Block Mess Gate*
-    - *Asima Hostel Foyer*
+    - *Kalam Room-341* (APJ Abdul Kalam Block)
+    - *Asima - 110* (ground floor)
   - **Room Delivery (₹5 Runner Fee)**: Direct-to-door delivery with hostel and room number inputs (room number is digits only).
 - **Scheduled Evening Delivery Slots**:
   - Pre-order for dinner windows: *8:00–8:30 PM*, *8:30–9:00 PM*, or *9:00–9:30 PM*.
@@ -225,6 +224,8 @@ MessMate Monorepo
     - Fruit bowl pricing formula
     - Order cancellation & refund guidelines
     - Payment settlement support
+- **Call / WhatsApp Contact**:
+  - The support chat header and the order confirmation screen show the team's phone number with one-tap WhatsApp and call buttons.
 - **Live Support Escalation**:
   - If automated answers do not address the question, students can seamlessly type custom messages to live kitchen staff.
 - **Fuzzy Message Deduplication**:
@@ -419,7 +420,7 @@ Staff checks Soundbox / Bank App ──► Clicks "Verify Payment" ──► Ord
 
 ## 🧪 Automated QA & Testing Suite
 
-MessMate includes 55 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
+Happy Tummy Co. includes 55 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
 
 ```bash
 # Run the entire test suite

@@ -1,4 +1,4 @@
--- MessMate Database Schema for Supabase
+-- Happy Tummy Co. Database Schema for Supabase
 -- Fully Idempotent & Security Hardened
 -- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 

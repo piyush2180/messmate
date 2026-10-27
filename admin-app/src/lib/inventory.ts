@@ -11,13 +11,11 @@ export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
   { id: "fruit-apple", name: "Fresh Apple", category: "Fruits", is_available: true },
   { id: "fruit-banana", name: "Robusta Banana", category: "Fruits", is_available: true },
   { id: "fruit-papaya", name: "Sweet Papaya", category: "Fruits", is_available: true },
-  { id: "fruit-watermelon", name: "Crisp Watermelon", category: "Fruits", is_available: true },
   { id: "fruit-pomegranate", name: "Pomegranate Pearls", category: "Fruits", is_available: true },
   { id: "fruit-orange", name: "Nagpur Orange", category: "Fruits", is_available: true },
   { id: "fruit-guava", name: "Pink Guava", category: "Fruits", is_available: true },
   { id: "fruit-grapes", name: "Black Grapes", category: "Fruits", is_available: true },
   { id: "fruit-pineapple", name: "Queen Pineapple", category: "Fruits", is_available: true },
-  { id: "fruit-seasonal", name: "Seasonal Special", category: "Fruits", is_available: true },
 ]
 
 export function getPickupPin(order: { pickup_code?: string; order_number?: number | string }): string {

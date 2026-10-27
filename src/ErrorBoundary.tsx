@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
           }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🌿</div>
             <h2 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px 0" }}>
-              MessMate encountered an issue
+              Happy Tummy Co. encountered an issue
             </h2>
             <p style={{ fontSize: "14px", color: "#606c38", margin: "0 0 24px 0", lineHeight: 1.5 }}>
               A temporary display error occurred. Please refresh to continue ordering your meal.
