@@ -2347,3 +2347,7 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 
 /* A cart line that sold out after it was added */
 .cart-sold-out { color: #b42318; font-weight: 700; font-size: 11px; line-height: 1.4; margin-top: 4px; display: block; }
+
+/* Store switched to Closed in admin: dots go grey and stop pulsing */
+.support-fab-dot.away,
+.support-header-dot.away { background: #9ca3af; box-shadow: none; animation: none; }

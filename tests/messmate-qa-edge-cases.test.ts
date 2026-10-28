@@ -8,6 +8,7 @@ import {
   getPickupPin,
   canCancelOrder,
   getFaqResponse,
+  FAQ_FALLBACK,
   mergeSupportMessages,
   type SupportMsg,
   safeStorage,
@@ -705,4 +706,9 @@ test("Fruit bowl cart lines remember which fruits were left out", () => {
   assert.deepEqual(bowlLeftOut(fruitBowlCartItem([]).id), [])
   assert.deepEqual(bowlLeftOut(fruitBowlCartItem(["Banana", "Apple"]).id), ["Apple", "Banana"])
   assert.deepEqual(bowlLeftOut("pickle-Mango Pickle (Avakaya)-50g"), [])
+})
+
+test("FAQ Bot - greetings and small talk have no instant answer, so the chat asks the AI helper", () => {
+  for (const q of ["hi", "hello", "meoww", "who are you?"]) assert.equal(getFaqResponse(q), FAQ_FALLBACK, q)
+  assert.notEqual(getFaqResponse("what time do you deliver"), FAQ_FALLBACK)
 })

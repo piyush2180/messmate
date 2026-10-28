@@ -286,3 +286,35 @@ drop policy if exists "Staff can remove counter sales" on public.counter_sales;
 create policy "Staff can remove counter sales" on public.counter_sales for delete using (true);
 
 grant select, insert, delete on public.counter_sales to anon, authenticated;
+
+-- ============================================================================
+-- 8. Store Open / Closed (admin switch; the student store reads it live)
+-- One row. Closed: checkout pauses and the chat says "Unavailable at the moment".
+-- ============================================================================
+create table if not exists public.store_status (
+  id int primary key default 1 check (id = 1),
+  is_open boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+insert into public.store_status (id) values (1) on conflict (id) do nothing;
+
+alter table public.store_status enable row level security;
+
+drop policy if exists "Anyone can read store status" on public.store_status;
+create policy "Anyone can read store status" on public.store_status for select using (true);
+drop policy if exists "Staff can create store status" on public.store_status;
+create policy "Staff can create store status" on public.store_status for insert with check (id = 1);
+drop policy if exists "Staff can set store status" on public.store_status;
+create policy "Staff can set store status" on public.store_status for update using (true) with check (id = 1);
+
+grant select, insert, update on public.store_status to anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'store_status'
+  ) then
+    alter publication supabase_realtime add table public.store_status;
+  end if;
+end $$;

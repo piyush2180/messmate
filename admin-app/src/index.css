@@ -1817,3 +1817,24 @@ button, input, select, textarea {
 .review-stars { color: var(--amber); letter-spacing: 1px; }
 .review-top small { color: var(--muted); }
 .review-list p { margin: 6px 0 0; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+
+/* Open / Closed switch at the top of every tab */
+.store-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 700;
+}
+.store-status-bar > span { display: inline-flex; align-items: center; gap: 8px; }
+.store-status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green-online); flex: none; }
+.store-status-bar.closed { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+.store-status-bar.closed .store-status-dot { background: #9ca3af; }
+.store-status-bar.missing { color: var(--muted); font-weight: 600; font-size: 13px; }
+.store-status-bar .action-btn-small { flex: none; min-height: 36px; padding: 6px 14px; }

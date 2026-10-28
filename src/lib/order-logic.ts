@@ -97,6 +97,8 @@ export function canCancelOrder(status: string | undefined | null): boolean {
 
 // Matches SUPPORT_NAME in App.tsx (the name support replies are stored under)
 const SUPPORT_TEAM = "Happy Tummy Co. Support Team"
+// The reply when no instant answer matches; the chat then asks the AI helper instead
+export const FAQ_FALLBACK = `Thanks for asking! For order-specific requests or anything else, tap 'Talk to our Support Team' below to speak directly with the ${SUPPORT_TEAM}.`
 const BOWL_FRUIT_COUNT = DEFAULT_MENU_ITEMS.filter((item) => item.category === "Fruits").length
 
 /**
@@ -182,7 +184,7 @@ export function getFaqResponse(query: string): string {
   ) {
     return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
   }
-  return `Thanks for asking! For order-specific requests or anything else, tap 'Talk to our Support Team' below to speak directly with the ${SUPPORT_TEAM}.`
+  return FAQ_FALLBACK
 }
 
 /**

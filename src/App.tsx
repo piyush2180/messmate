@@ -20,6 +20,7 @@ import {
   DELIVERY_FEE,
   calculateOrderTotals,
   cleanPhoneInput,
+  FAQ_FALLBACK,
   getFaqResponse,
   isValidIndianPhone,
   normalizePhone,
@@ -105,8 +106,9 @@ const pickleImage =
   "https://cdn.shopify.com/s/files/1/0722/3872/7323/files/mango-pickle-scaled_f383ec5b-be63-4988-81c1-f2f381d76f8e.webp?width=1000"
 
 // A real bowl of cut fruit; free to use under the Unsplash License.
+// Unsplash photo, cropped to the bowl (the original also shows a chocolate bar)
 const fruitImage =
-  "https://images.unsplash.com/photo-1760881592698-abbf44a47872?auto=format&fit=crop&w=1200&q=85"
+  "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&crop=focalpoint&fp-x=0.49&fp-y=0.49&fp-z=1.25&w=1000&h=1000&q=80"
 
 const BRAND = "Happy Tummy Co."
 
@@ -125,6 +127,8 @@ const PICKUP_POINTS = [
 const SUPPORT_NAME = `${BRAND} Support Team`
 const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
 const SLOTS = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
+// What students see while the admin has the store switched to Closed
+const CLOSED_MESSAGE = "Unavailable at the moment"
 
 // Admin stock names for each fruit (older menus used longer names)
 const fruitSoldOut = (name: string, soldOut: Set<string>) =>
@@ -1179,14 +1183,17 @@ function Cart({
   remove,
   go,
   soldOutItems,
+  storeOpen,
 }: {
   items: CartItem[]
   updateQuantity: (id: string, quantity: number) => void
   remove: (id: string) => void
   go: (screen: Screen) => void
   soldOutItems: Set<string>
+  storeOpen: boolean
 }) {
-  const blocked = items.some((item) => soldOutNote(item, soldOutItems))
+  const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
+  const ctaLabel = !storeOpen ? CLOSED_MESSAGE : blocked ? "Remove sold-out items" : "Go to checkout"
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
@@ -1289,7 +1296,7 @@ function Cart({
                 </div>
                 <div className="desktop-cart-cta">
                   <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
-                    {blocked ? "Remove sold-out items" : "Go to checkout"}
+                    {ctaLabel}
                   </PrimaryButton>
                 </div>
               </div>
@@ -1318,7 +1325,7 @@ function Cart({
             <strong>₹{subtotal}</strong>
           </div>
           <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
-            {blocked ? "Remove sold-out items" : "Go to checkout"}
+            {ctaLabel}
           </PrimaryButton>
         </BottomBar>
       )}
@@ -1741,6 +1748,7 @@ function Payment({
   onPay,
   isSubmitting,
   soldOutItems,
+  storeOpen,
 }: {
   go: (screen: Screen) => void
   items: CartItem[]
@@ -1748,8 +1756,9 @@ function Payment({
   onPay: (method: "upi" | "counter", utr?: string) => void
   isSubmitting: boolean
   soldOutItems: Set<string>
+  storeOpen: boolean
 }) {
-  const blocked = items.some((item) => soldOutNote(item, soldOutItems))
+  const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
   // Same calculation handlePay uses, so the amount shown is the amount saved.
   const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
@@ -1988,7 +1997,9 @@ function Payment({
               </div>
               <div className="desktop-payment-cta">
                 <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
-                  {blocked
+                  {!storeOpen
+                    ? CLOSED_MESSAGE
+                    : blocked
                     ? "Remove sold-out items"
                     : isSubmitting
                     ? "Placing order..."
@@ -2007,7 +2018,9 @@ function Payment({
           <strong>₹{total}</strong>
         </div>
         <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
-          {blocked
+          {!storeOpen
+            ? CLOSED_MESSAGE
+            : blocked
             ? "Remove sold-out items"
             : isSubmitting
             ? "Placing order..."
@@ -2929,12 +2942,38 @@ function mergeSupportMessages(
   )
 }
 
+// AI reply (server function in api/chat.js) for messages the instant answers don't cover; null if unavailable
+async function askAi(message: string, history: Array<{ sender: "user" | "bot"; text: string }>): Promise<string | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        history: history.slice(-6).map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+      }),
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return typeof data?.reply === "string" && data.reply.trim() ? data.reply.trim() : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function SupportChatWidget({
   customerPhone = "",
   customerName = "",
+  storeOpen = true,
 }: {
   customerPhone?: string
   customerName?: string
+  storeOpen?: boolean
 }) {
   // 1. Initial saved messages from localStorage
   const savedCleanPhone = (customerPhone || safeStorage.getItem("messmate_phone", "") || "")
@@ -3181,18 +3220,24 @@ function SupportChatWidget({
     setFaqHistory((prev) => [...prev, userMsg, botMsg])
   }
 
-  const handleSendFaqQuestion = (e?: React.FormEvent) => {
+  const handleSendFaqQuestion = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
     const answer = getFaqResponse(query)
+    const known = answer !== FAQ_FALLBACK
+    const botId = `faq-b-${Date.now() + 1}`
 
     setFaqHistory((prev) => [
       ...prev,
       { id: `faq-u-${Date.now()}`, sender: "user", text: query },
-      { id: `faq-b-${Date.now() + 1}`, sender: "bot", text: answer, showEscalate: true },
+      { id: botId, sender: "bot", text: known ? answer : "Typing…", showEscalate: known },
     ])
+    if (known) return
+    // No instant answer (a greeting, small talk…): let the AI helper reply, or point to the team if it can't
+    const reply = await askAi(query, faqHistory)
+    setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply ?? FAQ_FALLBACK, showEscalate: true } : m)))
   }
 
   const handleResetChat = () => {
@@ -3250,7 +3295,9 @@ function SupportChatWidget({
       phone: activePhone,
       customer_name: SUPPORT_NAME,
       sender: "support",
-      message: `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`,
+      message: storeOpen
+        ? `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`
+        : `Thanks ${name.trim()}! We're unavailable at the moment, but we have your details and will reply on ${activePhone} when we're back.`,
       created_at: new Date().toISOString(),
     }
 
@@ -3338,7 +3385,7 @@ function SupportChatWidget({
         aria-label="Open support chat"
         title={SUPPORT_NAME}
       >
-        <span className="support-fab-dot" />
+        <span className={`support-fab-dot ${storeOpen ? "" : "away"}`} />
         <Icon name={isOpen ? "close" : "chat"} size={19} />
         <span className="support-fab-label">{isOpen ? "Close" : "Support Team"}</span>
         {!isOpen && unreadCount > 0 && (
@@ -3356,7 +3403,7 @@ function SupportChatWidget({
               <div className="support-header-text">
                 <strong>{BRAND} Support</strong>
                 <small>
-                  <span className="support-header-dot" /> {CONTACT_PHONE}
+                  <span className={`support-header-dot ${storeOpen ? "" : "away"}`} /> {storeOpen ? CONTACT_PHONE : CLOSED_MESSAGE}
                 </small>
               </div>
             </div>
@@ -3578,7 +3625,7 @@ function SupportChatWidget({
                   <Icon name="check" size={14} />
                 </div>
                 <div className="support-status-copy">
-                  <strong>We will contact you shortly!</strong>
+                  <strong>{storeOpen ? "We will contact you shortly!" : "We'll reply when we're back"}</strong>
                   <span>{SUPPORT_NAME} reaching out to <strong>{phone.replace(/\D/g, "").slice(-10)}</strong></span>
                 </div>
                 <button
@@ -3761,6 +3808,31 @@ export default function App() {
     safeStorage.setJson("ht_dismissed_ready", [...dismissedReadyIds])
     safeStorage.setJson("ht_dismissed_cancelled", [...dismissedCancelledIds])
   }, [dismissedReadyIds, dismissedCancelledIds])
+  // Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
+  const [storeOpen, setStoreOpen] = useState(true)
+  useEffect(() => {
+    const client = supabase
+    if (!client) return
+    client
+      .from("store_status")
+      .select("is_open")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) setStoreOpen(Boolean(data.is_open))
+      })
+    const channel = client
+      .channel("store_status_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
+        const row = payload.new as { is_open?: boolean }
+        if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+      })
+      .subscribe()
+    return () => {
+      client.removeChannel(channel)
+    }
+  }, [])
+
   // What the confirmation screen shows; the cart itself is emptied once the order is placed
   const [orderedItems, setOrderedItems] = useState<CartItem[]>([])
 
@@ -4000,6 +4072,14 @@ export default function App() {
     setIsSubmitting(true)
 
     try {
+      // The kitchen may have closed while this page was open
+      const { data: status } = await supabase.from("store_status").select("is_open").eq("id", 1).maybeSingle()
+      if (status?.is_open === false) {
+        setStoreOpen(false)
+        alert(`${CLOSED_MESSAGE}, so your order wasn't placed. If you already paid, please message us in Support.`)
+        return
+      }
+
       const { subtotal, fee, total } = calculateOrderTotals(cart, fulfilment)
       const orderTotal = total
 
@@ -4235,6 +4315,7 @@ export default function App() {
             }
             go={go}
             soldOutItems={soldOutItems}
+            storeOpen={storeOpen}
           />
         )}
         {screen === "checkout" && (
@@ -4266,6 +4347,7 @@ export default function App() {
             onPay={handlePay}
             isSubmitting={isSubmitting}
             soldOutItems={soldOutItems}
+            storeOpen={storeOpen}
           />
         )}
         {screen === "confirmation" && (
@@ -4313,6 +4395,7 @@ export default function App() {
         <SupportChatWidget
           customerPhone={details.phone}
           customerName={details.name}
+          storeOpen={storeOpen}
         />
       </div>
     </div>

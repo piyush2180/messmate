@@ -177,6 +177,10 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine))
   const [liveOk, setLiveOk] = useState(true)
 
+  // Open / Closed switch the student store follows (null until loaded)
+  const [storeOpen, setStoreOpen] = useState<boolean | null>(null)
+  const [storeStatusMissing, setStoreStatusMissing] = useState(false)
+
   const [counterSales, setCounterSales] = useState<CounterSale[]>([])
   const [counterSalesState, setCounterSalesState] = useState<"loading" | "ready" | "missing" | "error">("loading")
   const [saleAmount, setSaleAmount] = useState("")
@@ -463,12 +467,52 @@ export default function App() {
       })
   }
 
+  const loadStoreStatus = () => {
+    if (!supabase) return
+    supabase
+      .from("store_status")
+      .select("is_open")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("Store status unavailable:", error.message)
+          // PGRST205 / 42P01: the store_status table hasn't been created yet
+          setStoreStatusMissing(error.code === "PGRST205" || error.code === "42P01")
+          return
+        }
+        setStoreStatusMissing(false)
+        setStoreOpen(data ? Boolean(data.is_open) : true)
+      })
+  }
+
+  const handleToggleStore = async () => {
+    if (!supabase || storeOpen === null) return
+    const next = !storeOpen
+    if (!next && !confirm("Close the store? Students won't be able to place orders, and the chat will say \"Unavailable at the moment\".")) return
+    setStoreOpen(next)
+    const { error } = await supabase
+      .from("store_status")
+      .upsert({ id: 1, is_open: next, updated_at: new Date().toISOString() })
+    if (error) {
+      console.error("Store status not saved:", error.message)
+      setStoreOpen(!next)
+      alert(
+        error.code === "PGRST205" || error.code === "42P01"
+          ? "The Open / Closed switch needs the latest SQL in Supabase. Please run it first."
+          : "Couldn't change the store status. Please check the connection and try again."
+      )
+    }
+  }
+
   useEffect(() => {
     loadCounterSales()
+    loadStoreStatus()
     const refresh = () => {
       loadOrders()
       loadSupport()
       loadCounterSales()
+      loadStoreStatus()
     }
     const onOnline = () => {
       setIsOnline(true)
@@ -940,6 +984,21 @@ export default function App() {
 
       {/* Main Content */}
       <main className="admin-main">
+        {storeStatusMissing ? (
+          <div className="store-status-bar missing">Run the store_status SQL in Supabase to use the Open / Closed switch.</div>
+        ) : (
+          storeOpen !== null && (
+            <div className={`store-status-bar ${storeOpen ? "open" : "closed"}`}>
+              <span>
+                <span className="store-status-dot" />
+                {storeOpen ? "Store is open" : "Store is closed: students can't order right now"}
+              </span>
+              <button type="button" className="action-btn-small" onClick={handleToggleStore}>
+                {storeOpen ? "Close store" : "Open store"}
+              </button>
+            </div>
+          )
+        )}
         {!soundOn && (
           <button
             type="button"
