@@ -30,13 +30,13 @@ body, #root { width: 100%; min-height: 100%; }
 body { margin: 0; font-family: "Manrope", sans-serif; background: var(--cream); overflow-x: hidden; overflow-x: clip; }
 button, input { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible { outline: 3px solid rgba(83, 107, 58, .24); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid var(--olive); outline-offset: 2px; }
 img { display: block; width: 100%; }
 h1, h2, h3, p { margin: 0; }
 
 .app-shell { width: 100%; min-height: 100vh; background: #eee9e0; overflow-x: hidden; overflow-x: clip; }
 .app-frame { width: 100%; max-width: none; min-height: 100vh; margin: 0 auto; background: var(--cream); position: relative; overflow-x: hidden; overflow-x: clip; box-shadow: 0 0 60px rgba(54, 45, 34, .08); }
-.header { width: 100%; min-height: calc(72px + env(safe-area-inset-top, 0px)); padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; position: sticky; top: 0; z-index: 45; background: rgba(255, 248, 238, .94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.header { width: 100%; min-height: calc(72px + env(safe-area-inset-top, 0px)); padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; position: sticky; top: 0; z-index: 45; background: #fff8ee; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .brand { border: 0; background: none; padding: 0; display: flex; align-items: center; gap: 9px; font-weight: 800; letter-spacing: -.04em; font-size: 17px; cursor: pointer; justify-self: start; }
 .brand-logo { width: auto; height: 80px; margin: -6px 0; } /* uses half the header padding so the header grows less */
 .header-heading { display: grid; justify-items: center; gap: 1px; white-space: nowrap; }
@@ -151,8 +151,8 @@ div.pack-option { cursor: default; }
 .primary-button { min-height: 54px; border: 0; border-radius: 17px; background: var(--olive); color: white; padding: 0 19px; display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 8px 18px rgba(83,107,58,.2); transition: transform .15s ease, background .15s ease; }
 .primary-button:hover { background: var(--olive-dark); }
 .primary-button:active { transform: scale(.98); }
-.primary-button.pickle { background: var(--terracotta); box-shadow: 0 8px 18px rgba(217,100,74,.22); }
-.primary-button.pickle:hover { background: var(--terracotta-dark); }
+.primary-button.pickle { background: var(--terracotta-dark); box-shadow: 0 8px 18px rgba(217,100,74,.22); }
+.primary-button.pickle:hover { background: #a3402c; }
 .primary-button.fruit { background: var(--green); box-shadow: 0 8px 18px rgba(79,138,91,.22); }
 .primary-button.fruit:hover { background: var(--green-dark); }
 .primary-button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
@@ -2323,7 +2323,7 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 }
 
 /* Tablets: the same compact support button as phones, lifted above the bottom bar */
-@media (min-width: 769px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   .support-fab {
     bottom: 112px;
     right: 16px;
@@ -2351,3 +2351,14 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* Store switched to Closed in admin: dots go grey and stop pulsing */
 .support-fab-dot.away,
 .support-header-dot.away { background: #9ca3af; box-shadow: none; animation: none; }
+
+@media (max-width: 1023px) {
+  /* Room at the bottom so the floating Support button never covers the last row */
+  .screen-content { padding-bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }
+  /* The home page keeps its cream background to the very bottom */
+  .coming-soon { margin-bottom: 0; }
+  .home-main { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+}
+.item-kind { font-size: 9px; }
+.price-card small { font-size: 10px; }
+.spice-pill, .diet-tag.non-veg { color: var(--terracotta-dark); }

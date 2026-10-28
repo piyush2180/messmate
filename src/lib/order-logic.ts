@@ -40,7 +40,7 @@ export function cleanPhoneInput(raw: string | undefined | null): string {
  */
 export function isValidIndianPhone(raw: string | undefined | null): boolean {
   const clean = normalizePhone(raw)
-  return /^[6-9]\d{9}$/.test(clean)
+  return /^[6-9]\d{9}$/.test(clean) && !/^(\d)\1{9}$/.test(clean)
 }
 
 // Room delivery fee in ₹ (campus pickup is free). The orders.delivery_fee CHECK constraint must allow it.
@@ -97,9 +97,26 @@ export function canCancelOrder(status: string | undefined | null): boolean {
 
 // Matches SUPPORT_NAME in App.tsx (the name support replies are stored under)
 const SUPPORT_TEAM = "Happy Tummy Co. Support Team"
+// Friendly built-in replies for greetings and small talk, used when the AI helper can't answer
+// (out of its daily allowance, offline, or not set up). Null when it isn't small talk.
+export function getSmallTalkReply(query: string): string | null {
+  const q = (query || "").toLowerCase().trim()
+  if (/^(hi+|hey+|hello+|helo+|hiya|yo|namaste|namaskar|good (morning|afternoon|evening))\b/.test(q)) {
+    return "Hi! 👋 I'm the Happy Tummy bot. Ask me about our pickles, fruit bowls, prices, pickup or delivery."
+  }
+  if (/\b(thanks|thank you|thank u|thx|ty|shukriya|dhanyavaad)\b/.test(q)) return "You're welcome! Enjoy your food 😊"
+  if (/^(bye+|good ?night|see (you|ya)|tata|cya)\b/.test(q)) return "Bye! Come back hungry 😄"
+  if (/^(ok+|okay|k|cool|nice|great|hmm+|lol|ha(ha)+|he(he)+)[!. ]*$/.test(q)) {
+    return "😊 Anything else I can help with? Ask me about the menu, prices, pickup or delivery."
+  }
+  return null
+}
+
 // The reply when no instant answer matches; the chat then asks the AI helper instead
 export const FAQ_FALLBACK = `Thanks for asking! For order-specific requests or anything else, tap 'Talk to our Support Team' below to speak directly with the ${SUPPORT_TEAM}.`
-const BOWL_FRUIT_COUNT = DEFAULT_MENU_ITEMS.filter((item) => item.category === "Fruits").length
+const BOWL_FRUIT_NAMES = DEFAULT_MENU_ITEMS.filter((item) => item.category === "Fruits").map((item) => item.name.toLowerCase())
+const BOWL_FRUIT_COUNT = BOWL_FRUIT_NAMES.length
+const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUIT_NAMES.at(-1)}`
 
 /**
  * Instant answers in the support chat. Checked in order: the first matching topic wins,
@@ -107,26 +124,39 @@ const BOWL_FRUIT_COUNT = DEFAULT_MENU_ITEMS.filter((item) => item.category === "
  */
 export function getFaqResponse(query: string): string {
   const q = (query || "").toLowerCase().trim()
-  // Whole words only, so "pineapple" isn't "pin" and "rate of" isn't a rating
+  // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
   const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
-  if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
+  const aboutPaying = /\b(pay|paid|paying|payment|upi|phonepe|gpay|paytm|money|cash|cod)\b/.test(q)
+  if (q.includes("refund") || (aboutPaying && /\b(fail|failed|deducted|debited|stuck|problem|issue|wrong|not received)\b/.test(q))) {
+    return `Sorry about that! Please tap 'Talk to our Support Team' below (with your UTR number if you paid by UPI) so the ${SUPPORT_TEAM} can sort it out right away.`
+  }
+  if (q.includes("cancel") || q.includes("change")) {
     return `Orders can be modified before prep starts. Please tap 'Talk to our Support Team' below so the ${SUPPORT_TEAM} can update your order right away!`
+  }
+  if (/\b(late|delay|delayed|not (come|came|arrived|received)|hasn'?t (come|arrived)|still waiting)\b/.test(q)) {
+    return `Sorry for the wait! You can see live progress in 'Track Orders', or tap 'Talk to our Support Team' below and the ${SUPPORT_TEAM} will check right away.`
   }
   if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
     return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"
   }
-  if (q.includes("utr") || q.includes("verify") || q.includes("verification") || q.includes("fraud") || q.includes("phonepe") || q.includes("upi")) {
+  if (word("utr") || q.includes("verify") || q.includes("verification") || q.includes("fraud")) {
     return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
   }
-  if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
+  if (aboutPaying) {
+    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or choose Pay at Counter at checkout."
+  }
+  if (q.includes("reorder") || word("again") || q.includes("repeat") || q.includes("previous")) {
     return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
   }
-  if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\brates? (of|for)\b/.test(q)) {
-    const chicken = pickleProducts.find((p) => p.diet === "non_veg")
-    const veg = pickleProducts.find((p) => p.diet === "veg")
-    return `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}. Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
+  const ratingTalk = /\b(rating|ratings|review|reviews|feedback|stars?)\b/.test(q) || /\brate (my|the|this|our|your)\b/.test(q)
+  if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\b(kitna|kitne|kitni|rates?)\b/.test(q)) {
+    if (!ratingTalk) {
+      const chicken = pickleProducts.find((p) => p.diet === "non_veg")
+      const veg = pickleProducts.find((p) => p.diet === "veg")
+      return `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}. Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
+    }
   }
-  if (word("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
+  if (ratingTalk) {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
   }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
@@ -171,18 +201,24 @@ export function getFaqResponse(query: string): string {
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits, and you can leave out any fruit you don't want.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits: ${BOWL_FRUITS}. You can leave out any fruit you don't want.`
   }
   if (
     q.includes("pickle") ||
-    q.includes("shelf") ||
+    q.includes("achar") ||
     q.includes("mango") ||
     q.includes("gongura") ||
-    q.includes("garlic") ||
-    q.includes("lemon") ||
+    q.includes("tomato") ||
+    q.includes("chicken") ||
+    q.includes("shelf") ||
     q.includes("expiry")
   ) {
-    return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
+    if (/\b(shelf|expiry|expire|expires|last|lasts|how long|fridge|store|keep)\b/.test(q)) {
+      return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
+    }
+    const veg = pickleProducts.filter((p) => p.diet === "veg")
+    const chicken = pickleProducts.find((p) => p.diet === "non_veg")
+    return `Our pickles (${packOptions[0].label} packs): ${veg.map((p) => p.name).join(", ")} at ₹${veg[0]?.price} each${chicken ? `, and ${chicken.name} at ₹${chicken.price}` : ""}.`
   }
   return FAQ_FALLBACK
 }
@@ -193,6 +229,24 @@ export function getFaqResponse(query: string): string {
  * - Deduplicates by ID or fuzzy sender+phone+content within a 90-second window
  * - Ensures strictly chronological ascending ordering by created_at
  */
+// Ids the apps give a message before the database assigns its own
+const isLocalMsgId = (id: string) => /^(msg|local|admin|ack)-/.test(id)
+
+function isValidSupportMsg(m: unknown): m is SupportMsg {
+  const v = m as Partial<Record<keyof SupportMsg, unknown>> | null
+  return Boolean(
+    v &&
+      typeof v.id === "string" &&
+      v.id !== "" &&
+      typeof v.phone === "string" &&
+      typeof v.message === "string" &&
+      v.message !== "" &&
+      typeof v.sender === "string" &&
+      typeof v.created_at === "string" &&
+      (v.customer_name == null || typeof v.customer_name === "string"),
+  )
+}
+
 export function mergeSupportMessages(
   existing: SupportMsg[],
   incomingList: SupportMsg[]
@@ -200,7 +254,8 @@ export function mergeSupportMessages(
   let result = [...existing]
 
   for (const incoming of incomingList) {
-    if (!incoming || !incoming.message) continue
+    // Saved chats and live broadcasts can hold anything; a malformed one must not crash the chat
+    if (!isValidSupportMsg(incoming)) continue
 
     // 1. Direct ID match
     const exactIndex = result.findIndex((m) => m.id === incoming.id)
@@ -211,6 +266,7 @@ export function mergeSupportMessages(
 
     // 2. Fuzzy match for optimistic local messages vs canonical server messages
     const fuzzyIndex = result.findIndex((m) => {
+      if (!isLocalMsgId(m.id) && !isLocalMsgId(incoming.id)) return false // two saved "ok"s are two messages
       const sameSender = m.sender === incoming.sender
       const p1 = (m.phone || "").replace(/\D/g, "").slice(-10)
       const p2 = (incoming.phone || "").replace(/\D/g, "").slice(-10)
@@ -240,6 +296,7 @@ export function mergeSupportMessages(
   for (const msg of result) {
     const isDup = deduped.some((d) => {
       if (d.id === msg.id) return true
+      if (!isLocalMsgId(d.id) && !isLocalMsgId(msg.id)) return false
       const sameSender = d.sender === msg.sender
       const p1 = (d.phone || "").replace(/\D/g, "").slice(-10)
       const p2 = (msg.phone || "").replace(/\D/g, "").slice(-10)

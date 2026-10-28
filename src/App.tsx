@@ -14,7 +14,7 @@ import {
   repriceForReorder,
   type CartItem,
 } from "./lib/inventory"
-import { PHONEPE_QR_BASE64 } from "./assets/phonepeQrData"
+import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
 import {
   DELIVERY_FEE,
@@ -22,7 +22,10 @@ import {
   cleanPhoneInput,
   FAQ_FALLBACK,
   getFaqResponse,
+  getSmallTalkReply,
   isValidIndianPhone,
+  mergeSupportMessages,
+  type SupportMsg,
   normalizePhone,
   safeStorage,
   sanitizeInput,
@@ -106,9 +109,8 @@ const pickleImage =
   "https://cdn.shopify.com/s/files/1/0722/3872/7323/files/mango-pickle-scaled_f383ec5b-be63-4988-81c1-f2f381d76f8e.webp?width=1000"
 
 // A real bowl of cut fruit; free to use under the Unsplash License.
-// Unsplash photo, cropped to the bowl (the original also shows a chocolate bar)
-const fruitImage =
-  "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&crop=focalpoint&fp-x=0.49&fp-y=0.49&fp-z=1.25&w=1000&h=1000&q=80"
+// Unsplash photo of cut papaya, pomegranate, guava, pineapple, orange, banana and apple (our bowl's fruits)
+const fruitImage = "https://images.unsplash.com/photo-1641642400143-6be68f1a0918?auto=format&fit=crop&w=800&h=800&q=80"
 
 const BRAND = "Happy Tummy Co."
 
@@ -142,6 +144,13 @@ const fruitSoldOut = (name: string, soldOut: Set<string>) =>
   (name === "Grapes" && soldOut.has("Black Grapes")) ||
   (name === "Pineapple" && soldOut.has("Queen Pineapple"))
 
+// Menu names of the rows marked sold out (matched by id, so a renamed item keeps its flag)
+const soldOutNames = (rows: Array<{ id: string; name: string; is_available: boolean }>) =>
+  new Set(rows.filter((r) => !r.is_available).map((r) => DEFAULT_MENU_ITEMS.find((i) => i.id === r.id)?.name ?? r.name))
+
+// Supplier (Shopify) photo at a given width
+const sized = (url: string, width: number) => url.replace(/width=\d+/, `width=${width}`)
+
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
   if (soldOut.has(item.name)) return "Sold out. Remove it to continue."
@@ -150,6 +159,15 @@ function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
   const gone = fruits.map((f) => f.name).filter((name) => !leftOut.includes(name) && fruitSoldOut(name, soldOut))
   return gone.length ? `${gone.join(", ")} just sold out. Remove this bowl and add it again.` : null
 }
+
+// Chat history only loads for numbers this phone has used in the support chat, so typing someone
+// else's number (at checkout or in the form) never shows their conversation
+const CHAT_PHONES_KEY = "ht_chat_phones"
+const isMyChatPhone = (p: string) => safeStorage.getJson<string[]>(CHAT_PHONES_KEY, []).includes(p)
+const rememberChatPhone = (p: string) =>
+  safeStorage.setJson(CHAT_PHONES_KEY, [...safeStorage.getJson<string[]>(CHAT_PHONES_KEY, []).filter((x) => x !== p), p].slice(-5))
+// When this phone last had the chat open, to count replies that came in while away
+const markChatSeen = (p: string) => safeStorage.setItem(`ht_chat_seen_${p}`, String(Date.now()))
 
 // Messages saved before the rename still mention the old name in their text
 const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT_NAME).replace(/MessMate/g, BRAND)
@@ -816,7 +834,7 @@ function PickleList({
                 }}
               >
                 <div className="product-image-wrap">
-                  <img src={product.image} alt={product.name} />
+                  <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
                 </div>
                 <div className="product-info">
@@ -890,7 +908,7 @@ function PickleDetail({
         <div className="detail-layout">
           <div className="detail-left-col">
             <div className="detail-image">
-              <img src={product.image} alt={product.name} />
+              <img src={sized(product.image, 1200)} alt={product.name} />
             </div>
             <aside className="love-note desktop-love-note">
               <span>
@@ -1236,7 +1254,7 @@ function Cart({
                     <img
                       src={
                         item.kind === "pickle"
-                          ? pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage
+                          ? sized(pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage, 240)
                           : fruitImage
                       }
                       alt=""
@@ -1451,12 +1469,13 @@ function Checkout({
                   label="Your name"
                   placeholder="e.g. Ananya"
                   autoComplete="name"
+                  maxLength={60}
                   value={details.name}
                   onChange={(v) => set("name", v)}
                 />
                 <Field
                   label="Phone number"
-                  placeholder="10-digit mobile number"
+                  placeholder="e.g. 9876543210"
                   type="tel"
                   autoComplete="tel"
                   hint={
@@ -1532,13 +1551,16 @@ function Checkout({
                     label="Room number"
                     placeholder="e.g. 214"
                     inputMode="numeric"
+                    maxLength={4}
                     value={details.room}
                     onChange={(v) => set("room", v.replace(/\D/g, ""))}
                   />
                 </div>
               )}
             </section>
-            {!isComplete && <div className="validation-hint mobile-validation-hint">{missing}</div>}
+            {!isComplete && (details.name || details.phone) && (
+              <div className="validation-hint mobile-validation-hint">{missing}</div>
+            )}
           </div>
           <div className="checkout-right-col">
             <div className="desktop-step-summary-card">
@@ -1725,7 +1747,7 @@ function Fulfilment({
               </div>
               <div className="desktop-fulfilment-cta">
                 <PrimaryButton onClick={() => go("payment")}>
-                  Review & pay
+                  Review & Pay
                 </PrimaryButton>
               </div>
             </div>
@@ -1734,7 +1756,7 @@ function Fulfilment({
       </main>
       <BottomBar>
         <PrimaryButton onClick={() => go("payment")}>
-          Review & pay
+          Review & Pay
         </PrimaryButton>
       </BottomBar>
     </>
@@ -1762,8 +1784,18 @@ function Payment({
   // Same calculation handlePay uses, so the amount shown is the amount saved.
   const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
-  const [method, setMethod] = useState<"upi" | "counter">("upi")
-  const [utr, setUtr] = useState("")
+  const [method, setMethodState] = useState<"upi" | "counter">(() =>
+    safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
+  )
+  const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
+  const setMethod = (m: "upi" | "counter") => {
+    setMethodState(m)
+    safeStorage.setItem("ht_pay_method", m)
+  }
+  const setUtr = (value: string) => {
+    setUtrState(value)
+    safeStorage.setItem("ht_pay_utr", value)
+  }
   const [copiedUpi, setCopiedUpi] = useState(false)
 
   const merchantUpiId = "Q477490796@ybl"
@@ -1821,13 +1853,13 @@ function Payment({
       <main className="screen-content payment-page">
         <section className="screen-intro compact">
           <div className="eyebrow">Step 3 of 3</div>
-          <h1>Complete Your Payment</h1>
+          <h1>Complete your payment</h1>
           <p>Scan & pay via merchant PhonePe QR or pay at counter.</p>
         </section>
         <div className="payment-layout">
           <div className="payment-left-col">
             <section className="payment-methods">
-              <h2>Select Payment Method</h2>
+              <h2>Select payment method</h2>
               <button
                 type="button"
                 className={method === "upi" ? "selected" : ""}
@@ -1860,7 +1892,13 @@ function Payment({
               </button>
             </section>
 
-            {method === "upi" ? (
+            {!storeOpen ? (
+              <div className="counter-payment-card">
+                <div>
+                  <strong>{CLOSED_MESSAGE}</strong>
+                </div>
+              </div>
+            ) : method === "upi" ? (
               <div className="phonepe-payment-card">
                 <div className="merchant-header-badge">
                   <div className="merchant-logo-pill">
@@ -1884,7 +1922,7 @@ function Payment({
                 {/* The Official PhonePe QR Image */}
                 <div className="qr-container">
                   <img
-                    src={PHONEPE_QR_BASE64}
+                    src={phonepeQrUrl}
                     alt={`PhonePe QR code for ${BRAND}`}
                     className="phonepe-qr-img"
                   />
@@ -2142,7 +2180,7 @@ function Confirmation({
               <Icon name="key" size={20} />
             </div>
             <div className="pin-card-copy">
-              <small>YOUR 4-DIGIT PICKUP PIN</small>
+              <small>{fulfilment === "pickup" ? "YOUR 4-DIGIT PICKUP PIN" : "YOUR 4-DIGIT ORDER PIN"}</small>
               <strong className="pin-digit-display">{displayPin}</strong>
               <span>
                 {fulfilment === "pickup"
@@ -2333,13 +2371,11 @@ function OrderRatingWidget({
 function OrdersPage({
   go,
   phone,
-  setPhone,
   cartCount,
   onReorder,
 }: {
   go: (screen: Screen) => void
   phone: string
-  setPhone: (phone: string) => void
   cartCount: number
   onReorder: (items: CartItem[]) => void
 }) {
@@ -2367,24 +2403,22 @@ function OrdersPage({
         setSearchedFor(null)
         return
       }
-      let query = supabase.from("orders").select("*")
-
       const cleanDigits = q.replace(/\D/g, "")
-      const normalizedPhone = cleanDigits.slice(-10)
-
-      if (/^\d{1,4}$/.test(q)) {
-        query = query.or(`order_number.eq.${parseInt(q)},customer_phone.eq.${q}`)
-      } else if (normalizedPhone.length === 10) {
-        query = query.or(
-          `customer_phone.eq.${normalizedPhone},customer_phone.eq.${cleanDigits},customer_phone.eq.${q}`
-        )
-      } else {
-        query = query.eq("customer_phone", q)
+      const normalizedPhone = normalizePhone(q)
+      // Only a full phone number finds orders. Order numbers count up one by one, so looking them
+      // up would show other students' PINs, phones and rooms.
+      if (normalizedPhone.length !== 10) {
+        setOrders([])
+        setSearchedFor(null)
+        activePhoneRef.current = ""
+        return
       }
 
-      const { data, error } = await query.order("order_number", {
-        ascending: false,
-      })
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.${cleanDigits}`)
+        .order("order_number", { ascending: false })
 
       if (error) {
         console.warn("Order lookup failed:", error.message)
@@ -2393,12 +2427,8 @@ function OrdersPage({
       } else {
         setOrders(data as OrderRecord[])
         setSearchedFor(q)
-        activePhoneRef.current = normalizedPhone.length === 10 ? normalizedPhone : ""
-        // Only a real 10-digit mobile becomes "your" phone (alerts, chat and checkout use it)
-        if (cleanDigits.length >= 10 && isValidIndianPhone(normalizedPhone)) {
-          safeStorage.setItem("messmate_phone", normalizedPhone)
-          setPhone(normalizedPhone)
-        }
+        // A lookup never changes the phone saved for checkout, alerts and chat (it may be a friend's)
+        activePhoneRef.current = normalizedPhone
       }
     } catch {
       setOrders([])
@@ -2626,7 +2656,9 @@ function OrdersPage({
                           <strong>{order.status === "no_show" ? "Not Collected" : "Order Cancelled by Kitchen"}</strong>
                           <p>
                             {order.status === "no_show"
-                              ? "This order was ready but wasn't picked up."
+                              ? order.fulfilment === "delivery"
+                                ? "We couldn't hand this order over at your room."
+                                : "This order was ready but wasn't picked up."
                               : "This order has been cancelled and will not be prepared or delivered."}
                           </p>
                         </div>
@@ -2637,9 +2669,13 @@ function OrdersPage({
                             <>Your UPI payment of ₹{order.total} has been refunded.</>
                           ) : order.status === "no_show" ? (
                             <>Questions about this order? Chat with the <strong>{SUPPORT_NAME}</strong>.</>
+                          ) : order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi") ? (
+                            <>
+                              If you paid by UPI, your refund will be processed. Questions? Chat with the <strong>{SUPPORT_NAME}</strong>.
+                            </>
                           ) : (
                             <>
-                              If you transferred payment via UPI, your refund will be processed or you can contact the <strong>{SUPPORT_NAME}</strong> for instant verification.
+                              Nothing is due for this order. Questions? Chat with the <strong>{SUPPORT_NAME}</strong>.
                             </>
                           )}
                         </span>
@@ -2704,7 +2740,7 @@ function OrdersPage({
                           <div
                             style={{
                               color: "var(--muted)",
-                              fontSize: "8px",
+                              fontSize: "10px",
                               marginTop: "2px",
                             }}
                           >
@@ -2738,7 +2774,7 @@ function OrdersPage({
                         <strong>₹{order.subtotal}</strong>
                       </div>
                       <div>
-                        <span>Delivery</span>
+                        <span>{order.fulfilment === "pickup" ? "Pickup" : "Delivery"}</span>
                         <strong>
                           {order.delivery_fee ? `₹${order.delivery_fee}` : "Free"}
                         </strong>
@@ -2763,7 +2799,7 @@ function OrdersPage({
                         </div>
                       </div>
                       <div>
-                        <span>Total Paid</span>
+                        <span>Total</span>
                         <strong>₹{order.total}</strong>
                       </div>
                     </div>
@@ -2801,14 +2837,6 @@ function OrdersPage({
 
 type ChatView = "faq" | "request" | "live"
 
-type SupportMsg = {
-  id: string
-  phone: string
-  customer_name: string
-  sender: "customer" | "support" | "bot"
-  message: string
-  created_at: string
-}
 
 const FAQ_ITEMS = [
   {
@@ -2865,7 +2893,7 @@ const FAQ_ITEMS = [
     label: "Fruit bowl price & fruits",
     question: "How does the fruit bowl work?",
     answer:
-      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl.`,
+      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits: ${fruits.map((f) => f.name.toLowerCase()).join(", ")}, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl.`,
   },
   {
     id: "pickle",
@@ -2877,73 +2905,13 @@ const FAQ_ITEMS = [
 ]
 
 
-function mergeSupportMessages(
-  existing: SupportMsg[],
-  incomingList: SupportMsg[]
-): SupportMsg[] {
-  let result = [...existing]
-
-  for (const incoming of incomingList) {
-    if (!incoming || !incoming.message) continue
-
-    // 1. Direct ID match
-    const exactIndex = result.findIndex((m) => m.id === incoming.id)
-    if (exactIndex !== -1) {
-      result[exactIndex] = { ...result[exactIndex], ...incoming }
-      continue
-    }
-
-    // 2. Fuzzy match for optimistic local messages vs canonical server messages
-    const fuzzyIndex = result.findIndex((m) => {
-      const sameSender = m.sender === incoming.sender
-      const p1 = (m.phone || "").replace(/\D/g, "").slice(-10)
-      const p2 = (incoming.phone || "").replace(/\D/g, "").slice(-10)
-      const samePhone = !p1 || !p2 || p1 === p2
-      const sameText = m.message.trim() === incoming.message.trim()
-      const t1 = new Date(m.created_at).getTime()
-      const t2 = new Date(incoming.created_at).getTime()
-      const sameTimeWindow = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
-
-      return sameSender && samePhone && sameText && sameTimeWindow
-    })
-
-    if (fuzzyIndex !== -1) {
-      const existingMsg = result[fuzzyIndex]
-      const incomingIsCanonical =
-        !incoming.id.startsWith("msg-") &&
-        !incoming.id.startsWith("local-") &&
-        !incoming.id.startsWith("admin-")
-      result[fuzzyIndex] = incomingIsCanonical ? incoming : existingMsg
-    } else {
-      result.push(incoming)
-    }
-  }
-
-  // Deduplicate any repeated messages with identical content in close proximity
-  const deduped: SupportMsg[] = []
-  for (const msg of result) {
-    const isDup = deduped.some((d) => {
-      if (d.id === msg.id) return true
-      const sameSender = d.sender === msg.sender
-      const p1 = (d.phone || "").replace(/\D/g, "").slice(-10)
-      const p2 = (msg.phone || "").replace(/\D/g, "").slice(-10)
-      const samePhone = !p1 || !p2 || p1 === p2
-      const sameText = d.message.trim() === msg.message.trim()
-      const t1 = new Date(d.created_at).getTime()
-      const t2 = new Date(msg.created_at).getTime()
-      const sameTime = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
-      return sameSender && samePhone && sameText && sameTime
-    })
-    if (!isDup) deduped.push(msg)
-  }
-
-  return deduped.sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
-}
 
 // AI reply (server function in api/chat.js) for messages the instant answers don't cover; null if unavailable
-async function askAi(message: string, history: Array<{ sender: "user" | "bot"; text: string }>): Promise<string | null> {
+async function askAi(
+  message: string,
+  history: Array<{ sender: "user" | "bot"; text: string }>,
+  storeOpen: boolean,
+): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10000)
   try {
@@ -2953,6 +2921,8 @@ async function askAi(message: string, history: Array<{ sender: "user" | "bot"; t
       body: JSON.stringify({
         message,
         history: history.slice(-6).map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
+        visitorId: safeStorage.getItem("ht_visitor_id", "") || undefined,
+        storeOpen,
       }),
       signal: controller.signal,
     })
@@ -3014,6 +2984,7 @@ function SupportChatWidget({
   })
 
   const [unreadCount, setUnreadCount] = useState<number>(0)
+  const fabRef = useRef<HTMLButtonElement>(null)
 
   const setIsOpen = (open: boolean) => {
     setIsOpenState(open)
@@ -3022,6 +2993,8 @@ function SupportChatWidget({
     } catch {}
     if (open) {
       setUnreadCount(0)
+    } else {
+      fabRef.current?.focus() // back to the Support button for keyboard and screen-reader users
     }
   }
 
@@ -3050,6 +3023,8 @@ function SupportChatWidget({
   const [phone, setPhone] = useState(
     customerPhone || safeStorage.getItem("messmate_phone", "") || ""
   )
+  const typedPhone = phone.replace(/\D/g, "").slice(-10)
+  const chatPhone = typedPhone.length === 10 && isMyChatPhone(typedPhone) ? typedPhone : ""
   const [issue, setIssue] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -3070,8 +3045,8 @@ function SupportChatWidget({
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const liveMessagesRef = useRef<SupportMsg[]>(liveMessages)
   liveMessagesRef.current = liveMessages
-  const phoneRef = useRef<string>(phone)
-  phoneRef.current = phone
+  const chatPhoneRef = useRef<string>(chatPhone)
+  chatPhoneRef.current = chatPhone
   const isOpenRef = useRef<boolean>(isOpen)
   isOpenRef.current = isOpen
 
@@ -3082,8 +3057,12 @@ function SupportChatWidget({
   }
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [faqHistory, liveMessages, view])
+    chatBottomRef.current?.scrollIntoView({ behavior: "auto" })
+  }, [faqHistory, liveMessages, view, isOpen])
+
+  useEffect(() => {
+    if (isOpen && chatPhone) markChatSeen(chatPhone)
+  }, [isOpen, chatPhone, liveMessages])
 
   useEffect(() => {
     if (!isOpen) return
@@ -3113,8 +3092,8 @@ function SupportChatWidget({
       .on("broadcast", { event: "support_msg" }, ({ payload }) => {
         if (!payload || !payload.phone) return
         const incoming = payload as SupportMsg
-        const currentPhone = (phoneRef.current || "").replace(/\D/g, "").slice(-10)
-        const incomingPhone = (incoming.phone || "").replace(/\D/g, "").slice(-10)
+        const currentPhone = chatPhoneRef.current
+        const incomingPhone = String(incoming.phone || "").replace(/\D/g, "").slice(-10)
 
         if (incomingPhone && currentPhone && incomingPhone === currentPhone) {
           const isNew = mergeSupportMessages(liveMessagesRef.current, [incoming]).length > liveMessagesRef.current.length
@@ -3131,16 +3110,6 @@ function SupportChatWidget({
           }
         }
       })
-      .on("broadcast", { event: "request_history" }, () => {
-        const currentPhone = (phoneRef.current || "").replace(/\D/g, "").slice(-10)
-        if (currentPhone && liveMessagesRef.current.length > 0) {
-          broadcastChannel.send({
-            type: "broadcast",
-            event: "sync_history",
-            payload: liveMessagesRef.current,
-          })
-        }
-      })
       .subscribe()
 
     return () => {
@@ -3150,9 +3119,8 @@ function SupportChatWidget({
 
   // Database fetch & Postgres changes when student phone is available
   useEffect(() => {
-    const clean = phone?.replace(/\D/g, "").slice(-10)
-    // Wait for a full number; partial input would subscribe on every keystroke
-    if (!clean || clean.length !== 10 || !supabase) return
+    const clean = chatPhone
+    if (!clean || !supabase) return
 
     supabase
       .from("support_messages")
@@ -3167,6 +3135,13 @@ function SupportChatWidget({
             return next
           })
           setView("live")
+          if (!isOpenRef.current) {
+            const seen = Number(safeStorage.getItem(`ht_chat_seen_${clean}`, "0")) || 0
+            const unseen = (data as SupportMsg[]).filter(
+              (m) => m.sender === "support" && new Date(m.created_at).getTime() > seen,
+            ).length
+            if (unseen > 0) setUnreadCount(unseen)
+          }
         }
       })
 
@@ -3203,7 +3178,7 @@ function SupportChatWidget({
     return () => {
       supabase?.removeChannel(pgChannel)
     }
-  }, [phone])
+  }, [chatPhone])
 
   const handleSelectFaq = (faq: (typeof FAQ_ITEMS)[0]) => {
     const userMsg = {
@@ -3235,9 +3210,10 @@ function SupportChatWidget({
       { id: botId, sender: "bot", text: known ? answer : "Typing…", showEscalate: known },
     ])
     if (known) return
-    // No instant answer (a greeting, small talk…): let the AI helper reply, or point to the team if it can't
-    const reply = await askAi(query, faqHistory)
-    setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply ?? FAQ_FALLBACK, showEscalate: true } : m)))
+    // No instant answer (a greeting, small talk…): the AI helper replies; if it can't, a built-in
+    // small-talk reply, and otherwise a pointer to the team
+    const reply = (await askAi(query, faqHistory, storeOpen)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
+    setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply, showEscalate: true } : m)))
   }
 
   const handleResetChat = () => {
@@ -3281,54 +3257,48 @@ function SupportChatWidget({
 
     const issueText = issue.trim() || `Requested ${SUPPORT_NAME} callback.`
 
-    const initialCustomerMsg: SupportMsg = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      phone: activePhone,
-      customer_name: name.trim(),
-      sender: "customer",
-      message: issueText,
-      created_at: new Date().toISOString(),
+    const { data: saved, error } = await supabase
+      .from("support_messages")
+      .insert({
+        phone: activePhone,
+        customer_name: name.trim(),
+        sender: "customer",
+        message: issueText,
+      })
+      .select()
+      .single()
+    if (error || !saved) {
+      console.warn("Support request not saved:", error?.message)
+      setFormError("Couldn't send your request. Please check your connection and try again.")
+      setIsSubmitting(false)
+      return
     }
 
+    rememberChatPhone(activePhone)
+    markChatSeen(activePhone)
+    const savedMsg = saved as SupportMsg
     const acknowledgmentMsg: SupportMsg = {
-      id: `ack-${Date.now() + 1}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `ack-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       phone: activePhone,
       customer_name: SUPPORT_NAME,
       sender: "support",
       message: storeOpen
         ? `Thanks ${name.trim()}! We have received your details. We will contact you shortly on ${activePhone}.`
         : `Thanks ${name.trim()}! We're unavailable at the moment, but we have your details and will reply on ${activePhone} when we're back.`,
-      created_at: new Date().toISOString(),
+      // Just after the saved message, so it always shows below it
+      created_at: new Date(new Date(savedMsg.created_at).getTime() + 1).toISOString(),
     }
 
-    const nextMsgs = mergeSupportMessages([], [initialCustomerMsg, acknowledgmentMsg])
+    const nextMsgs = mergeSupportMessages([], [savedMsg, acknowledgmentMsg])
     setLiveMessages(nextMsgs)
     saveChatToLocal(activePhone, nextMsgs)
     setView("live")
-
-    if (supabase) {
-      // 1. Broadcast immediately across Supabase Realtime channel so Admin receives it without delay
-      const bc = supabase.channel("messmate_support_broadcast")
-      bc.send({
-        type: "broadcast",
-        event: "support_msg",
-        payload: initialCustomerMsg,
-      })
-
-      // 2. Also try inserting into database table
-      try {
-        await supabase
-          .from("support_messages")
-          .insert({
-            phone: activePhone,
-            customer_name: name.trim(),
-            sender: "customer",
-            message: issueText,
-          })
-      } catch (err) {
-        console.warn("DB notice (table might not exist yet):", err)
-      }
-    }
+    // An open admin dashboard shows it instantly (it also gets the saved row)
+    supabase.channel("messmate_support_broadcast").send({
+      type: "broadcast",
+      event: "support_msg",
+      payload: savedMsg,
+    })
     setIsSubmitting(false)
   }
 
@@ -3363,23 +3333,35 @@ function SupportChatWidget({
       return next
     })
 
-    supabase.channel("messmate_support_broadcast").send({
-      type: "broadcast",
-      event: "support_msg",
-      payload: optimistic,
-    })
     const { error } = await supabase.from("support_messages").insert({
       phone: cleanPhone,
       customer_name: name || "Student",
       sender: "customer",
       message: text,
     })
-    if (error) console.warn("Support message not saved:", error.message)
+    if (error) {
+      console.warn("Support message not saved:", error.message)
+      setLiveMessages((prev) => {
+        const next = prev.filter((m) => m.id !== optimistic.id)
+        saveChatToLocal(cleanPhone, next)
+        return next
+      })
+      setLiveInput(text)
+      alert("Message not sent. Please check your connection and try again.")
+      return
+    }
+    rememberChatPhone(cleanPhone)
+    supabase.channel("messmate_support_broadcast").send({
+      type: "broadcast",
+      event: "support_msg",
+      payload: optimistic,
+    })
   }
 
   return (
     <>
       <button
+        ref={fabRef}
         className={`support-fab ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open support chat"
@@ -3464,7 +3446,7 @@ function SupportChatWidget({
 
           {view === "faq" && (
             <>
-              <div className="support-body">
+              <div className="support-body" aria-live="polite">
                 {faqHistory.map((item) => (
                   <div
                     key={item.id}
@@ -3516,6 +3498,7 @@ function SupportChatWidget({
                 <input
                   type="text"
                   placeholder="Ask a question (e.g. delivery time)..."
+                  maxLength={500}
                   value={faqInput}
                   onChange={(e) => setFaqInput(e.target.value)}
                 />
@@ -3532,7 +3515,7 @@ function SupportChatWidget({
           )}
 
           {view === "request" && (
-            <div className="support-body">
+            <div className="support-body" aria-live="polite">
               <form
                 className="support-request-form"
                 onSubmit={handleStartLiveChat}
@@ -3540,8 +3523,9 @@ function SupportChatWidget({
                 <div className="support-request-intro">
                   <h4>Talk to our Support Team</h4>
                   <p>
-                    Submit your name and phone number. Our support team will
-                    contact you shortly!
+                    {storeOpen
+                      ? "Submit your name and phone number. Our support team will contact you shortly!"
+                      : "We're unavailable at the moment. Leave your details and we'll reply when we're back."}
                   </p>
                 </div>
 
@@ -3552,9 +3536,12 @@ function SupportChatWidget({
                 )}
 
                 <div className="support-field">
-                  <label>Your Name</label>
+                  <label htmlFor="support-name">Your name</label>
                   <input
+                    id="support-name"
                     type="text"
+                    maxLength={60}
+                    autoComplete="name"
                     placeholder="e.g. Ananya"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -3564,14 +3551,16 @@ function SupportChatWidget({
 
                 <div className="support-field">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-                    <label>Phone Number</label>
+                    <label htmlFor="support-phone">Phone number</label>
                     <span style={{ fontSize: "11px", color: "var(--muted)" }}>
                       {phone.replace(/\D/g, "").length}/10 digits
                     </span>
                   </div>
                   <input
+                    id="support-phone"
                     type="tel"
-                    placeholder="10-digit mobile number"
+                    autoComplete="tel"
+                    placeholder="e.g. 9876543210"
                     value={phone}
                     onChange={(e) => setPhone(cleanPhoneInput(e.target.value))}
                     required
@@ -3579,8 +3568,9 @@ function SupportChatWidget({
                 </div>
 
                 <div className="support-field">
-                  <label>Your Issue / Question (Optional)</label>
+                  <label htmlFor="support-issue">Your issue or question (optional)</label>
                   <textarea
+                    id="support-issue"
                     placeholder="What do you need help with? (e.g. delivery query, change room number...)"
                     maxLength={2000}
                     value={issue}
@@ -3610,7 +3600,7 @@ function SupportChatWidget({
                     disabled={isSubmitting || !name.trim() || phone.replace(/\D/g, "").length !== 10}
                     style={{ flex: 1, minHeight: 44, fontSize: 13 }}
                   >
-                    {isSubmitting ? "Submitting..." : "Submit & Contact Me"}
+                    {isSubmitting ? "Submitting..." : storeOpen ? "Submit & Contact Me" : "Send message"}
                   </button>
                 </div>
               </form>
@@ -3639,7 +3629,7 @@ function SupportChatWidget({
               </div>
               )}
 
-              <div className="support-body">
+              <div className="support-body" aria-live="polite">
                 {liveMessages.length === 0 ? (
                   <div className="empty-state" style={{ padding: 20 }}>
                     <Icon name="chat" size={24} />
@@ -3810,17 +3800,19 @@ export default function App() {
   }, [dismissedReadyIds, dismissedCancelledIds])
   // Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
   const [storeOpen, setStoreOpen] = useState(true)
-  useEffect(() => {
-    const client = supabase
-    if (!client) return
-    client
-      .from("store_status")
+  const refreshStoreStatus = () =>
+    supabase
+      ?.from("store_status")
       .select("is_open")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!error && data) setStoreOpen(Boolean(data.is_open))
       })
+  useEffect(() => {
+    const client = supabase
+    if (!client) return
+    refreshStoreStatus()
     const channel = client
       .channel("store_status_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
@@ -3830,6 +3822,21 @@ export default function App() {
       .subscribe()
     return () => {
       client.removeChannel(channel)
+    }
+  }, [])
+
+  // Live updates can be missed while the page sits in the background (e.g. paying in a UPI app)
+  useEffect(() => {
+    const onBack = () => {
+      if (document.visibilityState !== "visible") return
+      refreshStock()
+      refreshStoreStatus()
+    }
+    document.addEventListener("visibilitychange", onBack)
+    window.addEventListener("online", onBack)
+    return () => {
+      document.removeEventListener("visibilitychange", onBack)
+      window.removeEventListener("online", onBack)
     }
   }, [])
 
@@ -3866,24 +3873,20 @@ export default function App() {
       })
   }, [])
 
+  const refreshStock = () =>
+    supabase
+      ?.from("menu_inventory")
+      .select("id, name, is_available")
+      .then(({ data, error }) => {
+        if (!error && data) setSoldOutItems(soldOutNames(data))
+      })
+
   // Sync inventory with Supabase realtime & broadcast
   useEffect(() => {
     if (!supabase) return
 
-    // 1. Fetch current inventory from table if available
-    supabase
-      .from("menu_inventory")
-      .select("*")
-      .then(({ data, error }) => {
-        if (!error && data) {
-          const out = new Set<string>()
-          data.forEach((row: any) => {
-            // Match by id so a renamed menu item keeps its stock flag.
-            if (!row.is_available) out.add(DEFAULT_MENU_ITEMS.find((i) => i.id === row.id)?.name ?? row.name)
-          })
-          setSoldOutItems(out)
-        }
-      })
+    // 1. Current stock from the table
+    refreshStock()
 
     // 2. Live updates: the admin's broadcast, plus the table itself in case a broadcast is missed
     const applyStock = (row?: { id?: string; is_available?: boolean }) => {
@@ -3983,8 +3986,8 @@ export default function App() {
               if (!dismissedCancelledIds.has(updated.id)) {
                 setActiveCancelledOrder(updated)
               }
-            } else if (updated.status === "delivered") {
-              setActiveReadyOrder(null)
+            } else {
+              setActiveReadyOrder((current: any) => (current?.id === updated.id ? null : current))
             }
           }
         }
@@ -4072,18 +4075,31 @@ export default function App() {
     setIsSubmitting(true)
 
     try {
-      // The kitchen may have closed while this page was open
-      const { data: status } = await supabase.from("store_status").select("is_open").eq("id", 1).maybeSingle()
+      // The kitchen may have closed, or sold something out, while this page was open
+      const [{ data: status }, { data: stock }] = await Promise.all([
+        supabase.from("store_status").select("is_open").eq("id", 1).maybeSingle(),
+        supabase.from("menu_inventory").select("id, name, is_available"),
+      ])
       if (status?.is_open === false) {
         setStoreOpen(false)
         alert(`${CLOSED_MESSAGE}, so your order wasn't placed. If you already paid, please message us in Support.`)
         return
       }
+      if (stock) {
+        const latest = soldOutNames(stock)
+        setSoldOutItems(latest)
+        if (cart.some((item) => soldOutNote(item, latest))) {
+          alert("Something in your cart just sold out, so the order wasn't placed. Please remove it and try again.")
+          go("cart")
+          return
+        }
+      }
 
       const { subtotal, fee, total } = calculateOrderTotals(cart, fulfilment)
       const orderTotal = total
 
-      const cleanUtr = utr ? sanitizeInput(utr, 12).replace(/\D/g, "") : ""
+      const typedUtr = utr ? sanitizeInput(utr, 12).replace(/\D/g, "") : ""
+      const cleanUtr = typedUtr.length === 12 ? typedUtr : ""
       const paymentLabel =
         method === "upi"
           ? cleanUtr
@@ -4170,6 +4186,8 @@ export default function App() {
             safeStorage.setItem("messmate_room", details.room.trim())
           }
           // Clear cart so subsequent orders start fresh
+          safeStorage.removeItem("ht_pay_method")
+          safeStorage.removeItem("ht_pay_utr")
           setOrderedItems(cart)
           setCart([])
           go("confirmation")
@@ -4368,7 +4386,6 @@ export default function App() {
           <OrdersPage
             go={go}
             phone={details.phone}
-            setPhone={(phone) => setDetails((prev) => ({ ...prev, phone }))}
             cartCount={cartCount}
             onReorder={handleReorder}
           />

@@ -8,6 +8,7 @@ import {
   getPickupPin,
   canCancelOrder,
   getFaqResponse,
+  getSmallTalkReply,
   FAQ_FALLBACK,
   mergeSupportMessages,
   type SupportMsg,
@@ -332,9 +333,10 @@ test("Support Messages - sorts messages chronologically", () => {
 
 test("Support Messages - filters rapid duplicate clicks", () => {
   const now = new Date().toISOString()
+  // A double tap makes two unsaved copies on the phone; they show once (two saved rows would be two messages)
   const spamMsgs: SupportMsg[] = [
-    { id: "s1", phone: "9876543210", customer_name: "Rahul", sender: "customer", message: "Need spoon", created_at: now },
-    { id: "s2", phone: "9876543210", customer_name: "Rahul", sender: "customer", message: "Need spoon", created_at: now },
+    { id: "msg-s1", phone: "9876543210", customer_name: "Rahul", sender: "customer", message: "Need spoon", created_at: now },
+    { id: "msg-s2", phone: "9876543210", customer_name: "Rahul", sender: "customer", message: "Need spoon", created_at: now },
   ]
   const merged = mergeSupportMessages([], spamMsgs)
   assert.equal(merged.length, 1)
@@ -711,4 +713,59 @@ test("Fruit bowl cart lines remember which fruits were left out", () => {
 test("FAQ Bot - greetings and small talk have no instant answer, so the chat asks the AI helper", () => {
   for (const q of ["hi", "hello", "meoww", "who are you?"]) assert.equal(getFaqResponse(q), FAQ_FALLBACK, q)
   assert.notEqual(getFaqResponse("what time do you deliver"), FAQ_FALLBACK)
+})
+
+test("Support merge - skips malformed messages instead of crashing the chat", () => {
+  const good = { id: "m1", phone: "9876543210", customer_name: "A", sender: "customer", message: "hi", created_at: new Date().toISOString() }
+  const bad = [
+    { ...good, id: "b1", phone: 9876543210 },
+    { ...good, id: "b2", message: { text: "x" } },
+    { ...good, id: "b3", customer_name: ["x"] },
+    { ...good, id: "b4", created_at: 12345 },
+    null,
+  ]
+  const merged = mergeSupportMessages([], [good, ...(bad as any)])
+  assert.deepEqual(merged.map((m) => m.id), ["m1"])
+})
+
+test("Small talk - friendly built-in replies when the AI helper can't answer", () => {
+  for (const q of ["hi", "Hiii", "hello!!", "hey there", "namaste", "good morning"]) assert.match(getSmallTalkReply(q) ?? "", /Happy Tummy bot/, q)
+  assert.match(getSmallTalkReply("thanks bro") ?? "", /welcome/)
+  assert.match(getSmallTalkReply("bye") ?? "", /Come back hungry/)
+  assert.match(getSmallTalkReply("ok") ?? "", /Anything else/)
+  for (const q of ["meoww", "write me a poem", "history of mango", "hike"]) assert.equal(getSmallTalkReply(q), null, q)
+})
+
+test("FAQ Bot - common student questions get the right instant answer", () => {
+  const price = /₹40/
+  assert.match(getFaqResponse("mango pickle ka rate kya hai"), price)
+  assert.match(getFaqResponse("what is the rate"), price)
+  assert.match(getFaqResponse("chicken pickle kitne ka hai"), /₹70/)
+  assert.match(getFaqResponse("cash on delivery?"), /Pay at Counter/)
+  assert.match(getFaqResponse("upi payment failed but money deducted"), /Support Team/)
+  assert.match(getFaqResponse("refund"), /sort it out/)
+  assert.match(getFaqResponse("my order is late"), /Track Orders/)
+  assert.match(getFaqResponse("do you have lemon pickle?"), /Gongura Pandu Mirchi/)
+  assert.doesNotMatch(getFaqResponse("do you have lemon pickle?"), /lemon/i)
+  assert.match(getFaqResponse("which fruits are in the bowl"), /apple, banana, papaya, pomegranate, orange, guava, grapes and pineapple/)
+})
+
+test("FAQ Bot - words inside other words don't trigger the wrong answer", () => {
+  assert.doesNotMatch(getFaqResponse("is the fruit bowl nutritious?"), /UTR/) // "utr" inside "nutritious"
+  assert.equal(getFaqResponse("this app is stupid"), FAQ_FALLBACK) // "upi" inside "stupid"
+  assert.doesNotMatch(getFaqResponse("so frustrating"), /star rating/) // "rating" inside "frustrating"
+})
+
+test("Phone validation - rejects dummy numbers that many people would share", () => {
+  assert.equal(isValidIndianPhone("9999999999"), false)
+  assert.equal(isValidIndianPhone("7777777777"), false)
+  assert.equal(isValidIndianPhone("9876543210"), true)
+})
+
+test("Support merge - the same text sent twice is two messages once both are saved", () => {
+  const at = new Date().toISOString()
+  const row = (id: string) => ({ id, phone: "9876543210", customer_name: "A", sender: "customer" as const, message: "ok", created_at: at })
+  assert.equal(mergeSupportMessages([], [row("uuid-1"), row("uuid-2")]).length, 2)
+  // a screen's own copy and its saved row are still one message
+  assert.equal(mergeSupportMessages([row("msg-123")], [row("uuid-3")]).length, 1)
 })

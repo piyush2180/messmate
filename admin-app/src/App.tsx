@@ -65,9 +65,24 @@ function formatWhen(iso: string): string {
 
 function get10DigitPhone(raw: string | null | undefined): string {
   if (!raw) return ""
-  const digits = raw.replace(/\D/g, "")
+  const digits = String(raw).replace(/\D/g, "")
   return digits.length > 10 ? digits.slice(-10) : digits
 }
+
+// Rows and broadcasts come from an open database and channel, so check their shape before using them
+const isValidMessage = (m: any): m is SupportMessage =>
+  Boolean(m) &&
+  typeof m.id === "string" &&
+  m.id !== "" &&
+  typeof m.phone === "string" &&
+  typeof m.message === "string" &&
+  m.message !== "" &&
+  typeof m.sender === "string" &&
+  typeof m.created_at === "string" &&
+  (m.customer_name == null || typeof m.customer_name === "string")
+// A real 1–5 star rating with optional text feedback
+const isValidRating = (rating: unknown, feedback: unknown) =>
+  Number.isInteger(rating) && (rating as number) >= 1 && (rating as number) <= 5 && (feedback == null || typeof feedback === "string")
 
 // Ids the apps give a message before the database assigns its own
 const isLocalId = (id: unknown) => /^(msg|local|admin|ack)-/.test(String(id))
@@ -93,7 +108,7 @@ function mergeSupportMessages(
 
   for (const incoming of incomingList) {
     // A malformed row or broadcast must not crash the dashboard
-    if (!incoming || !incoming.id || typeof incoming.message !== "string" || !incoming.message) continue
+    if (!isValidMessage(incoming)) continue
 
     const exactIndex = result.findIndex((m) => m.id === incoming.id)
     if (exactIndex !== -1) {
@@ -272,7 +287,7 @@ export default function App() {
         try {
           const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
           fetched = fetched.map((o) =>
-            cachedRatings[o.id]
+            isValidRating(cachedRatings[o.id]?.rating, cachedRatings[o.id]?.feedback)
               ? {
                   ...o,
                   rating: o.rating ?? cachedRatings[o.id].rating,
@@ -376,7 +391,7 @@ export default function App() {
         if (fresh && newMsg.sender === "customer") playChime("message")
       })
       .on("broadcast", { event: "order_rating" }, ({ payload }) => {
-        if (payload?.orderId && payload?.rating) {
+        if (typeof payload?.orderId === "string" && isValidRating(payload.rating, payload.feedback)) {
           setOrders((prev) =>
             prev.map((o) =>
               o.id === payload.orderId
@@ -508,6 +523,13 @@ export default function App() {
   useEffect(() => {
     loadCounterSales()
     loadStoreStatus()
+    const storeChannel = supabase
+      ?.channel("admin_store_status")
+      .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
+        const row = payload.new as { is_open?: boolean }
+        if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+      })
+      .subscribe()
     const refresh = () => {
       loadOrders()
       loadSupport()
@@ -527,6 +549,7 @@ export default function App() {
     window.addEventListener("offline", onOffline)
     document.addEventListener("visibilitychange", onVisible)
     return () => {
+      if (storeChannel) supabase?.removeChannel(storeChannel)
       window.removeEventListener("online", onOnline)
       window.removeEventListener("offline", onOffline)
       document.removeEventListener("visibilitychange", onVisible)
@@ -753,7 +776,7 @@ export default function App() {
         const matchPin = pin.includes(q)
         const matchName = (order.customer_name || "").toLowerCase().includes(q)
         // "+91 98765 43210" or "98765-43210" still finds the stored 10 digits
-        const phoneQuery = /^[\d\s+()-]+$/.test(q) ? get10DigitPhone(q) : ""
+        const phoneQuery = /^[\d\s+()-]+$/.test(q) ? get10DigitPhone(q.replace(/^\+91/, "")) : ""
         const matchPhone = phoneQuery !== "" && get10DigitPhone(order.customer_phone).includes(phoneQuery)
         const matchHostel = (order.hostel || "").toLowerCase().includes(q)
         const matchRoom = (order.room || "").toLowerCase().includes(q)
@@ -983,7 +1006,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="admin-main">
+      <main className={`admin-main tab-${tab}`}>
         {storeStatusMissing ? (
           <div className="store-status-bar missing">Run the store_status SQL in Supabase to use the Open / Closed switch.</div>
         ) : (
@@ -1297,13 +1320,19 @@ export default function App() {
                       onClick={() => setSelectedPhone(thread.phone)}
                     >
                       <div className="inbox-item-top">
-                        <span className="inbox-item-name">{thread.customerName}</span>
+                        <span className="inbox-item-name">
+                          {thread.messages[thread.messages.length - 1]?.sender === "customer" && (
+                            <span className="awaiting-dot" title="Waiting for a reply" aria-label="Waiting for a reply" />
+                          )}
+                          {thread.customerName}
+                        </span>
                         <span className="inbox-item-time">
                           {formatWhen(thread.latestAt)}
                         </span>
                       </div>
                       <span className="inbox-item-phone">{get10DigitPhone(thread.phone)}</span>
                       <div className="inbox-item-preview">
+                        {thread.messages[thread.messages.length - 1]?.sender === "support" ? "You: " : ""}
                         {rebrand(thread.messages[thread.messages.length - 1]?.message || "Requested contact")}
                       </div>
                     </div>
@@ -1857,7 +1886,9 @@ function OrderCard({
           {/* Payment Verification Status Badge */}
           {isUpi && (
             <div className="payment-verification-status">
-              {isVerified ? (
+              {order.payment_status === "refunded" ? (
+                <span className="verify-badge success">Refunded</span>
+              ) : isVerified ? (
                 <span className="verify-badge success">UTR Verified</span>
               ) : isFailed ? (
                 <span className="verify-badge danger">Unverified / Flagged</span>
@@ -1875,7 +1906,7 @@ function OrderCard({
       </div>
 
       {/* UPI Payment Verification Buttons */}
-      {isUpi && order.status !== "cancelled" && order.payment_status !== "refunded" && (
+      {isUpi && order.payment_status !== "refunded" && (
         <div className="payment-verify-actions">
           {!isVerified && (
             <button

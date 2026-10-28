@@ -745,7 +745,7 @@ button, input, select, textarea {
 /* Support Inbox */
 .support-inbox-grid {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 20px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -870,6 +870,7 @@ button, input, select, textarea {
 
 .thread-bubble {
   max-width: 75%;
+  overflow-wrap: anywhere; /* a long link can't push the thread off screen */
   padding: 10px 14px;
   border-radius: 16px;
   font-size: 13px;
@@ -1453,7 +1454,7 @@ button, input, select, textarea {
 
   /* Mobile Support Inbox */
   .support-inbox-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     height: auto;
     min-height: 520px;
   }
@@ -1838,3 +1839,37 @@ button, input, select, textarea {
 .store-status-bar.closed .store-status-dot { background: #9ca3af; }
 .store-status-bar.missing { color: var(--muted); font-weight: 600; font-size: 13px; }
 .store-status-bar .action-btn-small { flex: none; min-height: 36px; padding: 6px 14px; }
+
+/* Columns may shrink, so long names and previews ellipsize instead of overflowing */
+.support-list-pane, .support-thread-pane { min-width: 0; }
+
+/* Search box clear button, inside the right end of the box */
+.search-input { padding-right: 36px; }
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.search-clear-btn:hover { background: var(--olive-soft); color: var(--text); }
+
+/* Chats waiting for a staff reply */
+.awaiting-dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--amber); vertical-align: middle; }
+
+@media (max-width: 768px) {
+  .search-input-wrap { min-width: 0; }
+  /* 16px stops iPhones zooming in when staff tap a field */
+  .search-input, .filter-select, .thread-reply-input { font-size: 16px; }
+  /* On the Support tab the reply box matters more than the summary cards */
+  .admin-main.tab-support .kpi-grid { display: none; }
+}

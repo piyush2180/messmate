@@ -14,6 +14,18 @@ function chatRequest(body: unknown, headers: Record<string, string> = {}) {
   })
 }
 
+// Answers per model: e.g. { "openai/gpt-oss-120b": 429 } makes that model act out of allowance
+function fakeGroqByModel(statusByModel: Record<string, number>, reply = "from fallback") {
+  const calls: any[] = []
+  globalThis.fetch = (async (_url: string, init: any) => {
+    const body = JSON.parse(init.body)
+    calls.push(body.model)
+    const status = statusByModel[body.model] ?? 200
+    return new Response(JSON.stringify(status === 200 ? { choices: [{ message: { content: reply } }] } : { error: "limit" }), { status })
+  }) as any
+  return calls
+}
+
 function fakeGroq(reply: string, status = 200) {
   const calls: any[] = []
   globalThis.fetch = (async (url: string, init: any) => {
@@ -84,9 +96,23 @@ test("AI chat: limits how many messages one visitor can send", async () => {
   process.env.GROQ_API_KEY = "test-key"
   fakeGroq("ok")
   const statuses = []
-  for (let i = 0; i < 16; i++) statuses.push((await POST(chatRequest({ message: "hi" }, { "x-forwarded-for": "10.9.9.9" }))).status)
-  assert.equal(statuses.filter((s) => s === 200).length, 15)
+  for (let i = 0; i < 31; i++) {
+    statuses.push((await POST(chatRequest({ message: "hi", visitorId: "visitor-test-0001" }, { "x-forwarded-for": "10.9.9.9" }))).status)
+  }
+  assert.equal(statuses.filter((s) => s === 200).length, 30) // 30 messages per student per 10 minutes
   assert.equal(statuses.at(-1), 429)
+})
+
+test("AI chat: students sharing one campus network each get their own allowance", async () => {
+  process.env.GROQ_API_KEY = "test-key"
+  fakeGroq("ok")
+  const statuses = []
+  for (let i = 0; i < 2001; i++) {
+    const visitorId = `visitor-campus-${String(i).padStart(4, "0")}`
+    statuses.push((await POST(chatRequest({ message: "hi", visitorId }, { "x-forwarded-for": "10.8.8.8" }))).status)
+  }
+  assert.equal(statuses.filter((s) => s === 200).length, 2000) // a whole campus Wi-Fi gets 2,000 a day
+  assert.equal(statuses.at(-1), 429) // the daily network cap still stops abuse
 })
 
 test("AI chat: a Groq error or empty reply falls back cleanly", async () => {
@@ -95,4 +121,41 @@ test("AI chat: a Groq error or empty reply falls back cleanly", async () => {
   assert.equal((await POST(chatRequest({ message: "hi" }))).status, 502)
   fakeGroq("rate limited", 429)
   assert.equal((await POST(chatRequest({ message: "hi" }))).status, 502)
+})
+
+test("AI chat: when the main model is out of allowance, the second model answers", async () => {
+  process.env.GROQ_API_KEY = "test-key"
+  const calls = fakeGroqByModel({ "openai/gpt-oss-120b": 429 })
+  const res = await POST(chatRequest({ message: "hi" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(await res.json(), { reply: "from fallback" })
+  assert.deepEqual(calls, ["openai/gpt-oss-120b", "openai/gpt-oss-20b"])
+})
+
+test("AI chat: both models out of allowance falls back to the built-in replies", async () => {
+  process.env.GROQ_API_KEY = "test-key"
+  const calls = fakeGroqByModel({ "openai/gpt-oss-120b": 429, "openai/gpt-oss-20b": 429 })
+  assert.equal((await POST(chatRequest({ message: "hi" }))).status, 502)
+  assert.deepEqual(calls, ["openai/gpt-oss-120b", "openai/gpt-oss-20b"])
+})
+
+test("AI chat: a bad key isn't retried on the second model", async () => {
+  process.env.GROQ_API_KEY = "wrong-key"
+  const calls = fakeGroqByModel({ "openai/gpt-oss-120b": 401 })
+  assert.equal((await POST(chatRequest({ message: "hi" }))).status, 502)
+  assert.deepEqual(calls, ["openai/gpt-oss-120b"])
+})
+
+test("AI chat: when the store is Closed, the helper is told so", async () => {
+  process.env.GROQ_API_KEY = "test-key"
+  const calls = fakeGroq("We're unavailable at the moment.")
+  await POST(chatRequest({ message: "can I order now?", storeOpen: false }))
+  assert.match(calls[0].body.messages[0].content, /store is CLOSED/)
+})
+
+test("AI chat: markdown is stripped from replies", async () => {
+  process.env.GROQ_API_KEY = "test-key"
+  fakeGroq("Please tap **Talk to our Support Team** below")
+  const res = await POST(chatRequest({ message: "my order is late" }))
+  assert.deepEqual(await res.json(), { reply: "Please tap Talk to our Support Team below" })
 })
