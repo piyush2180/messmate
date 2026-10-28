@@ -111,6 +111,11 @@ export function fruitBowlCartItem(leftOut: string[]): CartItem {
  * Rebuilds a past order's items at today's prices so a reorder never reuses old prices.
  * Items no longer on the menu are dropped. Past orders come from the database, so nothing in them is trusted.
  */
+/** The fruits a bowl line leaves out, read back from the id fruitBowlCartItem gives it. */
+export function bowlLeftOut(id: string): string[] {
+  return id.startsWith("fruit-bowl") ? id.split("-no-").slice(1) : []
+}
+
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   return items.flatMap((item) => {
     const quantity = Math.max(1, Math.floor(Number(item?.quantity)) || 1)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { supabase } from "./lib/supabase"
 import type {
+  CounterSale,
   OrderRecord,
   OrderStatus,
   PaymentStatus,
@@ -21,23 +22,34 @@ const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT
 // "1 order" / "2 orders"
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-// Web Audio API Ding chime for incoming orders
-function playOrderChime() {
+// One shared audio context. Browsers keep it muted until someone taps the page once after loading.
+let audioCtx: AudioContext | null = null
+function getAudio(): AudioContext | null {
+  if (!audioCtx) {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext
+    if (Ctor) audioCtx = new Ctor()
+  }
+  return audioCtx
+}
+
+// Rising two-note ding for a new order; one softer note for a new chat message
+function playChime(kind: "order" | "message" = "order") {
+  const ctx = getAudio()
+  if (!ctx || ctx.state !== "running") return
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = "sine"
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime) // D5
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15) // A5
-    gain.gain.setValueAtTime(0.2, ctx.currentTime)
+    osc.frequency.setValueAtTime(kind === "order" ? 587.33 : 880, ctx.currentTime) // D5 / A5
+    if (kind === "order") osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15)
+    gain.gain.setValueAtTime(kind === "order" ? 0.2 : 0.12, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.start()
     osc.stop(ctx.currentTime + 0.6)
   } catch (err) {
-    console.warn("Audio chime not allowed yet:", err)
+    console.warn("Chime failed:", err)
   }
 }
 
@@ -133,7 +145,43 @@ export default function App() {
     }
     return []
   })
-  const [soundEnabled, setSoundEnabled] = useState(true)
+  const supportRef = useRef(supportMessages)
+  useEffect(() => {
+    supportRef.current = supportMessages
+  }, [supportMessages])
+  // True when a message isn't on screen yet (each one arrives by broadcast and again from the database)
+  const isNewMessage = (m: SupportMessage) =>
+    typeof m?.message === "string" && !supportRef.current.some((s) => s.id === m.id || isSameMessage(s, m))
+
+  // Sound needs one tap after every page load; any tap or key press turns it on
+  const [soundOn, setSoundOn] = useState(false)
+  useEffect(() => {
+    const ctx = getAudio()
+    if (!ctx) return
+    const sync = () => setSoundOn(ctx.state === "running")
+    const unlock = () => {
+      if (ctx.state !== "running") ctx.resume().then(sync).catch(() => {})
+    }
+    sync()
+    ctx.addEventListener("statechange", sync)
+    window.addEventListener("pointerdown", unlock)
+    window.addEventListener("keydown", unlock)
+    return () => {
+      ctx.removeEventListener("statechange", sync)
+      window.removeEventListener("pointerdown", unlock)
+      window.removeEventListener("keydown", unlock)
+    }
+  }, [])
+
+  // Connection state for the "connection lost" notice
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine))
+  const [liveOk, setLiveOk] = useState(true)
+
+  const [counterSales, setCounterSales] = useState<CounterSale[]>([])
+  const [counterSalesState, setCounterSalesState] = useState<"loading" | "ready" | "missing" | "error">("loading")
+  const [saleAmount, setSaleAmount] = useState("")
+  const [saleNote, setSaleNote] = useState("")
+  const [savingSale, setSavingSale] = useState(false)
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
   const [visitStatsState, setVisitStatsState] = useState<"loading" | "ready" | "missing" | "error">("loading")
   // Ticks every minute so "today" numbers and "Today, …" labels roll over at midnight
@@ -205,10 +253,9 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  // Initial Fetch & Realtime for Orders
-  useEffect(() => {
+  // Orders from the database. Also runs after a reconnect, so changes missed while offline show up.
+  const loadOrders = () => {
     if (!supabase) return
-
     supabase
       .from("orders")
       .select("*")
@@ -216,26 +263,35 @@ export default function App() {
       .then(({ data, error }) => {
         if (error) console.error("Failed to load orders:", error.message)
         setOrdersError(Boolean(error))
-        if (!error && data) {
-          try {
-            const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
-            const merged = (data as OrderRecord[]).map((o) => {
-              if (cachedRatings[o.id]) {
-                return {
+        if (error || !data) return
+        let fetched = data as OrderRecord[]
+        try {
+          const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
+          fetched = fetched.map((o) =>
+            cachedRatings[o.id]
+              ? {
                   ...o,
                   rating: o.rating ?? cachedRatings[o.id].rating,
                   rating_feedback: o.rating_feedback ?? cachedRatings[o.id].feedback,
                 }
-              }
-              return o
-            })
-            setOrders(merged)
-          } catch {
-            setOrders(data as OrderRecord[])
-          }
-        }
+              : o
+          )
+        } catch {}
+        // Keep orders that arrived live while this request was on its way
+        setOrders((prev) => {
+          const ids = new Set(fetched.map((o) => o.id))
+          const recent = prev.filter((o) => !ids.has(o.id) && Date.now() - new Date(o.created_at).getTime() < 60_000)
+          return [...recent, ...fetched]
+        })
       })
+  }
 
+  // Initial Fetch & Realtime for Orders
+  useEffect(() => {
+    if (!supabase) return
+    loadOrders()
+
+    let joined = false
     const ordersChannel = supabase
       .channel("admin_orders_channel")
       .on(
@@ -245,7 +301,7 @@ export default function App() {
           if (payload.eventType === "INSERT") {
             const newOrder = payload.new as OrderRecord
             setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)])
-            if (soundEnabled) playOrderChime()
+            playChime("order")
           } else if (payload.eventType === "UPDATE") {
             const updated = payload.new as OrderRecord
             setOrders((prev) =>
@@ -257,18 +313,20 @@ export default function App() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        setLiveOk(status === "SUBSCRIBED")
+        // Rejoined after the connection dropped: fetch whatever changed in between
+        if (status === "SUBSCRIBED" && joined) loadOrders()
+        if (status === "SUBSCRIBED") joined = true
+      })
 
     return () => {
       supabase?.removeChannel(ordersChannel)
     }
-  }, [soundEnabled])
+  }, [])
 
-  // Initial Fetch & Realtime for Support Messages
-  useEffect(() => {
+  const loadSupport = () => {
     if (!supabase) return
-
-    // 1. Fetch from database if table exists
     supabase
       .from("support_messages")
       .select("*")
@@ -289,6 +347,12 @@ export default function App() {
           })
         }
       })
+  }
+
+  // Initial Fetch & Realtime for Support Messages
+  useEffect(() => {
+    if (!supabase) return
+    loadSupport()
 
     // 2. Realtime Broadcast Channel (zero table needed, works instantly across web)
     const broadcastChannel = supabase.channel("messmate_support_broadcast", {
@@ -299,14 +363,13 @@ export default function App() {
       .on("broadcast", { event: "support_msg" }, ({ payload }) => {
         if (!payload || !payload.phone) return
         const newMsg = payload as SupportMessage
+        const fresh = isNewMessage(newMsg)
         setSupportMessages((prev) => {
           const next = mergeSupportMessages(prev, [newMsg])
           saveAdminSupportToLocal(next)
           return next
         })
-        if (soundEnabled && newMsg.sender === "customer") {
-          playOrderChime()
-        }
+        if (fresh && newMsg.sender === "customer") playChime("message")
       })
       .on("broadcast", { event: "order_rating" }, ({ payload }) => {
         if (payload?.orderId && payload?.rating) {
@@ -352,6 +415,7 @@ export default function App() {
       })
 
     // 3. Postgres changes if table exists
+    let pgJoined = false
     const pgChannel = supabase
       .channel("admin_support_pg_channel")
       .on(
@@ -359,23 +423,71 @@ export default function App() {
         { event: "INSERT", schema: "public", table: "support_messages" },
         (payload) => {
           const newMsg = payload.new as SupportMessage
+          const fresh = isNewMessage(newMsg)
           setSupportMessages((prev) => {
             const next = mergeSupportMessages(prev, [newMsg])
             saveAdminSupportToLocal(next)
             return next
           })
-          if (soundEnabled && newMsg.sender === "customer") {
-            playOrderChime()
-          }
+          if (fresh && newMsg.sender === "customer") playChime("message")
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED" && pgJoined) loadSupport()
+        if (status === "SUBSCRIBED") pgJoined = true
+      })
 
     return () => {
       supabase?.removeChannel(broadcastChannel)
       supabase?.removeChannel(pgChannel)
     }
-  }, [soundEnabled])
+  }, [])
+
+  // Counter sales staff typed in; also re-fetched after a reconnect
+  const loadCounterSales = () => {
+    if (!supabase) return
+    supabase
+      .from("counter_sales")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("Counter sales unavailable:", error.message)
+          // PGRST205 / 42P01: the counter_sales table hasn't been created yet
+          setCounterSalesState(error.code === "PGRST205" || error.code === "42P01" ? "missing" : "error")
+          return
+        }
+        setCounterSales((data as CounterSale[]).map((s) => ({ ...s, amount: Number(s.amount) })))
+        setCounterSalesState("ready")
+      })
+  }
+
+  useEffect(() => {
+    loadCounterSales()
+    const refresh = () => {
+      loadOrders()
+      loadSupport()
+      loadCounterSales()
+    }
+    const onOnline = () => {
+      setIsOnline(true)
+      refresh()
+    }
+    const onOffline = () => setIsOnline(false)
+    // A tablet waking up, or staff coming back from PhonePe: catch up on anything missed
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh()
+    }
+    window.addEventListener("online", onOnline)
+    window.addEventListener("offline", onOffline)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.removeEventListener("online", onOnline)
+      window.removeEventListener("offline", onOffline)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [])
 
   // Realtime & Sync for Menu Inventory
   useEffect(() => {
@@ -473,7 +585,11 @@ export default function App() {
           prev.map((o) => (o.id === orderId && o.status === nextStatus ? { ...o, status: previous } : o))
         )
       }
-      alert("Couldn't save the order status. Please check the connection and try again.")
+      alert(
+        nextStatus === "no_show" && (error.code === "23514" || error.code === "P0001")
+          ? "No-shows need the latest SQL in Supabase. Please run it first."
+          : "Couldn't save the order status. Please check the connection and try again."
+      )
     }
   }
 
@@ -524,6 +640,60 @@ export default function App() {
     }
   }
 
+  // UPI money sent back to the student (cancelled orders, or a no-show you chose to refund)
+  const handleMarkRefunded = async (orderId: string) => {
+    const before = orders.find((o) => o.id === orderId)
+    if (!before || !supabase) return
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, payment_status: "refunded" } : o)))
+    const { error } = await supabase.from("orders").update({ payment_status: "refunded" }).eq("id", orderId)
+    if (error) {
+      console.error("Failed to mark refunded:", error.message)
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, payment_status: before.payment_status } : o)))
+      alert(
+        error.code === "23514"
+          ? "Refunds need the latest SQL in Supabase. Please run it first."
+          : "Couldn't save the refund. Please check the connection and try again."
+      )
+    }
+  }
+
+  const handleAddCounterSale = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = Math.round(Number(saleAmount) * 100) / 100
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
+      alert("Enter an amount between ₹1 and ₹1,00,000.")
+      return
+    }
+    if (!supabase) return
+    setSavingSale(true)
+    const { data, error } = await supabase
+      .from("counter_sales")
+      .insert({ amount, note: saleNote.trim() || null })
+      .select()
+      .single()
+    setSavingSale(false)
+    if (error || !data) {
+      console.error("Counter sale not saved:", error?.message)
+      alert("Couldn't save the counter sale. Please try again.")
+      return
+    }
+    const saved = data as CounterSale
+    setCounterSales((prev) => [{ ...saved, amount: Number(saved.amount) }, ...prev])
+    setSaleAmount("")
+    setSaleNote("")
+  }
+
+  const handleRemoveCounterSale = async (sale: CounterSale) => {
+    if (!supabase || !confirm(`Remove the ₹${sale.amount} counter sale${sale.note ? ` (${sale.note})` : ""}?`)) return
+    const { error } = await supabase.from("counter_sales").delete().eq("id", sale.id)
+    if (error) {
+      console.error("Counter sale not removed:", error.message)
+      alert("Couldn't remove it. Please try again.")
+      return
+    }
+    setCounterSales((prev) => prev.filter((s) => s.id !== sale.id))
+  }
+
   // Filtered Orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -552,8 +722,21 @@ export default function App() {
 
   // KPI Calculations & Analytics Breakdown
   const stats = useMemo(
-    () => computeStats(orders, supportMessages, inventory, now),
-    [orders, supportMessages, inventory, now],
+    () => computeStats(orders, supportMessages, inventory, now, counterSales),
+    [orders, supportMessages, inventory, now, counterSales],
+  )
+  const todaysSales = useMemo(() => {
+    const startOfToday = new Date(now).setHours(0, 0, 0, 0)
+    return counterSales.filter((s) => new Date(s.created_at).getTime() >= startOfToday)
+  }, [counterSales, now])
+  // Latest student reviews, newest order first
+  const reviews = useMemo(
+    () =>
+      orders
+        .filter((o) => typeof o.rating === "number" && o.rating > 0)
+        .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())
+        .slice(0, 30),
+    [orders]
   )
 
   // Analytics charts use the same period as the money cards; cancelled orders are left out
@@ -757,6 +940,20 @@ export default function App() {
 
       {/* Main Content */}
       <main className="admin-main">
+        {!soundOn && (
+          <button
+            type="button"
+            className="admin-banner sound"
+            onClick={() => getAudio()?.resume().then(() => playChime("order")).catch(() => {})}
+          >
+            🔔 Tap here to turn on the new-order sound
+          </button>
+        )}
+        {(!isOnline || !liveOk) && (
+          <div className="admin-banner offline" role="status">
+            Connection lost. The board will refresh by itself as soon as it's back.
+          </div>
+        )}
         {/* KPI Ribbon */}
         <section className="kpi-grid">
           <div className="kpi-card">
@@ -850,6 +1047,8 @@ export default function App() {
                 { id: "preparing", label: "Preparing", count: orders.filter((o) => o.status === "preparing").length },
                 { id: "ready", label: "Ready", count: orders.filter((o) => o.status === "ready").length },
                 { id: "delivered", label: "Delivered", count: orders.filter((o) => o.status === "delivered").length },
+                { id: "cancelled", label: "Cancelled", count: orders.filter((o) => o.status === "cancelled").length },
+                { id: "no_show", label: "No-show", count: orders.filter((o) => o.status === "no_show").length },
               ].map((pill) => (
                 <button
                   key={pill.id}
@@ -951,6 +1150,7 @@ export default function App() {
                     order={order}
                     onUpdateStatus={handleUpdateStatus}
                     onVerifyPayment={handleVerifyPayment}
+                    onMarkRefunded={handleMarkRefunded}
                   />
                 ))}
               </div>
@@ -1226,7 +1426,11 @@ export default function App() {
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeCashRevenue : stats.todayCashRevenue).toLocaleString()}
                   </strong>
-                  <span>{plural(revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount, "handed-over order", "handed-over orders")}</span>
+                  <span>
+                    {plural(revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount, "handed-over order", "handed-over orders")}
+                    {(revenuePeriod === "all" ? stats.allTimeCounterSales : stats.todayCounterSales) > 0 &&
+                      ` + ${plural(revenuePeriod === "all" ? stats.allTimeCounterSales : stats.todayCounterSales, "counter sale", "counter sales")}`}
+                  </span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Delivery Fees</small>
@@ -1245,6 +1449,15 @@ export default function App() {
                   </strong>
                   <span>Unverified UPI + counter orders not handed over</span>
                 </div>
+                <div className="fin-metric-box">
+                  <small>Refunds Due</small>
+                  <strong>₹{stats.refundsDue.toLocaleString()}</strong>
+                  <span>
+                    {stats.refundsDueCount > 0
+                      ? `${plural(stats.refundsDueCount, "cancelled UPI order", "cancelled UPI orders")} to pay back`
+                      : "Nothing to refund"}
+                  </span>
+                </div>
                 <div className="fin-metric-box highlight">
                   <small>Total Collected</small>
                   <strong>
@@ -1252,11 +1465,80 @@ export default function App() {
                   </strong>
                   <span>
                     {revenuePeriod === "all"
-                      ? `${plural(stats.allTimeTotalOrders, "paid order", "paid orders")} (all time)`
-                      : `${plural(stats.todayUpiCount + stats.todayCashCount, "paid order", "paid orders")} today`}
+                      ? `${plural(stats.allTimeTotalOrders, "paid order", "paid orders")}${stats.allTimeCounterSales ? ` + ${plural(stats.allTimeCounterSales, "counter sale", "counter sales")}` : ""} (all time)`
+                      : `${plural(stats.todayUpiCount + stats.todayCashCount, "paid order", "paid orders")}${stats.todayCounterSales ? ` + ${plural(stats.todayCounterSales, "counter sale", "counter sales")}` : ""} today`}
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Payments taken at the counter without an app order */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <div>
+                  <span>Counter Sales</span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    Cash or soundbox payments taken without an app order. They add into Paid at Counter.
+                  </div>
+                </div>
+              </div>
+              {counterSalesState === "missing" ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>
+                  Run the counter_sales SQL in Supabase to start adding counter sales.
+                </p>
+              ) : (
+                <>
+                  <form className="counter-sale-form" onSubmit={handleAddCounterSale}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      step="any"
+                      placeholder="Amount (₹)"
+                      aria-label="Amount in rupees"
+                      value={saleAmount}
+                      onChange={(e) => setSaleAmount(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      maxLength={200}
+                      placeholder="Note (optional), e.g. 2 mango pickles"
+                      aria-label="Note"
+                      value={saleNote}
+                      onChange={(e) => setSaleNote(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      className="action-btn primary"
+                      disabled={savingSale || !saleAmount}
+                      style={{ flex: "0 0 auto", padding: "10px 20px" }}
+                    >
+                      {savingSale ? "Adding…" : "Add"}
+                    </button>
+                  </form>
+                  {counterSalesState === "error" && (
+                    <p style={{ fontSize: 12, color: "var(--red)", margin: "10px 0 0" }}>
+                      Couldn't load counter sales. Reload the page to try again.
+                    </p>
+                  )}
+                  {todaysSales.length === 0 ? (
+                    <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>No counter sales added today.</p>
+                  ) : (
+                    <ul className="counter-sale-list">
+                      {todaysSales.map((sale) => (
+                        <li key={sale.id}>
+                          <strong>₹{sale.amount.toLocaleString()}</strong>
+                          <span>{sale.note || "Counter sale"}</span>
+                          <small>{formatWhen(sale.created_at)}</small>
+                          <button type="button" className="action-btn-small flag-btn" onClick={() => handleRemoveCounterSale(sale)}>
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="analytics-card">
@@ -1315,6 +1597,45 @@ export default function App() {
                 )
               })}
             </div>
+
+            {/* What students said when rating their orders */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <div>
+                  <span>Reviews</span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    {stats.ratedCount > 0
+                      ? `${stats.avgRating} average from ${plural(stats.ratedCount, "review", "reviews")}`
+                      : "No reviews yet"}
+                  </div>
+                </div>
+              </div>
+              {reviews.length === 0 ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>
+                  Students can rate an order in Track Orders once it's delivered.
+                </p>
+              ) : (
+                <ul className="review-list">
+                  {reviews.map((o) => {
+                    const stars = Math.max(0, Math.min(5, Math.round(o.rating || 0)))
+                    return (
+                      <li key={o.id}>
+                        <div className="review-top">
+                          <span className="review-stars" aria-label={`${stars} out of 5 stars`}>
+                            {"★".repeat(stars)}
+                            {"☆".repeat(5 - stars)}
+                          </span>
+                          <small>
+                            #{o.order_number} · {o.customer_name} · {formatWhen(o.created_at)}
+                          </small>
+                        </div>
+                        <p>{o.rating_feedback ? `"${o.rating_feedback}"` : "No written feedback"}</p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -1327,10 +1648,12 @@ function OrderCard({
   order,
   onUpdateStatus,
   onVerifyPayment,
+  onMarkRefunded,
 }: {
   order: OrderRecord
   onUpdateStatus: (id: string, next: OrderStatus) => void
   onVerifyPayment: (id: string, verified: boolean) => void
+  onMarkRefunded: (id: string) => void
 }) {
   const [copiedUtr, setCopiedUtr] = useState(false)
   const utrMatch = order.payment_method?.match(/UTR:\s*([A-Za-z0-9]+)/i)
@@ -1357,6 +1680,20 @@ function OrderCard({
     ready: { label: "Ready", cls: "ready" },
     delivered: { label: "Delivered", cls: "delivered" },
     cancelled: { label: "Cancelled", cls: "cancelled" },
+    no_show: { label: "No-show", cls: "cancelled" },
+  }
+
+  // One wrong tap shouldn't cancel an order, so these ask first
+  const cancel = () => {
+    if (confirm(`Cancel order #${order.order_number}? The student will see it as cancelled.`)) onUpdateStatus(order.id, "cancelled")
+  }
+  const markNoShow = () => {
+    if (confirm(`Mark order #${order.order_number} as not collected (no-show)?`)) onUpdateStatus(order.id, "no_show")
+  }
+  const markRefunded = () => {
+    if (confirm(`Mark ₹${order.total} as refunded for order #${order.order_number}? Do this after you've sent the money back.`)) {
+      onMarkRefunded(order.id)
+    }
   }
   const st = statusMap[order.status] || { label: order.status, cls: "placed" }
 
@@ -1479,7 +1816,7 @@ function OrderCard({
       </div>
 
       {/* UPI Payment Verification Buttons */}
-      {isUpi && order.status !== "cancelled" && (
+      {isUpi && order.status !== "cancelled" && order.payment_status !== "refunded" && (
         <div className="payment-verify-actions">
           {!isVerified && (
             <button
@@ -1543,34 +1880,40 @@ function OrderCard({
             >
               Start Kitchen Prep →
             </button>
-            <button
-              type="button"
-              className="action-btn secondary cancel-touch-btn"
-              onClick={() => onUpdateStatus(order.id, "cancelled")}
-            >
+            <button type="button" className="action-btn secondary cancel-touch-btn" onClick={cancel}>
               Cancel
             </button>
           </>
         )}
 
         {order.status === "preparing" && (
-          <button
-            type="button"
-            className="action-btn green main-touch-btn"
-            onClick={() => onUpdateStatus(order.id, "ready")}
-          >
-            Mark Ready for Pickup / Drop
-          </button>
+          <>
+            <button
+              type="button"
+              className="action-btn green main-touch-btn"
+              onClick={() => onUpdateStatus(order.id, "ready")}
+            >
+              Mark Ready for Pickup / Drop
+            </button>
+            <button type="button" className="action-btn secondary cancel-touch-btn" onClick={cancel}>
+              Cancel
+            </button>
+          </>
         )}
 
         {order.status === "ready" && (
-          <button
-            type="button"
-            className="action-btn primary main-touch-btn"
-            onClick={() => onUpdateStatus(order.id, "delivered")}
-          >
-            Complete & Mark Delivered
-          </button>
+          <>
+            <button
+              type="button"
+              className="action-btn primary main-touch-btn"
+              onClick={() => onUpdateStatus(order.id, "delivered")}
+            >
+              Complete & Mark Delivered
+            </button>
+            <button type="button" className="action-btn secondary cancel-touch-btn" onClick={markNoShow}>
+              No-show
+            </button>
+          </>
         )}
 
         {order.status === "delivered" && (
@@ -1584,6 +1927,24 @@ function OrderCard({
             <span>Order Cancelled</span>
           </div>
         )}
+
+        {order.status === "no_show" && (
+          <div className="order-cancelled-banner">
+            <span>Not collected (no-show)</span>
+          </div>
+        )}
+
+        {/* UPI money on an order that never went out: refund it (or keep it, for a no-show) */}
+        {(order.status === "cancelled" || order.status === "no_show") &&
+          isUpi &&
+          (isVerified || order.payment_status === "refunded") &&
+          (order.payment_status === "refunded" ? (
+            <span className="verified-confirm-text">₹{order.total} refunded to the student</span>
+          ) : (
+            <button type="button" className="action-btn secondary" onClick={markRefunded}>
+              {order.status === "cancelled" ? `Refund due ₹${order.total} · Mark refunded` : `Paid ₹${order.total} · Mark refunded`}
+            </button>
+          ))}
       </div>
     </div>
   )

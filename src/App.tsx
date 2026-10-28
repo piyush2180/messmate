@@ -5,6 +5,7 @@ import {
   DEFAULT_MENU_ITEMS,
   FRUIT_BOWL_NAME,
   FRUIT_BOWL_PRICE,
+  bowlLeftOut,
   fruitBowlCartItem,
   getPickupPin,
   packOptions,
@@ -60,10 +61,10 @@ type OrderRecord = {
   delivery_fee: number
   total: number
   payment_method: string
-  status: "placed" | "preparing" | "ready" | "delivered" | "cancelled"
+  status: "placed" | "preparing" | "ready" | "delivered" | "cancelled" | "no_show"
   created_at: string
   pickup_code?: string
-  payment_status?: "pending" | "verified" | "rejected"
+  payment_status?: "pending" | "verified" | "rejected" | "refunded"
   rating?: number
   rating_feedback?: string
 }
@@ -123,6 +124,29 @@ const PICKUP_POINTS = [
 // Support messages are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = `${BRAND} Support Team`
 const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
+const SLOTS = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
+
+// Admin stock names for each fruit (older menus used longer names)
+const fruitSoldOut = (name: string, soldOut: Set<string>) =>
+  soldOut.has(name) ||
+  soldOut.has(`Fresh ${name}`) ||
+  soldOut.has(`Sweet ${name}`) ||
+  soldOut.has(`Robusta ${name}`) ||
+  (name === "Pomegranate" && soldOut.has("Pomegranate Pearls")) ||
+  (name === "Orange" && soldOut.has("Nagpur Orange")) ||
+  (name === "Guava" && soldOut.has("Pink Guava")) ||
+  (name === "Grapes" && soldOut.has("Black Grapes")) ||
+  (name === "Pineapple" && soldOut.has("Queen Pineapple"))
+
+// Why a cart line can't be ordered right now, or null when it can
+function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
+  if (soldOut.has(item.name)) return "Sold out. Remove it to continue."
+  if (item.kind !== "fruit") return null
+  const leftOut = bowlLeftOut(item.id)
+  const gone = fruits.map((f) => f.name).filter((name) => !leftOut.includes(name) && fruitSoldOut(name, soldOut))
+  return gone.length ? `${gone.join(", ")} just sold out. Remove this bowl and add it again.` : null
+}
+
 // Messages saved before the rename still mention the old name in their text
 const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT_NAME).replace(/MessMate/g, BRAND)
 
@@ -962,18 +986,7 @@ function FruitBuilder({
 }) {
   const [leftOut, setLeftOut] = useState<string[]>([])
 
-  const isFruitSoldOut = (name: string) =>
-    Boolean(
-      soldOutItems?.has(name) ||
-        soldOutItems?.has(`Fresh ${name}`) ||
-        soldOutItems?.has(`Sweet ${name}`) ||
-        soldOutItems?.has(`Robusta ${name}`) ||
-        (name === "Pomegranate" && soldOutItems?.has("Pomegranate Pearls")) ||
-        (name === "Orange" && soldOutItems?.has("Nagpur Orange")) ||
-        (name === "Guava" && soldOutItems?.has("Pink Guava")) ||
-        (name === "Grapes" && soldOutItems?.has("Black Grapes")) ||
-        (name === "Pineapple" && soldOutItems?.has("Queen Pineapple")),
-    )
+  const isFruitSoldOut = (name: string) => fruitSoldOut(name, soldOutItems ?? new Set())
 
   // Sold-out fruits count as left out, so the order tells the kitchen exactly what goes in.
   const skipped = fruits
@@ -1165,12 +1178,15 @@ function Cart({
   updateQuantity,
   remove,
   go,
+  soldOutItems,
 }: {
   items: CartItem[]
   updateQuantity: (id: string, quantity: number) => void
   remove: (id: string) => void
   go: (screen: Screen) => void
+  soldOutItems: Set<string>
 }) {
+  const blocked = items.some((item) => soldOutNote(item, soldOutItems))
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
@@ -1226,6 +1242,9 @@ function Cart({
                       </span>
                       <h3>{item.name}</h3>
                       <p>{item.detail}</p>
+                      {soldOutNote(item, soldOutItems) && (
+                        <p className="cart-sold-out">{soldOutNote(item, soldOutItems)}</p>
+                      )}
                       <div className="cart-controls">
                         <Quantity
                           value={item.quantity}
@@ -1269,8 +1288,8 @@ function Cart({
                   <strong>₹{subtotal}</strong>
                 </div>
                 <div className="desktop-cart-cta">
-                  <PrimaryButton onClick={() => go("checkout")}>
-                    Go to checkout
+                  <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
+                    {blocked ? "Remove sold-out items" : "Go to checkout"}
                   </PrimaryButton>
                 </div>
               </div>
@@ -1298,8 +1317,8 @@ function Cart({
             <small>Total</small>
             <strong>₹{subtotal}</strong>
           </div>
-          <PrimaryButton onClick={() => go("checkout")}>
-            Go to checkout
+          <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
+            {blocked ? "Remove sold-out items" : "Go to checkout"}
           </PrimaryButton>
         </BottomBar>
       )}
@@ -1573,7 +1592,7 @@ function Fulfilment({
   pickupPoint: string
   setPickupPoint: (value: string) => void
 }) {
-  const slots = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
+  const slots = SLOTS
 
   const slotPicker = (heading: string) => (
     <div className="time-section">
@@ -1721,13 +1740,16 @@ function Payment({
   fulfilment,
   onPay,
   isSubmitting,
+  soldOutItems,
 }: {
   go: (screen: Screen) => void
   items: CartItem[]
   fulfilment: "pickup" | "delivery"
   onPay: (method: "upi" | "counter", utr?: string) => void
   isSubmitting: boolean
+  soldOutItems: Set<string>
 }) {
+  const blocked = items.some((item) => soldOutNote(item, soldOutItems))
   // Same calculation handlePay uses, so the amount shown is the amount saved.
   const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
@@ -1774,7 +1796,7 @@ function Payment({
   }
 
   const handleSubmit = () => {
-    if (isSubmitting || items.length === 0) return
+    if (isSubmitting || items.length === 0 || blocked) return
     onPay(method, utr)
   }
 
@@ -1943,6 +1965,9 @@ function Payment({
                   <span>
                     <strong>{item.name}</strong>
                     <small>{item.detail}</small>
+                    {soldOutNote(item, soldOutItems) && (
+                      <small className="cart-sold-out">{soldOutNote(item, soldOutItems)}</small>
+                    )}
                   </span>
                   <strong>₹{item.price * item.quantity}</strong>
                 </div>
@@ -1962,8 +1987,10 @@ function Payment({
                 </div>
               </div>
               <div className="desktop-payment-cta">
-                <PrimaryButton disabled={isSubmitting || items.length === 0} onClick={handleSubmit}>
-                  {isSubmitting
+                <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
+                  {blocked
+                    ? "Remove sold-out items"
+                    : isSubmitting
                     ? "Placing order..."
                     : method === "upi"
                     ? `I've Paid ₹${total} — Place Order`
@@ -1979,8 +2006,10 @@ function Payment({
           <small>Total</small>
           <strong>₹{total}</strong>
         </div>
-        <PrimaryButton disabled={isSubmitting || items.length === 0} onClick={handleSubmit}>
-          {isSubmitting
+        <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
+          {blocked
+            ? "Remove sold-out items"
+            : isSubmitting
             ? "Placing order..."
             : method === "upi"
             ? `I've Paid ₹${total} — Place Order`
@@ -2570,23 +2599,36 @@ function OrdersPage({
                           : "Ready for Pickup")}
                       {order.status === "delivered" && "Delivered"}
                       {order.status === "cancelled" && "Order Cancelled"}
+                      {order.status === "no_show" && "Not Collected"}
                     </span>
                   </div>
 
-                  {order.status === "cancelled" ? (
+                  {order.status === "cancelled" || order.status === "no_show" ? (
                     <div className="order-cancelled-notice-card">
                       <div className="cancelled-card-top">
                         <span className="cancelled-card-icon">
                           <Icon name="close" size={16} />
                         </span>
                         <div>
-                          <strong>Order Cancelled by Kitchen</strong>
-                          <p>This order has been cancelled and will not be prepared or delivered.</p>
+                          <strong>{order.status === "no_show" ? "Not Collected" : "Order Cancelled by Kitchen"}</strong>
+                          <p>
+                            {order.status === "no_show"
+                              ? "This order was ready but wasn't picked up."
+                              : "This order has been cancelled and will not be prepared or delivered."}
+                          </p>
                         </div>
                       </div>
                       <div className="cancelled-card-refund">
                         <span>
-                          If you transferred payment via UPI, your refund will be processed or you can contact the <strong>{SUPPORT_NAME}</strong> for instant verification.
+                          {order.payment_status === "refunded" ? (
+                            <>Your UPI payment of ₹{order.total} has been refunded.</>
+                          ) : order.status === "no_show" ? (
+                            <>Questions about this order? Chat with the <strong>{SUPPORT_NAME}</strong>.</>
+                          ) : (
+                            <>
+                              If you transferred payment via UPI, your refund will be processed or you can contact the <strong>{SUPPORT_NAME}</strong> for instant verification.
+                            </>
+                          )}
                         </span>
                         <button
                           type="button"
@@ -2694,7 +2736,9 @@ function OrdersPage({
                           <strong style={{ textTransform: "uppercase" }}>
                             {order.payment_method}
                           </strong>
-                          {order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]") ? (
+                          {order.payment_status === "refunded" ? (
+                            <span className="pay-verify-badge neutral">Refunded</span>
+                          ) : order.payment_status === "verified" || order.payment_method?.includes("[VERIFIED]") ? (
                             <span className="pay-verify-badge success">Payment Verified</span>
                           ) : order.payment_status === "rejected" || order.payment_method?.includes("[FAILED]") ? (
                             <span className="pay-verify-badge danger">Verification Issue</span>
@@ -3614,12 +3658,46 @@ function SupportChatWidget({
   )
 }
 
+const SCREENS: Screen[] = ["home", "pickles", "pickle-detail", "fruit-builder", "cart", "checkout", "fulfilment", "payment", "confirmation", "orders"]
+// Steps that only make sense with something in the cart
+const NEEDS_CART: Screen[] = ["cart", "checkout", "fulfilment", "payment"]
+const SESSION_KEY = "ht_session"
+const SESSION_MAX_AGE = 6 * 60 * 60 * 1000 // an old cart from yesterday shouldn't come back
+
+type SavedSession = {
+  screen: Screen
+  cart: CartItem[]
+  selectedProduct: string
+  fulfilment: "pickup" | "delivery"
+  pickupPoint: string
+  slot: string
+  savedAt: number
+}
+
+// Cart and checkout step from before a reload (phones often reload the tab after paying in a UPI app)
+function restoreSession() {
+  const saved = safeStorage.getJson<Partial<SavedSession> | null>(SESSION_KEY, null)
+  const fresh = saved && typeof saved.savedAt === "number" && Date.now() - saved.savedAt < SESSION_MAX_AGE ? saved : {}
+  const cart = repriceForReorder(Array.isArray(fresh.cart) ? fresh.cart : [])
+  let screen: Screen = fresh.screen && SCREENS.includes(fresh.screen) ? fresh.screen : "home"
+  if (screen === "confirmation" || (NEEDS_CART.includes(screen) && cart.length === 0)) screen = "home"
+  return {
+    screen,
+    cart,
+    selectedProduct: pickleProducts.find((p) => p.name === fresh.selectedProduct)?.name ?? pickleProducts[0].name,
+    fulfilment: fresh.fulfilment === "delivery" ? ("delivery" as const) : ("pickup" as const),
+    pickupPoint: PICKUP_POINTS.find((p) => p.name === fresh.pickupPoint)?.name ?? PICKUP_POINTS[0].name,
+    slot: fresh.slot && SLOTS.includes(fresh.slot) ? fresh.slot : "8:30–9:00 PM",
+  }
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("home")
+  const [restored] = useState(restoreSession)
+  const [screen, setScreen] = useState<Screen>(restored.screen)
 
-  const [selectedProduct, setSelectedProduct] = useState(pickleProducts[0].name)
+  const [selectedProduct, setSelectedProduct] = useState(restored.selectedProduct)
 
-  const [cart, setCart] = useState<CartItem[]>([])
+  const [cart, setCart] = useState<CartItem[]>(restored.cart)
 
   const [details, setDetails] = useState<CustomerDetails>(() => ({
     name: safeStorage.getItem("messmate_customer_name", "") || "",
@@ -3629,10 +3707,35 @@ export default function App() {
     room: (safeStorage.getItem("messmate_room", "") || "").replace(/\D/g, ""),
   }))
 
-  const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">("pickup")
-  const [pickupPoint, setPickupPoint] = useState(PICKUP_POINTS[0].name)
+  const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">(restored.fulfilment)
+  const [pickupPoint, setPickupPoint] = useState(restored.pickupPoint)
 
-  const [slot, setSlot] = useState("8:30–9:00 PM")
+  const [slot, setSlot] = useState(restored.slot)
+
+  useEffect(() => {
+    safeStorage.setJson(SESSION_KEY, { screen, cart, selectedProduct, fulfilment, pickupPoint, slot, savedAt: Date.now() })
+  }, [screen, cart, selectedProduct, fulfilment, pickupPoint, slot])
+
+  // The phone's Back button steps back through the screens instead of leaving the site
+  const cartRef = useRef(cart)
+  useEffect(() => {
+    cartRef.current = cart
+  }, [cart])
+  useEffect(() => {
+    window.history.replaceState({ screen: restored.screen }, "")
+    const onPop = (e: PopStateEvent) => {
+      let target: Screen = SCREENS.includes(e.state?.screen) ? e.state.screen : "home"
+      // After an order the cart is empty, so Back lands on Home instead of the payment page again
+      if (target === "confirmation" || (NEEDS_CART.includes(target) && cartRef.current.length === 0)) {
+        target = "home"
+        window.history.replaceState({ screen: target }, "")
+      }
+      setScreen(target)
+      window.scrollTo({ top: 0, behavior: "instant" })
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
 
   const [orderNumber, setOrderNumber] = useState<number | string>(1048)
   const [orderPin, setOrderPin] = useState<string>("1048")
@@ -3831,6 +3934,7 @@ export default function App() {
   const go = (next: Screen) => {
     if (next === "home" && screen === "confirmation") setCart([])
 
+    if (next !== screen) window.history.pushState({ screen: next }, "")
     setScreen(next)
 
     window.scrollTo({ top: 0, behavior: "instant" })
@@ -3886,6 +3990,11 @@ export default function App() {
     }
     if (!supabase) {
       alert("Ordering isn't available right now, so your order was not placed. If you already paid, please tap Support to reach us.")
+      return
+    }
+    if (cart.some((item) => soldOutNote(item, soldOutItems))) {
+      alert("Something in your cart just sold out, so the order wasn't placed. Please remove it and try again.")
+      go("cart")
       return
     }
     setIsSubmitting(true)
@@ -4125,6 +4234,7 @@ export default function App() {
               setCart((current) => current.filter((item) => item.id !== id))
             }
             go={go}
+            soldOutItems={soldOutItems}
           />
         )}
         {screen === "checkout" && (
@@ -4155,6 +4265,7 @@ export default function App() {
             fulfilment={fulfilment}
             onPay={handlePay}
             isSubmitting={isSubmitting}
+            soldOutItems={soldOutItems}
           />
         )}
         {screen === "confirmation" && (

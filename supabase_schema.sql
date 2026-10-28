@@ -19,7 +19,7 @@ create table if not exists public.orders (
   delivery_fee numeric not null default 0,
   total numeric not null,
   payment_method text not null,
-  status text not null default 'placed' check (status in ('placed', 'preparing', 'ready', 'delivered', 'cancelled')),
+  status text not null default 'placed' check (status in ('placed', 'preparing', 'ready', 'delivered', 'cancelled', 'no_show')),
   created_at timestamptz default now()
 );
 
@@ -44,7 +44,21 @@ alter table public.orders drop constraint if exists chk_orders_valid_rating;
 alter table public.orders add constraint chk_orders_valid_rating check (rating is null or (rating >= 1 and rating <= 5));
 
 alter table public.orders drop constraint if exists chk_orders_payment_status;
-alter table public.orders add constraint chk_orders_payment_status check (payment_status is null or payment_status in ('pending', 'verified', 'rejected'));
+alter table public.orders add constraint chk_orders_payment_status check (payment_status is null or payment_status in ('pending', 'verified', 'rejected', 'refunded'));
+
+-- 'no_show': ready but never collected. Replaces whichever status check an older setup created.
+do $$
+declare c record;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.orders'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) like '%status%' and pg_get_constraintdef(oid) not like '%payment_status%'
+  loop
+    execute format('alter table public.orders drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table public.orders add constraint orders_status_check check (status in ('placed', 'preparing', 'ready', 'delivered', 'cancelled', 'no_show'));
 
 -- Defensive cleanup: Pad any historical test rows with short phones before applying constraint
 update public.orders 
@@ -63,7 +77,7 @@ begin
     raise exception 'Security violation: Cannot alter order items, subtotal, total, or order number after placement';
   end if;
   -- Ensure status only moves through valid states
-  if new.status not in ('placed', 'preparing', 'ready', 'delivered', 'cancelled') then
+  if new.status not in ('placed', 'preparing', 'ready', 'delivered', 'cancelled', 'no_show') then
     raise exception 'Security violation: Invalid status transition';
   end if;
   return new;
@@ -249,3 +263,26 @@ $$;
 
 revoke all on function public.visit_stats() from public;
 grant execute on function public.visit_stats() to anon, authenticated;
+
+-- ============================================================================
+-- 7. Counter Sales (admin Analytics → Counter Sales)
+-- Payments staff take at the counter without an app order; added into Paid at Counter.
+-- ============================================================================
+create table if not exists public.counter_sales (
+  id uuid primary key default gen_random_uuid(),
+  amount numeric not null check (amount > 0 and amount <= 100000),
+  note text check (note is null or length(note) <= 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_counter_sales_created_at on public.counter_sales (created_at desc);
+
+alter table public.counter_sales enable row level security;
+
+drop policy if exists "Staff can view counter sales" on public.counter_sales;
+create policy "Staff can view counter sales" on public.counter_sales for select using (true);
+drop policy if exists "Staff can add counter sales" on public.counter_sales;
+create policy "Staff can add counter sales" on public.counter_sales for insert with check (amount > 0);
+drop policy if exists "Staff can remove counter sales" on public.counter_sales;
+create policy "Staff can remove counter sales" on public.counter_sales for delete using (true);
+
+grant select, insert, delete on public.counter_sales to anon, authenticated;

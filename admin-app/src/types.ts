@@ -13,9 +13,10 @@ export type OrderStatus =
   | "ready"
   | "delivered"
   | "cancelled"
+  | "no_show" // ready but never collected
 
 // Must match the orders.payment_status CHECK constraint in supabase_schema.sql
-export type PaymentStatus = "pending" | "verified" | "rejected"
+export type PaymentStatus = "pending" | "verified" | "rejected" | "refunded"
 
 export type OrderRecord = {
   id: string
@@ -65,4 +66,12 @@ export type VisitStats = {
   week_visitors: number
   total_visits: number
   total_visitors: number
+}
+
+// A payment staff typed in at the counter (walk-in sale, not an app order)
+export type CounterSale = {
+  id: string
+  amount: number
+  note: string | null
+  created_at: string
 }

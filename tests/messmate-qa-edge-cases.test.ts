@@ -21,6 +21,7 @@ import {
   pickleProducts,
   packOptions,
   pickleCartItem,
+  bowlLeftOut,
   fruitBowlCartItem,
   repriceForReorder,
   type CartItem,
@@ -700,4 +701,8 @@ test("Support Chat - detects rapid burst spamming", () => {
   assert.equal(isChatRateLimited(normalInterval, 5000, 4), false)
 })
 
-
+test("Fruit bowl cart lines remember which fruits were left out", () => {
+  assert.deepEqual(bowlLeftOut(fruitBowlCartItem([]).id), [])
+  assert.deepEqual(bowlLeftOut(fruitBowlCartItem(["Banana", "Apple"]).id), ["Apple", "Banana"])
+  assert.deepEqual(bowlLeftOut("pickle-Mango Pickle (Avakaya)-50g"), [])
+})

@@ -79,3 +79,26 @@ test("Admin support badge counts only chats still waiting for a reply", () => {
   ]
   assert.equal(computeStats([], messages, [], now).pendingCallbacks, 1)
 })
+
+test("Admin money handles no-shows, refunds and counter sales added by hand", () => {
+  const orders = [
+    order({ id: "no-show-counter", status: "no_show", total: 50 }), // never paid, never collected
+    order({ id: "no-show-upi", upi: true, pay: "verified", status: "no_show", total: 80 }), // paid: kept unless refunded
+    order({ id: "cancelled-upi", upi: true, pay: "verified", status: "cancelled", total: 60 }), // money to give back
+    order({ id: "refunded", upi: true, pay: "refunded", status: "cancelled", total: 90 }), // already given back
+  ]
+  const sale = (amount: number, at: string): any => ({ id: `sale-${amount}`, amount, note: null, created_at: at })
+  const sales = [sale(40, today(18)), sale(25, today(19)), sale(100, yesterday)]
+  const s = computeStats(orders, [], [], now, sales)
+
+  assert.equal(s.todayUpiRevenue, 80)
+  assert.equal(s.todayCashRevenue, 65) // the two counter sales typed in today
+  assert.equal(s.todayUpiRevenue + s.todayCashRevenue, s.revenue)
+  assert.equal(s.revenue, 145)
+  assert.equal(s.allTimeRevenue, 245) // plus yesterday's ₹100 sale
+  assert.equal(s.toCollectToday, 0) // no-shows and cancelled orders aren't money still to come
+  assert.equal(s.refundsDue, 60)
+  assert.equal(s.refundsDueCount, 1)
+  assert.equal(s.todayCounterSales, 2)
+  assert.equal(s.active, 0)
+})
