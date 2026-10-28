@@ -1873,3 +1873,84 @@ button, input, select, textarea {
   /* On the Support tab the reply box matters more than the summary cards */
   .admin-main.tab-support .kpi-grid { display: none; }
 }
+
+/* Staff login */
+.login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  display: grid;
+  gap: 14px;
+  padding: 28px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.login-card .brand-logo { height: 76px; width: auto; margin: 0 auto; }
+.login-card h1 { margin: 0; font-size: 20px; color: var(--text); }
+.login-card p { margin: 0; font-size: 13px; color: var(--muted); }
+.login-card label { display: grid; gap: 6px; text-align: left; font-size: 13px; font-weight: 600; color: var(--text); }
+.login-card input {
+  padding: 11px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* no zoom-in on iPhones */
+}
+.login-card .login-error { color: var(--red); font-weight: 600; }
+.logout-btn {
+  margin-left: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logout-btn:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* ---- Phone and tablet fixes ---- */
+/* The refund button / refunded note get their own full-width row under the banner */
+.card-action-buttons { flex-wrap: wrap; }
+.card-action-buttons .refund-action { flex: 1 1 100%; }
+/* The reply box shrinks so Send stays on screen on small phones */
+.thread-reply-input { min-width: 0; }
+/* Card header: PIN and time each stay on one line */
+.card-top-bar { flex-wrap: wrap; row-gap: 6px; }
+.pickup-pin-pill, .order-time-text { white-space: nowrap; }
+/* "Connection lost" stays visible wherever the board is scrolled */
+.admin-banner.offline { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 1000; margin: 0; box-shadow: var(--shadow-lg); }
+/* On Support the reply box matters more than the summary cards, at every size */
+.admin-main.tab-support .kpi-grid { display: none; }
+/* Stars and score on one line, feedback below */
+.order-rating-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.order-rating-box .rating-comment { flex-basis: 100%; margin: 2px 0 0; }
+/* Refunded looks different from verified; flagged orders stand out */
+.verify-badge.refunded { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.order-card-mobile.flagged { border-color: var(--red); }
+/* Cards in a row keep their own height */
+.orders-feed-grid { align-items: start; }
+
+@media (max-width: 768px) {
+  /* Bigger targets for the money buttons */
+  .action-btn-small { min-height: 40px; }
+  .utr-inline-badge { min-height: 36px; }
+  .revenue-toggle-btn { min-height: 32px; }
+  .mobile-back-to-inbox { min-width: 40px; min-height: 40px; }
+  /* The six money boxes as two columns instead of one long stack */
+  .analytics-financial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  /* Tablet portrait: 2x2 summary cards and labels that don't break */
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-tab-btn, .brand-title, .brand-pill { white-space: nowrap; }
+}

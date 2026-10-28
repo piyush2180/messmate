@@ -356,8 +356,8 @@ test("FAQ Bot - resolves delivery and timing queries", () => {
 
 test("FAQ Bot - resolves pickup location queries", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
-  assert.match(reply, /Kalam \(Room 341\)/)
-  assert.match(reply, /Asima \(Room 110\)/)
+  assert.match(reply, /Kalam Room-341/)
+  assert.match(reply, /Asima - 110/)
   assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
 })
 
@@ -741,7 +741,7 @@ test("FAQ Bot - common student questions get the right instant answer", () => {
   assert.match(getFaqResponse("mango pickle ka rate kya hai"), price)
   assert.match(getFaqResponse("what is the rate"), price)
   assert.match(getFaqResponse("chicken pickle kitne ka hai"), /₹70/)
-  assert.match(getFaqResponse("cash on delivery?"), /Pay at Counter/)
+  assert.match(getFaqResponse("cash on delivery?"), /runner on room delivery/)
   assert.match(getFaqResponse("upi payment failed but money deducted"), /Support Team/)
   assert.match(getFaqResponse("refund"), /sort it out/)
   assert.match(getFaqResponse("my order is late"), /Track Orders/)

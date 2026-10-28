@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react"
+import type { Session } from "@supabase/supabase-js"
 import { supabase } from "./lib/supabase"
 import type {
   CounterSale,
@@ -80,9 +81,6 @@ const isValidMessage = (m: any): m is SupportMessage =>
   typeof m.sender === "string" &&
   typeof m.created_at === "string" &&
   (m.customer_name == null || typeof m.customer_name === "string")
-// A real 1–5 star rating with optional text feedback
-const isValidRating = (rating: unknown, feedback: unknown) =>
-  Number.isInteger(rating) && (rating as number) >= 1 && (rating as number) <= 5 && (feedback == null || typeof feedback === "string")
 
 // Ids the apps give a message before the database assigns its own
 const isLocalId = (id: unknown) => /^(msg|local|admin|ack)-/.test(String(id))
@@ -134,7 +132,78 @@ function mergeSupportMessages(
   )
 }
 
+// Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
+  useEffect(() => {
+    if (!supabase) {
+      setSession(null)
+      return
+    }
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
+    return () => data.subscription.unsubscribe()
+  }, [])
+  if (session === undefined) return null
+  if (!session) return <StaffLogin />
+  return <Dashboard onLogout={() => supabase?.auth.signOut()} />
+}
+
+function StaffLogin() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!supabase) {
+      setError("Not connected to the database.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    setBusy(false)
+    if (error) {
+      setError(/invalid/i.test(error.message) ? "Wrong email or password." : "Couldn't log in. Please check the connection and try again.")
+    }
+  }
+
+  return (
+    <div className="login-shell">
+      <form className="login-card" onSubmit={handleLogin}>
+        <img className="brand-logo" src={logoUrl} alt="Happy Tummy Co." />
+        <h1>Staff login</h1>
+        <p>Kitchen dashboard for the Happy Tummy Co. team.</p>
+        <label>
+          Email
+          <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </label>
+        {error && (
+          <p className="login-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="action-btn primary" disabled={busy || !email.trim() || !password}>
+          {busy ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
   const [ordersError, setOrdersError] = useState(false)
@@ -283,19 +352,7 @@ export default function App() {
         if (error) console.error("Failed to load orders:", error.message)
         setOrdersError(Boolean(error))
         if (error || !data) return
-        let fetched = data as OrderRecord[]
-        try {
-          const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
-          fetched = fetched.map((o) =>
-            isValidRating(cachedRatings[o.id]?.rating, cachedRatings[o.id]?.feedback)
-              ? {
-                  ...o,
-                  rating: o.rating ?? cachedRatings[o.id].rating,
-                  rating_feedback: o.rating_feedback ?? cachedRatings[o.id].feedback,
-                }
-              : o
-          )
-        } catch {}
+        const fetched = data as OrderRecord[]
         // Keep orders that arrived live while this request was on its way
         setOrders((prev) => {
           const ids = new Set(fetched.map((o) => o.id))
@@ -373,66 +430,7 @@ export default function App() {
     if (!supabase) return
     loadSupport()
 
-    // 2. Realtime Broadcast Channel (zero table needed, works instantly across web)
-    const broadcastChannel = supabase.channel("messmate_support_broadcast", {
-      config: { broadcast: { self: false } },
-    })
-
-    broadcastChannel
-      .on("broadcast", { event: "support_msg" }, ({ payload }) => {
-        if (!payload || !payload.phone) return
-        const newMsg = payload as SupportMessage
-        const fresh = isNewMessage(newMsg)
-        setSupportMessages((prev) => {
-          const next = mergeSupportMessages(prev, [newMsg])
-          saveAdminSupportToLocal(next)
-          return next
-        })
-        if (fresh && newMsg.sender === "customer") playChime("message")
-      })
-      .on("broadcast", { event: "order_rating" }, ({ payload }) => {
-        if (typeof payload?.orderId === "string" && isValidRating(payload.rating, payload.feedback)) {
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === payload.orderId
-                ? { ...o, rating: payload.rating, rating_feedback: payload.feedback }
-                : o
-            )
-          )
-          try {
-            const cached = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
-            cached[payload.orderId] = { rating: payload.rating, feedback: payload.feedback }
-            localStorage.setItem("messmate_cached_ratings", JSON.stringify(cached))
-          } catch {}
-        }
-      })
-      .on("broadcast", { event: "sync_history" }, ({ payload }) => {
-        // Only messages a student screen hasn't saved yet: saved ones come from the database (so deleted
-        // chats stay deleted), and "ack-" is the student's own automatic note, not a staff reply
-        const unsaved = Array.isArray(payload)
-          ? (payload as SupportMessage[]).filter(
-              (m) => /^(msg|local)-/.test(String(m?.id)) && Date.now() - new Date(m.created_at).getTime() < 5 * 60 * 1000,
-            )
-          : []
-        if (unsaved.length > 0) {
-          setSupportMessages((prev) => {
-            const next = mergeSupportMessages(prev, unsaved)
-            saveAdminSupportToLocal(next)
-            return next
-          })
-        }
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          // Ask any active student window to sync their active messages
-          broadcastChannel.send({
-            type: "broadcast",
-            event: "request_history",
-            payload: {},
-          })
-        }
-      })
-
+    // Messages arrive from the database only, never from the open broadcast channel (anyone could fake those)
     // 3. Postgres changes if table exists
     let pgJoined = false
     const pgChannel = supabase
@@ -457,7 +455,6 @@ export default function App() {
       })
 
     return () => {
-      supabase?.removeChannel(broadcastChannel)
       supabase?.removeChannel(pgChannel)
     }
   }, [])
@@ -576,19 +573,19 @@ export default function App() {
         }
       })
 
-    // Subscribe to stock broadcast channel
+    // Stock changes from any admin device, straight from the table
     const stockChannel = supabase
-      .channel("menu_stock_updates")
-      .on("broadcast", { event: "stock_update" }, ({ payload }) => {
-        if (payload?.id) {
-          setInventory((prev) => {
-            const updated = prev.map((item) =>
-              item.id === payload.id ? { ...item, is_available: payload.is_available } : item
-            )
+      .channel("admin_menu_inventory")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_inventory" }, (payload) => {
+        const row = payload.new as { id?: string; is_available?: boolean }
+        if (!row?.id || typeof row.is_available !== "boolean") return
+        setInventory((prev) => {
+          const updated = prev.map((item) => (item.id === row.id ? { ...item, is_available: row.is_available as boolean } : item))
+          try {
             localStorage.setItem("messmate_menu_inventory", JSON.stringify(updated))
-            return updated
-          })
-        }
+          } catch {}
+          return updated
+        })
       })
       .subscribe()
 
@@ -625,13 +622,7 @@ export default function App() {
       alert("Couldn't save the stock change. Please check the connection and try again.")
       return
     }
-    // Tell open student screens and other admin devices now. This returns the channel the stock
-    // effect above already joined, so send directly: subscribing to it again never fires.
-    supabase.channel("menu_stock_updates").send({
-      type: "broadcast",
-      event: "stock_update",
-      payload: { id: itemId, is_available: newStatus },
-    })
+    // Saved: student screens and other admin devices pick it up live from the table
   }
 
   // Update Order Status
@@ -928,12 +919,7 @@ export default function App() {
       alert("Couldn't send the reply. Please check the connection and try again.")
       return
     }
-    // Saved: show it on the student's screen straight away
-    supabase.channel("messmate_support_broadcast").send({
-      type: "broadcast",
-      event: "support_msg",
-      payload: optimistic,
-    })
+    // Saved: the student's screen gets it live from the database
   }
 
   // Filtered inventory list
@@ -955,6 +941,15 @@ export default function App() {
               </div>
               <span className="brand-subtitle">Campus Order Management Console</span>
             </div>
+            <button
+              type="button"
+              className="logout-btn"
+              onClick={() => {
+                if (confirm("Log out of the kitchen dashboard?")) onLogout()
+              }}
+            >
+              Log out
+            </button>
           </div>
 
           {/* Navigation Tabs */}
@@ -1154,7 +1149,7 @@ export default function App() {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search by order #, PIN (e.g. 4821), phone, student..."
+                  placeholder="Order #, PIN, phone or name"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="search-input"
@@ -1590,7 +1585,7 @@ export default function App() {
                     <input
                       type="text"
                       maxLength={200}
-                      placeholder="Note (optional), e.g. 2 mango pickles"
+                      placeholder="Note (optional)"
                       aria-label="Note"
                       value={saleNote}
                       onChange={(e) => setSaleNote(e.target.value)}
@@ -1786,7 +1781,7 @@ function OrderCard({
   const st = statusMap[order.status] || { label: order.status, cls: "placed" }
 
   return (
-    <div className={`order-card-mobile ${order.status}`}>
+    <div className={`order-card-mobile ${order.status}${isFailed ? " flagged" : ""}`}>
       {/* Top Header Row */}
       <div className="card-top-bar">
         <div className="card-top-left">
@@ -1844,7 +1839,7 @@ function OrderCard({
       </div>
 
       <div className={`fulfilment-pill-row ${order.fulfilment}`}>
-        <span>{order.fulfilment === "delivery" ? `Hostel Room Delivery (₹${order.delivery_fee})` : (order.hostel || "Campus Pickup")}</span>
+        <span>{order.fulfilment === "delivery" ? `Hostel Room Delivery (₹${order.delivery_fee})` : "Campus Pickup (Free)"}</span>
       </div>
 
       {/* Items List */}
@@ -1880,14 +1875,14 @@ function OrderCard({
               )}
             </div>
           ) : (
-            <span className="counter-status-pill">Pay at Counter</span>
+            <span className="counter-status-pill">{order.fulfilment === "delivery" ? "Pay on Delivery" : "Pay at Counter"}</span>
           )}
 
           {/* Payment Verification Status Badge */}
           {isUpi && (
             <div className="payment-verification-status">
               {order.payment_status === "refunded" ? (
-                <span className="verify-badge success">Refunded</span>
+                <span className="verify-badge refunded">Refunded</span>
               ) : isVerified ? (
                 <span className="verify-badge success">UTR Verified</span>
               ) : isFailed ? (
@@ -1922,7 +1917,11 @@ function OrderCard({
             <button
               type="button"
               className="action-btn-small flag-btn"
-              onClick={() => onVerifyPayment(order.id, false)}
+              onClick={() => {
+                if (confirm(`Flag order #${order.order_number} as unpaid? It won't count as money collected.`)) {
+                  onVerifyPayment(order.id, false)
+                }
+              }}
               title="Flag if UTR is fake or payment was not received"
             >
               Flag Unpaid
@@ -2029,9 +2028,9 @@ function OrderCard({
           isUpi &&
           (isVerified || order.payment_status === "refunded") &&
           (order.payment_status === "refunded" ? (
-            <span className="verified-confirm-text">₹{order.total} refunded to the student</span>
+            <span className="verified-confirm-text refund-action">₹{order.total} refunded to the student</span>
           ) : (
-            <button type="button" className="action-btn secondary" onClick={markRefunded}>
+            <button type="button" className="action-btn secondary refund-action" onClick={markRefunded}>
               {order.status === "cancelled" ? `Refund due ₹${order.total} · Mark refunded` : `Paid ₹${order.total} · Mark refunded`}
             </button>
           ))}

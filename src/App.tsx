@@ -727,7 +727,7 @@ function Home({
                 <h3>Homemade Pickles & Fresh Cut Bowls</h3>
                 <p>
                   Instant upgrade for bland mess food. Delivered to your room, or
-                  ready for pickup at Kalam (Room 341) or Asima (Room 110).
+                  ready for pickup at Kalam Room-341 or Asima - 110.
                 </p>
                 <div className="feature-stats">
                   <div className="stat-item">
@@ -1211,7 +1211,7 @@ function Cart({
   storeOpen: boolean
 }) {
   const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
-  const ctaLabel = !storeOpen ? CLOSED_MESSAGE : blocked ? "Remove sold-out items" : "Go to checkout"
+  const ctaLabel = !storeOpen ? CLOSED_MESSAGE : blocked ? "Remove the sold-out item above" : "Go to checkout"
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
@@ -1254,7 +1254,7 @@ function Cart({
                     <img
                       src={
                         item.kind === "pickle"
-                          ? sized(pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage, 240)
+                          ? sized(pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage, 480)
                           : fruitImage
                       }
                       alt=""
@@ -1885,8 +1885,10 @@ function Payment({
                   <Icon name="receipt" size={18} />
                 </span>
                 <span>
-                  <strong>Pay at Counter</strong>
-                  <small>Cash or soundbox scan upon pickup</small>
+                  <strong>{fulfilment === "delivery" ? "Pay on delivery" : "Pay at Counter"}</strong>
+                  <small>
+                    {fulfilment === "delivery" ? "Cash or scan when your order arrives" : "Cash or soundbox scan upon pickup"}
+                  </small>
                 </span>
                 <span className="radio">{method === "counter" && <span />}</span>
               </button>
@@ -1924,6 +1926,8 @@ function Payment({
                   <img
                     src={phonepeQrUrl}
                     alt={`PhonePe QR code for ${BRAND}`}
+                    width={472}
+                    height={610}
                     className="phonepe-qr-img"
                   />
                   <div className="qr-scan-instruction">
@@ -1990,8 +1994,12 @@ function Payment({
                   <Icon name="receipt" size={24} />
                 </div>
                 <div>
-                  <strong>Pay ₹{total} at the Counter</strong>
-                  <p>You can pay via cash or scan our countertop soundbox QR at the pickup table.</p>
+                  <strong>{fulfilment === "delivery" ? `Pay ₹${total} on delivery` : `Pay ₹${total} at the Counter`}</strong>
+                  <p>
+                    {fulfilment === "delivery"
+                      ? "Pay the runner by cash or scan when your order reaches your room."
+                      : "You can pay via cash or scan our soundbox QR at the pickup point."}
+                  </p>
                 </div>
               </div>
             )}
@@ -2038,12 +2046,12 @@ function Payment({
                   {!storeOpen
                     ? CLOSED_MESSAGE
                     : blocked
-                    ? "Remove sold-out items"
+                    ? "An item sold out: edit your cart"
                     : isSubmitting
                     ? "Placing order..."
                     : method === "upi"
                     ? `I've Paid ₹${total} — Place Order`
-                    : `Place Order (Pay ₹${total} at Counter)`}
+                    : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
                 </PrimaryButton>
               </div>
             </section>
@@ -2059,12 +2067,12 @@ function Payment({
           {!storeOpen
             ? CLOSED_MESSAGE
             : blocked
-            ? "Remove sold-out items"
+            ? "An item sold out: edit your cart"
             : isSubmitting
             ? "Placing order..."
             : method === "upi"
             ? `I've Paid ₹${total} — Place Order`
-            : `Place Order (Pay ₹${total})`}
+            : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -2284,13 +2292,8 @@ function OrderRatingWidget({
       return
     }
 
-    // Saved: remember it on this device and tell the kitchen dashboard instantly
+    // Saved: remember it on this device (the kitchen dashboard sees the saved rating live)
     safeStorage.setJson(`messmate_order_rating_${orderId}`, { rating, feedback: trimmed })
-    supabase.channel("messmate_support_broadcast").send({
-      type: "broadcast",
-      event: "order_rating",
-      payload: { orderId, rating, feedback: trimmed },
-    })
 
     setIsSending(false)
     setSubmitted(true)
@@ -2339,11 +2342,12 @@ function OrderRatingWidget({
               onMouseLeave={() => setHovered(0)}
               onClick={() => setRating(star)}
               title={`${star} Star${star > 1 ? "s" : ""}`}
-              style={{ color: isFilled ? "#f59e0b" : "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "2px" }}
+              style={{ color: isFilled ? "#f59e0b" : "#8a8172", background: "none", border: "none", cursor: "pointer", padding: "6px" }}
+              aria-label={`${star} star${star > 1 ? "s" : ""}`}
             >
               <Icon
                 name="star"
-                size={20}
+                size={26}
                 fill={isFilled ? "#f59e0b" : "none"}
               />
             </button>
@@ -2354,7 +2358,7 @@ function OrderRatingWidget({
         <>
           <input
             type="text"
-            placeholder="Optional: How was the taste, packaging, or delivery?"
+            placeholder="Anything to add? (optional)"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             className="rating-feedback-input"
@@ -2697,8 +2701,8 @@ function OrdersPage({
                     <div className="tracker-timeline">
                       <div className="tracker-steps">
                         {steps.map((step, idx) => {
-                          const isDone = idx < currentStep
-                          const isActive = idx === currentStep
+                          const isDone = idx < currentStep || order.status === "delivered"
+                          const isActive = !isDone && idx === currentStep
                           return (
                             <div
                               key={step.label}
@@ -2794,7 +2798,9 @@ function OrdersPage({
                           ) : order.payment_method?.includes("PhonePe") || order.payment_method?.toLowerCase().includes("upi") ? (
                             <span className="pay-verify-badge pending">UTR Under Verification</span>
                           ) : (
-                            <span className="pay-verify-badge neutral">Pay at Counter</span>
+                            <span className="pay-verify-badge neutral">
+                              {order.fulfilment === "delivery" ? "Pay on Delivery" : "Pay at Counter"}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -2844,7 +2850,7 @@ const FAQ_ITEMS = [
     label: "Where is my 4-digit PIN?",
     question: "Where do I find my 4-digit Pickup PIN?",
     answer:
-      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Show this PIN at your pickup point (Kalam Room 341 or Asima Room 110) to collect your food!",
+      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Show this PIN at your pickup point (Kalam Room-341 or Asima - 110) to collect your food!",
   },
   {
     id: "payment_verify",
@@ -2879,7 +2885,7 @@ const FAQ_ITEMS = [
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      "Pick up from Kalam (Room 341, APJ Abdul Kalam Block) or Asima (Room 110, ground floor). Choose your spot at checkout!",
+      "Pick up from Kalam Room-341 (APJ Abdul Kalam Block) or Asima - 110 (ground floor). Choose your spot at checkout!",
   },
   {
     id: "sold_out",
@@ -2993,10 +2999,25 @@ function SupportChatWidget({
     } catch {}
     if (open) {
       setUnreadCount(0)
+      // A history step for the open chat, so the phone's Back closes it instead of changing the page
+      if (!window.history.state?.chat) window.history.pushState({ ...window.history.state, chat: true }, "")
     } else {
+      if (window.history.state?.chat) window.history.back()
       fabRef.current?.focus() // back to the Support button for keyboard and screen-reader users
     }
   }
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      if (e.state?.chat || !isOpenRef.current) return
+      setIsOpenState(false)
+      try {
+        localStorage.setItem("messmate_support_open", "false")
+      } catch {}
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
 
   // 3. View state: if there is an active live chat with messages or saved as 'live', stay on live!
   const [view, setViewState] = useState<ChatView>(() => {
@@ -3045,8 +3066,6 @@ function SupportChatWidget({
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const liveMessagesRef = useRef<SupportMsg[]>(liveMessages)
   liveMessagesRef.current = liveMessages
-  const chatPhoneRef = useRef<string>(chatPhone)
-  chatPhoneRef.current = chatPhone
   const isOpenRef = useRef<boolean>(isOpen)
   isOpenRef.current = isOpen
 
@@ -3080,72 +3099,48 @@ function SupportChatWidget({
     if (customerName.trim()) setName(customerName)
   }, [customerPhone, customerName])
 
-  // Realtime Broadcast Channel & History Sync
-  useEffect(() => {
-    if (!supabase) return
-
-    const broadcastChannel = supabase.channel("messmate_support_broadcast", {
-      config: { broadcast: { self: false } },
-    })
-
-    broadcastChannel
-      .on("broadcast", { event: "support_msg" }, ({ payload }) => {
-        if (!payload || !payload.phone) return
-        const incoming = payload as SupportMsg
-        const currentPhone = chatPhoneRef.current
-        const incomingPhone = String(incoming.phone || "").replace(/\D/g, "").slice(-10)
-
-        if (incomingPhone && currentPhone && incomingPhone === currentPhone) {
-          const isNew = mergeSupportMessages(liveMessagesRef.current, [incoming]).length > liveMessagesRef.current.length
-          setLiveMessages((prev) => {
-            const next = mergeSupportMessages(prev, [incoming])
-            saveChatToLocal(currentPhone, next)
-            return next
-          })
-          if (incoming.sender === "support") {
-            setView("live")
-            if (!isOpenRef.current && isNew) {
-              setUnreadCount((c) => c + 1)
-            }
-          }
-        }
-      })
-      .subscribe()
-
-    return () => {
-      supabase?.removeChannel(broadcastChannel)
-    }
-  }, [])
-
+  // Staff replies arrive from the database below, never from the open broadcast channel, so they can't be faked
   // Database fetch & Postgres changes when student phone is available
   useEffect(() => {
     const clean = chatPhone
-    if (!clean || !supabase) return
+    const client = supabase
+    if (!clean || !client) return
 
-    supabase
+    // Also re-read when the student comes back to the tab: a sleeping phone can miss live replies
+    const loadHistory = () =>
+      client
       .from("support_messages")
       .select("*")
       .eq("phone", clean)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
+        // Messages from before a "New" request stay hidden on this phone
+        const since = Number(safeStorage.getItem(`ht_chat_since_${clean}`, "0")) || 0
+        const fresh = !error && data ? (data as SupportMsg[]).filter((m) => new Date(m.created_at).getTime() > since) : []
+        if (fresh.length > 0) {
           setLiveMessages((prev) => {
-            const next = mergeSupportMessages(prev, data as SupportMsg[])
+            const next = mergeSupportMessages(prev, fresh)
             saveChatToLocal(clean, next)
             return next
           })
           setView("live")
           if (!isOpenRef.current) {
             const seen = Number(safeStorage.getItem(`ht_chat_seen_${clean}`, "0")) || 0
-            const unseen = (data as SupportMsg[]).filter(
+            const unseen = fresh.filter(
               (m) => m.sender === "support" && new Date(m.created_at).getTime() > seen,
             ).length
             if (unseen > 0) setUnreadCount(unseen)
           }
         }
       })
+    loadHistory()
+    const onBack = () => {
+      if (document.visibilityState === "visible") loadHistory()
+    }
+    document.addEventListener("visibilitychange", onBack)
+    window.addEventListener("online", onBack)
 
-    const pgChannel = supabase
+    const pgChannel = client
       .channel(`support_pg_${clean}`)
       .on(
         "postgres_changes",
@@ -3176,7 +3171,9 @@ function SupportChatWidget({
       .subscribe()
 
     return () => {
-      supabase?.removeChannel(pgChannel)
+      document.removeEventListener("visibilitychange", onBack)
+      window.removeEventListener("online", onBack)
+      client.removeChannel(pgChannel)
     }
   }, [chatPhone])
 
@@ -3216,19 +3213,17 @@ function SupportChatWidget({
     setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply, showEscalate: true } : m)))
   }
 
+  // "New": a fresh request. Earlier messages stay with the team but no longer show on this phone.
   const handleResetChat = () => {
     const clean = (phone || "").replace(/\D/g, "").slice(-10)
     if (clean) {
-      try {
-        localStorage.removeItem(`messmate_chat_${clean}`)
-        localStorage.removeItem("messmate_support_view")
-      } catch {}
+      safeStorage.setItem(`ht_chat_since_${clean}`, String(Date.now()))
+      safeStorage.removeItem(`messmate_chat_${clean}`)
     }
     setLiveMessages([])
-    setName(customerName || safeStorage.getItem("messmate_customer_name", "") || "")
-    setPhone(customerPhone || safeStorage.getItem("messmate_phone", "") || "")
     setIssue("")
-    setView("faq")
+    setFormError(null)
+    setView("request")
   }
 
   const handleStartLiveChat = async (e: React.FormEvent) => {
@@ -3293,12 +3288,6 @@ function SupportChatWidget({
     setLiveMessages(nextMsgs)
     saveChatToLocal(activePhone, nextMsgs)
     setView("live")
-    // An open admin dashboard shows it instantly (it also gets the saved row)
-    supabase.channel("messmate_support_broadcast").send({
-      type: "broadcast",
-      event: "support_msg",
-      payload: savedMsg,
-    })
     setIsSubmitting(false)
   }
 
@@ -3351,11 +3340,6 @@ function SupportChatWidget({
       return
     }
     rememberChatPhone(cleanPhone)
-    supabase.channel("messmate_support_broadcast").send({
-      type: "broadcast",
-      event: "support_msg",
-      payload: optimistic,
-    })
   }
 
   return (
@@ -3432,7 +3416,7 @@ function SupportChatWidget({
                 view === "request" || view === "live" ? "active" : ""
               }`}
               onClick={() => {
-                if (liveMessages.length > 0 || (phone.replace(/\D/g, "").length === 10 && name.trim())) {
+                if (liveMessages.length > 0) {
                   setView("live")
                 } else {
                   setView("request")
@@ -3463,7 +3447,7 @@ function SupportChatWidget({
                           type="button"
                           className="support-escalate-btn"
                           onClick={() => {
-                            if (liveMessages.length > 0 || (phone.replace(/\D/g, "").length === 10 && name.trim())) {
+                            if (liveMessages.length > 0) {
                               setView("live")
                             } else {
                               setView("request")
@@ -3753,20 +3737,32 @@ export default function App() {
     safeStorage.setJson(SESSION_KEY, { screen, cart, selectedProduct, fulfilment, pickupPoint, slot, savedAt: Date.now() })
   }, [screen, cart, selectedProduct, fulfilment, pickupPoint, slot])
 
-  // The phone's Back button steps back through the screens instead of leaving the site
+  // The phone's Back button steps back through the screens instead of leaving the site.
+  // nav mirrors the browser history (one screen per step) so the on-screen back arrows can use it too.
   const cartRef = useRef(cart)
+  const screenRef = useRef(screen)
+  const navRef = useRef<{ depth: number; stack: Screen[] }>({ depth: 0, stack: [] })
   useEffect(() => {
     cartRef.current = cart
-  }, [cart])
+    screenRef.current = screen
+  }, [cart, screen])
   useEffect(() => {
-    window.history.replaceState({ screen: restored.screen }, "")
+    const depth = typeof window.history.state?.depth === "number" ? window.history.state.depth : 0
+    navRef.current = { depth, stack: Object.assign([], { [depth]: restored.screen }) }
+    window.history.replaceState({ screen: restored.screen, depth }, "")
     const onPop = (e: PopStateEvent) => {
-      let target: Screen = SCREENS.includes(e.state?.screen) ? e.state.screen : "home"
+      const state = e.state ?? {}
+      let target: Screen = SCREENS.includes(state.screen) ? state.screen : "home"
+      const stepDepth = typeof state.depth === "number" ? state.depth : 0
       // After an order the cart is empty, so Back lands on Home instead of the payment page again
       if (target === "confirmation" || (NEEDS_CART.includes(target) && cartRef.current.length === 0)) {
         target = "home"
-        window.history.replaceState({ screen: target }, "")
+        window.history.replaceState({ ...state, screen: target, depth: stepDepth }, "")
       }
+      navRef.current.depth = stepDepth
+      navRef.current.stack[stepDepth] = target
+      // Closing the chat also steps back; the page itself stays where it was
+      if (target === screenRef.current) return
       setScreen(target)
       window.scrollTo({ top: 0, behavior: "instant" })
     }
@@ -3902,11 +3898,7 @@ export default function App() {
         return next
       })
     }
-    const stockChannel = supabase
-      .channel("menu_stock_updates")
-      .on("broadcast", { event: "stock_update" }, ({ payload }) => applyStock(payload))
-      .subscribe()
-    // Own channel, so a table that isn't set up for realtime can't break the broadcast above
+    // Straight from the table (an open broadcast channel could carry fake "sold out" messages)
     const stockTableChannel = supabase
       .channel("menu_inventory_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_inventory" }, (payload) =>
@@ -3915,7 +3907,6 @@ export default function App() {
       .subscribe()
 
     return () => {
-      supabase?.removeChannel(stockChannel)
       supabase?.removeChannel(stockTableChannel)
     }
   }, [])
@@ -4009,7 +4000,18 @@ export default function App() {
   const go = (next: Screen) => {
     if (next === "home" && screen === "confirmation") setCart([])
 
-    if (next !== screen) window.history.pushState({ screen: next }, "")
+    // Going to the screen we just came from (an on-screen back arrow) is the same as the phone's Back
+    const nav = navRef.current
+    if (next !== screen && nav.depth > 0 && nav.stack[nav.depth - 1] === next && !window.history.state?.chat) {
+      window.history.back()
+      return
+    }
+    if (next !== screen) {
+      nav.depth += 1
+      nav.stack[nav.depth] = next
+      nav.stack.length = nav.depth + 1
+      window.history.pushState({ screen: next, depth: nav.depth }, "")
+    }
     setScreen(next)
 
     window.scrollTo({ top: 0, behavior: "instant" })
@@ -4052,7 +4054,16 @@ export default function App() {
       )
     }
     if (current.length === 0) return
-    setCart(current)
+    // Like "Buy it again" in most shops: add to the cart instead of replacing what's there
+    setCart((existing) => {
+      const merged = [...existing]
+      for (const item of current) {
+        const i = merged.findIndex((m) => m.id === item.id)
+        if (i === -1) merged.push(item)
+        else merged[i] = { ...merged[i], quantity: merged[i].quantity + item.quantity }
+      }
+      return merged
+    })
     go("cart")
   }
 
@@ -4105,7 +4116,9 @@ export default function App() {
           ? cleanUtr
             ? `PhonePe UPI (UTR: ${cleanUtr})`
             : "PhonePe UPI"
-          : "Pay at Counter"
+          : fulfilment === "delivery"
+            ? "Pay on Delivery"
+            : "Pay at Counter"
 
       setPaymentMethodName(paymentLabel)
 
@@ -4256,8 +4269,8 @@ export default function App() {
         {activeCancelledOrder && (
           <div className="cancelled-order-alert-banner">
             <div className="alert-banner-content">
-              <span className="alert-bell cancelled-bell">
-                <Icon name="close" size={16} />
+              <span className="alert-bell cancelled-bell" aria-hidden="true">
+                !
               </span>
               <div>
                 <strong>Order #{activeCancelledOrder.order_number} has been CANCELLED</strong>

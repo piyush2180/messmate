@@ -143,7 +143,7 @@ export function getFaqResponse(query: string): string {
     return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
   }
   if (aboutPaying) {
-    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or choose Pay at Counter at checkout."
+    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or pay in person: at the counter for pickup, or to the runner on room delivery."
   }
   if (q.includes("reorder") || word("again") || q.includes("repeat") || q.includes("previous")) {
     return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
@@ -194,7 +194,7 @@ export function getFaqResponse(query: string): string {
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return "Pickups are available at Kalam (Room 341) and Asima (Room 110). Select your preferred spot during checkout!"
+    return "Pickups are available at Kalam Room-341 and Asima - 110. Select your preferred spot during checkout!"
   }
   if (
     q.includes("fruit") ||

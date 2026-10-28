@@ -3,6 +3,32 @@
 -- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 
 -- ============================================================================
+-- 0. Staff account (admin login). Create the user in Authentication → Users first.
+-- Only accounts listed here can change orders, stock, the Open/Closed switch and counter sales.
+-- ============================================================================
+create table if not exists public.staff_users (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  added_at timestamptz not null default now()
+);
+alter table public.staff_users enable row level security; -- no policies: only is_staff() reads it
+
+insert into public.staff_users (user_id)
+select id from auth.users where email = 'staff@happytummy.co'
+on conflict do nothing;
+
+create or replace function public.is_staff()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.staff_users where user_id = auth.uid())
+$$;
+revoke all on function public.is_staff() from public;
+grant execute on function public.is_staff() to anon, authenticated;
+
+-- ============================================================================
 -- 1. Orders Table & Security Constraints
 -- ============================================================================
 create table if not exists public.orders (
@@ -110,12 +136,22 @@ create policy "Anyone can view orders"
   on public.orders for select
   using (true);
 
--- Policy 3 (Update): Allow updating order status and ratings
+-- Policy 3 (Update): students can only rate a delivered order; staff can change everything else
 drop policy if exists "Anyone can update orders" on public.orders;
-create policy "Anyone can update orders"
-  on public.orders for update
-  using (true)
-  with check (true);
+drop policy if exists "Students can rate delivered orders" on public.orders;
+create policy "Students can rate delivered orders"
+  on public.orders for update to anon
+  using (status = 'delivered')
+  with check (status = 'delivered');
+drop policy if exists "Staff can update orders" on public.orders;
+create policy "Staff can update orders"
+  on public.orders for update to authenticated
+  using (public.is_staff())
+  with check (public.is_staff());
+-- Students may only touch the rating columns
+revoke update on public.orders from anon;
+grant update (rating, rating_feedback) on public.orders to anon;
+grant update on public.orders to authenticated;
 
 -- ============================================================================
 -- 2. Support Messages Table & Security Constraints
@@ -139,11 +175,19 @@ alter table public.support_messages add constraint chk_support_message_length ch
 -- RLS & Policies for Support Messages
 alter table public.support_messages enable row level security;
 
+-- Students send their own messages; only staff can reply as support
 drop policy if exists "Anyone can insert support messages" on public.support_messages;
-create policy "Anyone can insert support messages"
-  on public.support_messages for insert
+drop policy if exists "Students can send support messages" on public.support_messages;
+create policy "Students can send support messages"
+  on public.support_messages for insert to anon
   with check (
-    length(phone) >= 10 and length(trim(message)) >= 1
+    sender = 'customer' and length(phone) >= 10 and length(trim(message)) >= 1
+  );
+drop policy if exists "Staff can send support messages" on public.support_messages;
+create policy "Staff can send support messages"
+  on public.support_messages for insert to authenticated
+  with check (
+    public.is_staff() and length(phone) >= 10 and length(trim(message)) >= 1
   );
 
 drop policy if exists "Anyone can view support messages" on public.support_messages;
@@ -171,10 +215,12 @@ create policy "Anyone can view menu inventory"
   using (true);
 
 drop policy if exists "Anyone can update menu inventory" on public.menu_inventory;
-create policy "Anyone can update menu inventory"
-  on public.menu_inventory for all
-  using (true)
-  with check (true);
+drop policy if exists "Staff can change menu inventory" on public.menu_inventory;
+create policy "Staff can change menu inventory"
+  on public.menu_inventory for all to authenticated
+  using (public.is_staff())
+  with check (public.is_staff());
+revoke insert, update, delete on public.menu_inventory from anon;
 
 -- Seed default menu items if not already present (ids and names match DEFAULT_MENU_ITEMS in the apps)
 insert into public.menu_inventory (id, name, category, is_available)
@@ -262,7 +308,7 @@ as $$
 $$;
 
 revoke all on function public.visit_stats() from public;
-grant execute on function public.visit_stats() to anon, authenticated;
+grant execute on function public.visit_stats() to authenticated; -- staff only
 
 -- ============================================================================
 -- 7. Counter Sales (admin Analytics → Counter Sales)
@@ -279,13 +325,14 @@ create index if not exists idx_counter_sales_created_at on public.counter_sales 
 alter table public.counter_sales enable row level security;
 
 drop policy if exists "Staff can view counter sales" on public.counter_sales;
-create policy "Staff can view counter sales" on public.counter_sales for select using (true);
+create policy "Staff can view counter sales" on public.counter_sales for select to authenticated using (public.is_staff());
 drop policy if exists "Staff can add counter sales" on public.counter_sales;
-create policy "Staff can add counter sales" on public.counter_sales for insert with check (amount > 0);
+create policy "Staff can add counter sales" on public.counter_sales for insert to authenticated with check (amount > 0 and public.is_staff());
 drop policy if exists "Staff can remove counter sales" on public.counter_sales;
-create policy "Staff can remove counter sales" on public.counter_sales for delete using (true);
+create policy "Staff can remove counter sales" on public.counter_sales for delete to authenticated using (public.is_staff());
 
-grant select, insert, delete on public.counter_sales to anon, authenticated;
+revoke all on public.counter_sales from anon;
+grant select, insert, delete on public.counter_sales to authenticated;
 
 -- ============================================================================
 -- 8. Store Open / Closed (admin switch; the student store reads it live)
@@ -303,11 +350,13 @@ alter table public.store_status enable row level security;
 drop policy if exists "Anyone can read store status" on public.store_status;
 create policy "Anyone can read store status" on public.store_status for select using (true);
 drop policy if exists "Staff can create store status" on public.store_status;
-create policy "Staff can create store status" on public.store_status for insert with check (id = 1);
+create policy "Staff can create store status" on public.store_status for insert to authenticated with check (id = 1 and public.is_staff());
 drop policy if exists "Staff can set store status" on public.store_status;
-create policy "Staff can set store status" on public.store_status for update using (true) with check (id = 1);
+create policy "Staff can set store status" on public.store_status for update to authenticated using (public.is_staff()) with check (id = 1 and public.is_staff());
 
-grant select, insert, update on public.store_status to anon, authenticated;
+revoke insert, update, delete on public.store_status from anon;
+grant select on public.store_status to anon;
+grant select, insert, update on public.store_status to authenticated;
 
 do $$
 begin
