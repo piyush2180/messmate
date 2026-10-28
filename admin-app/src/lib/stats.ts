@@ -31,11 +31,16 @@ export function computeStats(
   const allTimeCashOrders = collectedAllTime.filter((o) => !isUpi(o))
 
   const active = orders.filter((o) => ["placed", "preparing", "ready"].includes(o.status)).length
-  const deliveries = nonCancelledToday.filter((o) => o.fulfilment === "delivery").length
-  const pickups = nonCancelledToday.filter((o) => o.fulfilment === "pickup").length
-  const pendingCallbacks = new Set(
-    supportMessages.filter((m) => m.sender === "customer").map((m) => m.phone)
-  ).size
+  // Chats waiting on staff: the latest message in the thread (per 10-digit phone) is the student's
+  const latestByPhone = new Map<string, SupportMessage>()
+  for (const m of supportMessages) {
+    const phone = String(m.phone || "").replace(/\D/g, "").slice(-10)
+    // "ack-" is the student screen's automatic note, not a staff reply
+    if (!phone || String(m.id).startsWith("ack-")) continue
+    const latest = latestByPhone.get(phone)
+    if (!latest || new Date(m.created_at).getTime() >= new Date(latest.created_at).getTime()) latestByPhone.set(phone, m)
+  }
+  const pendingCallbacks = [...latestByPhone.values()].filter((m) => m.sender === "customer").length
 
   const pendingUtrs = nonCancelledAllTime.filter((o) => isUpi(o) && !isVerified(o) && !isFlagged(o)).length
 
@@ -54,8 +59,6 @@ export function computeStats(
     toCollectToday: toCollect(nonCancelledToday),
     toCollectAllTime: toCollect(nonCancelledAllTime),
     active,
-    deliveries,
-    pickups,
     pendingCallbacks,
     todayUpiRevenue: sumTotal(todayUpiOrders),
     todayUpiCount: todayUpiOrders.length,

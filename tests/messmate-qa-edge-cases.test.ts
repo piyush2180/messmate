@@ -231,10 +231,12 @@ test("Reorder - re-prices past items at today's menu and drops discontinued ones
 // ============================================================================
 // TEST SUITE 4: Order Status Transitions & Cancellation Policy
 // ============================================================================
-test("Cancellation Policy - only 'pending' orders can be cancelled", () => {
-  assert.equal(canCancelOrder("pending"), true)
-  assert.equal(canCancelOrder("PENDING"), true)
-  assert.equal(canCancelOrder(" Pending "), true)
+test("Cancellation Policy - only 'placed' orders can be cancelled", () => {
+  assert.equal(canCancelOrder("placed"), true)
+  assert.equal(canCancelOrder("PLACED"), true)
+  assert.equal(canCancelOrder(" Placed "), true)
+
+  assert.equal(canCancelOrder("pending"), false) // not an order status in the database
 
   assert.equal(canCancelOrder("preparing"), false)
   assert.equal(canCancelOrder("ready"), false)
@@ -375,6 +377,28 @@ test("FAQ Bot - resolves order tracking queries", () => {
 test("FAQ Bot - resolves cancellation and refund queries", () => {
   const reply = getFaqResponse("How do I cancel order or get refund?")
   assert.match(reply, /Happy Tummy Co\. Support Team/)
+})
+
+test("FAQ Bot - answers price questions with real menu prices", () => {
+  for (const q of ["what is the price of mango pickle", "how much is the chicken pickle?", "what's the rate of gongura"]) {
+    const reply = getFaqResponse(q)
+    assert.match(reply, /₹40/, q)
+    assert.match(reply, /₹70/, q)
+    assert.match(reply, /50g/, q)
+  }
+})
+
+test("FAQ Bot - matches whole words, so fruit names don't trigger PIN or rating answers", () => {
+  assert.doesNotMatch(getFaqResponse("is pineapple in the bowl?"), /PIN/)
+  assert.match(getFaqResponse("is pineapple in the bowl?"), /fixed ₹60/)
+  assert.match(getFaqResponse("where is my pin"), /4-digit Pickup PIN/)
+  assert.doesNotMatch(getFaqResponse("I want to rate my order"), /PIN/)
+  assert.match(getFaqResponse("I want to rate my order"), /star rating/)
+})
+
+test("FAQ Bot - refund questions go to the team before topic answers", () => {
+  assert.match(getFaqResponse("refund for my pickle order"), /Happy Tummy Co\. Support Team/)
+  assert.match(getFaqResponse("can I change my delivery room?"), /modified before prep starts/)
 })
 
 test("FAQ Bot - falls back gracefully with official Support Team branding", () => {

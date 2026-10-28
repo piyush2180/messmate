@@ -19,6 +19,8 @@ import {
   DELIVERY_FEE,
   calculateOrderTotals,
   cleanPhoneInput,
+  getFaqResponse,
+  isValidIndianPhone,
   normalizePhone,
   safeStorage,
   sanitizeInput,
@@ -121,6 +123,8 @@ const PICKUP_POINTS = [
 // Support messages are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = `${BRAND} Support Team`
 const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
+// Messages saved before the rename still mention the old name in their text
+const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT_NAME).replace(/MessMate/g, BRAND)
 
 const fruits = [
   { name: "Apple", color: "#D9644A", emoji: "A" },
@@ -473,7 +477,7 @@ function Header({
             <button
               className="bag-button mobile-only-inline-flex"
               onClick={onCart}
-              aria-label={`Cart with ${cartCount} items`}
+              aria-label={`Cart with ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
             >
               <Icon name="bag" />
               {cartCount > 0 && <span>{cartCount}</span>}
@@ -481,7 +485,7 @@ function Header({
             <button
               className="desktop-cart-pill desktop-only-inline-flex"
               onClick={onCart}
-              aria-label={`Cart with ${cartCount} items`}
+              aria-label={`Cart with ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
             >
               <Icon name="bag" size={15} />
               <span>Cart {cartCount > 0 ? `(${cartCount})` : ""}</span>
@@ -520,23 +524,26 @@ function Quantity({
   value,
   onChange,
   small = false,
+  label,
 }: {
   value: number
   onChange: (value: number) => void
   small?: boolean
+  label?: string
 }) {
+  const of = label ? ` of ${label}` : ""
   return (
     <div className={`quantity ${small ? "small" : ""}`}>
       <button
         onClick={() => onChange(Math.max(0, value - 1))}
-        aria-label="Decrease quantity"
+        aria-label={`Decrease quantity${of}`}
       >
         <Icon name="minus" size={16} />
       </button>
       <span>{value}</span>
       <button
         onClick={() => onChange(value + 1)}
-        aria-label="Increase quantity"
+        aria-label={`Increase quantity${of}`}
       >
         <Icon name="plus" size={16} />
       </button>
@@ -598,12 +605,12 @@ function CategoryCard({
             <span key={label}>{label}</span>
           ))}
         </div>
-        <span className="text-cta">
+        <button type="button" className="text-cta">
           {cta}
           <span>
             <Icon name="arrow-right" size={16} />
           </span>
-        </span>
+        </button>
       </div>
     </article>
   )
@@ -673,8 +680,8 @@ function Home({
                 <div className="feature-badge">Hostel Delivery & Pickup</div>
                 <h3>Homemade Pickles & Fresh Cut Bowls</h3>
                 <p>
-                  Instant upgrade for bland mess food. Delivered directly to your
-                  room or ready at the hostel entrance.
+                  Instant upgrade for bland mess food. Delivered to your room, or
+                  ready for pickup at Kalam (Room 341) or Asima (Room 110).
                 </p>
                 <div className="feature-stats">
                   <div className="stat-item">
@@ -1070,10 +1077,17 @@ function FruitBuilder({
                     {includedCount} of {fruits.length} fruits
                   </strong>
                 </div>
-                <span>
-                  <Icon name="check" size={16} />
-                </span>
+                {includedCount > 0 && (
+                  <span>
+                    <Icon name="check" size={16} />
+                  </span>
+                )}
               </div>
+              {includedCount === 0 && !bowlSoldOut && (
+                <div className="summary-row">
+                  <strong>Pick at least one fruit to add the bowl.</strong>
+                </div>
+              )}
               <div className="summary-row">
                 <span>Leaving out</span>
                 <strong>{skipped.length ? skipped.join(", ") : "Nothing"}</strong>
@@ -1101,7 +1115,9 @@ function FruitBuilder({
       </main>
       <BottomBar>
         <div className="dock-price">
-          <small>{includedCount} fruits</small>
+          <small>
+            {includedCount === 0 ? "Pick a fruit" : `${includedCount} ${includedCount === 1 ? "fruit" : "fruits"}`}
+          </small>
           <strong>₹{FRUIT_BOWL_PRICE}</strong>
         </div>
         <PrimaryButton
@@ -1175,12 +1191,18 @@ function Cart({
       />
       <main className="screen-content cart-page">
         <section className="screen-intro compact">
-          <div className="eyebrow">Almost there</div>
-          <h1>
-            Your order is
-            <br />
-            <em>looking good.</em>
-          </h1>
+          <div className="eyebrow">{items.length ? "Almost there" : "Your cart"}</div>
+          {items.length ? (
+            <h1>
+              Your order is
+              <br />
+              <em>looking good.</em>
+            </h1>
+          ) : (
+            <h1>
+              Nothing here <em>yet.</em>
+            </h1>
+          )}
         </section>
         {items.length ? (
           <div className="cart-layout">
@@ -1211,6 +1233,7 @@ function Cart({
                             updateQuantity(item.id, quantity)
                           }
                           small
+                          label={`${item.name}, ${item.detail}`}
                         />
                         <strong>₹{item.price * item.quantity}</strong>
                       </div>
@@ -1218,7 +1241,7 @@ function Cart({
                     <button
                       className="remove"
                       onClick={() => remove(item.id)}
-                      aria-label={`Remove ${item.name}`}
+                      aria-label={`Remove ${item.name}, ${item.detail}`}
                     >
                       <Icon name="close" size={17} />
                     </button>
@@ -1294,6 +1317,7 @@ function Field({
   maxLength,
   hint,
   options,
+  autoComplete,
 }: {
   label: string
   placeholder: string
@@ -1304,6 +1328,7 @@ function Field({
   maxLength?: number
   hint?: string
   options?: string[]
+  autoComplete?: string
 }) {
   return (
     <label className="field">
@@ -1330,6 +1355,7 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           maxLength={maxLength}
+          autoComplete={autoComplete}
         />
       )}
     </label>
@@ -1355,20 +1381,25 @@ function Checkout({
     setDetails({ ...details, [key]: value })
     try {
       if (key === "name") localStorage.setItem("messmate_customer_name", value)
-      if (key === "phone") localStorage.setItem("messmate_phone", value)
+      if (key === "phone" && isValidIndianPhone(value)) localStorage.setItem("messmate_phone", value)
       if (key === "hostel") localStorage.setItem("messmate_hostel", value)
       if (key === "room") localStorage.setItem("messmate_room", value)
     } catch {}
   }
 
   const cleanPhone = details.phone.replace(/\D/g, "")
-  const isPhoneValid = cleanPhone.length === 10
+  const isPhoneValid = isValidIndianPhone(cleanPhone)
   // Hostel and room only matter for room delivery; pickup uses the chosen pickup point.
   const isComplete = Boolean(
     details.name.trim() &&
     isPhoneValid &&
     (fulfilment === "pickup" || (details.hostel.trim() && details.room.trim()))
   )
+  const missing = !details.name.trim()
+    ? "Please enter your name to continue"
+    : !isPhoneValid
+      ? "Please enter a valid 10-digit mobile number"
+      : "Please choose your hostel and room number"
 
   return (
     <>
@@ -1393,6 +1424,7 @@ function Checkout({
                 <Field
                   label="Your name"
                   placeholder="e.g. Ananya"
+                  autoComplete="name"
                   value={details.name}
                   onChange={(v) => set("name", v)}
                 />
@@ -1400,7 +1432,14 @@ function Checkout({
                   label="Phone number"
                   placeholder="10-digit mobile number"
                   type="tel"
-                  hint={details.phone ? `${cleanPhone.length}/10 digits` : "10 digits required"}
+                  autoComplete="tel"
+                  hint={
+                    !details.phone
+                      ? "10 digits required"
+                      : cleanPhone.length === 10 && !isPhoneValid
+                        ? "Not a valid mobile number"
+                        : `${cleanPhone.length}/10 digits`
+                  }
                   value={details.phone}
                   onChange={(v) => set("phone", cleanPhoneInput(v))}
                 />
@@ -1422,6 +1461,7 @@ function Checkout({
                 className={`fulfilment-card ${
                   fulfilment === "pickup" ? "selected" : ""
                 }`}
+                aria-pressed={fulfilment === "pickup"}
                 onClick={() => setFulfilment("pickup")}
               >
                 <span className="fulfilment-icon">
@@ -1438,6 +1478,7 @@ function Checkout({
                 className={`fulfilment-card ${
                   fulfilment === "delivery" ? "selected" : ""
                 }`}
+                aria-pressed={fulfilment === "delivery"}
                 onClick={() => setFulfilment("delivery")}
               >
                 <span className="fulfilment-icon">
@@ -1471,6 +1512,7 @@ function Checkout({
                 </div>
               )}
             </section>
+            {!isComplete && <div className="validation-hint mobile-validation-hint">{missing}</div>}
           </div>
           <div className="checkout-right-col">
             <div className="desktop-step-summary-card">
@@ -1497,13 +1539,7 @@ function Checkout({
                   Continue to Fulfilment
                 </PrimaryButton>
               </div>
-              {!isComplete && (
-                <div className="validation-hint">
-                  {!isPhoneValid && details.phone
-                    ? "Please enter a valid 10-digit mobile number"
-                    : "Please fill in all contact fields to continue"}
-                </div>
-              )}
+              {!isComplete && <div className="validation-hint">{missing}</div>}
             </div>
           </div>
         </div>
@@ -1547,6 +1583,7 @@ function Fulfilment({
           <button
             key={item}
             className={slot === item ? "selected" : ""}
+            aria-pressed={slot === item}
             onClick={() => setSlot(item)}
           >
             <Icon name="clock" size={18} />
@@ -1618,6 +1655,7 @@ function Fulfilment({
                       <button
                         key={pt.name}
                         className={pickupPoint === pt.name ? "selected" : ""}
+                        aria-pressed={pickupPoint === pt.name}
                         onClick={() => setPickupPoint(pt.name)}
                       >
                         <Icon name="location" size={18} />
@@ -1762,6 +1800,7 @@ function Payment({
               <button
                 type="button"
                 className={method === "upi" ? "selected" : ""}
+                aria-pressed={method === "upi"}
                 onClick={() => setMethod("upi")}
               >
                 <span className="upi-mark phonepe-pill">
@@ -1776,6 +1815,7 @@ function Payment({
               <button
                 type="button"
                 className={method === "counter" ? "selected" : ""}
+                aria-pressed={method === "counter"}
                 onClick={() => setMethod("counter")}
               >
                 <span className="card-mark">
@@ -1866,7 +1906,7 @@ function Payment({
                     inputMode="numeric"
                     className="utr-input"
                     maxLength={12}
-                    placeholder="e.g. 409128381920 (from PhonePe receipt)"
+                    placeholder="e.g. 409128381920"
                     value={utr}
                     onChange={(e) => setUtr(e.target.value.replace(/\D/g, "").slice(0, 12))}
                   />
@@ -1913,7 +1953,7 @@ function Payment({
                   <strong>₹{subtotal}</strong>
                 </div>
                 <div>
-                  <span>Delivery</span>
+                  <span>{fee ? "Delivery" : "Pickup"}</span>
                   <strong>{fee ? `₹${fee}` : "Free"}</strong>
                 </div>
                 <div>
@@ -1976,6 +2016,10 @@ function Confirmation({
   isCancelled?: boolean
 }) {
   const displayPin = pickupPin || getPickupPin({ order_number: orderNumber })
+  // Latch: dismissing the top alert must not turn a cancelled order back into "You're all set!"
+  const [cancelled, setCancelled] = useState(Boolean(isCancelled))
+  if (isCancelled && !cancelled) setCancelled(true)
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
     <main className="confirmation">
@@ -1988,9 +2032,11 @@ function Confirmation({
             <Icon name="check" size={38} />
           </span>
         </div>
-        <div className="eyebrow">Order confirmed · #{orderNumber}</div>
+        <div className="eyebrow">
+          {cancelled ? "Order cancelled" : "Order confirmed"} · #{orderNumber}
+        </div>
 
-        {isCancelled && (
+        {cancelled && (
           <div className="confirmation-cancelled-banner">
             <Icon name="close" size={18} />
             <div>
@@ -2000,8 +2046,8 @@ function Confirmation({
           </div>
         )}
 
-        <h1>You're all set!</h1>
-        <p>Good food is on the way. We'll take it from here.</p>
+        <h1>{cancelled ? "This order was cancelled" : "You're all set!"}</h1>
+        {!cancelled && <p>Good food is on the way. We'll take it from here.</p>}
         <section className="confirmation-card">
           <div className="confirm-head">
             <span>
@@ -2033,7 +2079,7 @@ function Confirmation({
               <span>
                 <small>Your order</small>
                 <strong>
-                  {items.reduce((sum, item) => sum + item.quantity, 0)} items
+                  {itemCount} {itemCount === 1 ? "item" : "items"}
                 </strong>
               </span>
             </div>
@@ -2058,7 +2104,7 @@ function Confirmation({
               <strong className="pin-digit-display">{displayPin}</strong>
               <span>
                 {fulfilment === "pickup"
-                  ? "Recite this PIN at the campus pickup table to collect your meal securely."
+                  ? "Show this PIN at your pickup point to collect your order."
                   : "Share this PIN with your delivery runner upon room handover."}
               </span>
             </div>
@@ -2067,7 +2113,7 @@ function Confirmation({
         <div className="sms-note">
           <Icon name="shield" size={18} />
           <span>
-            We'll send order details and live updates to{" "}
+            Follow live updates in Track your order with{" "}
             <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
           </span>
         </div>
@@ -2140,40 +2186,31 @@ function OrderRatingWidget({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!rating) return
+    if (!supabase) {
+      alert("Ratings can't be saved right now. Please try again later.")
+      return
+    }
     setIsSending(true)
     const trimmed = feedback.trim()
 
-    // 1. Cache rating locally
-    try {
-      localStorage.setItem(
-        `messmate_order_rating_${orderId}`,
-        JSON.stringify({ rating, feedback: trimmed })
-      )
-    } catch {}
-
-    // 2. Broadcast across Realtime channel so Admin receives it instantly
-    if (supabase) {
-      try {
-        const bc = supabase.channel("messmate_support_broadcast")
-        bc.send({
-          type: "broadcast",
-          event: "order_rating",
-          payload: { orderId, rating, feedback: trimmed },
-        })
-      } catch (err) {
-        console.warn("Rating broadcast notice:", err)
-      }
-
-      // 3. Save to Supabase DB table if column exists
-      try {
-        await supabase
-          .from("orders")
-          .update({ rating, rating_feedback: trimmed })
-          .eq("id", orderId)
-      } catch (err) {
-        console.warn("Rating save notice (run SQL migration to persist in database):", err)
-      }
+    const { error } = await supabase
+      .from("orders")
+      .update({ rating, rating_feedback: trimmed })
+      .eq("id", orderId)
+    if (error) {
+      console.warn("Rating not saved:", error.message)
+      setIsSending(false)
+      alert("Couldn't save your rating. Please try again.")
+      return
     }
+
+    // Saved: remember it on this device and tell the kitchen dashboard instantly
+    safeStorage.setJson(`messmate_order_rating_${orderId}`, { rating, feedback: trimmed })
+    supabase.channel("messmate_support_broadcast").send({
+      type: "broadcast",
+      event: "order_rating",
+      payload: { orderId, rating, feedback: trimmed },
+    })
 
     setIsSending(false)
     setSubmitted(true)
@@ -2265,21 +2302,27 @@ function OrdersPage({
   onReorder: (items: CartItem[]) => void
 }) {
   const [searchInput, setSearchInput] = useState(() => {
-    return phone || localStorage.getItem("messmate_phone") || ""
+    return phone || safeStorage.getItem("messmate_phone", "") || ""
   })
   const [orders, setOrders] = useState<OrderRecord[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [searchedFor, setSearchedFor] = useState<string | null>(null)
+  // Phone whose orders are on screen; live inserts for any other phone are ignored
+  const activePhoneRef = useRef("")
 
   const loadOrders = async (targetPhone?: string) => {
-    if (!supabase) return
+    const q = (targetPhone !== undefined ? targetPhone : searchInput).trim()
+    if (!supabase) {
+      if (q) setMessage("Order tracking isn't available right now. Please try again in a little while.")
+      return
+    }
     setIsLoading(true)
     setMessage(null)
     try {
-      const q = (targetPhone !== undefined ? targetPhone : searchInput).trim()
       if (!q) {
         setOrders([])
-        setIsLoading(false)
+        setSearchedFor(null)
         return
       }
       let query = supabase.from("orders").select("*")
@@ -2302,14 +2345,22 @@ function OrdersPage({
       })
 
       if (error) {
-        setMessage(error.message)
+        console.warn("Order lookup failed:", error.message)
+        setOrders([])
+        setMessage("Couldn't load your orders right now. Please try again.")
       } else {
         setOrders(data as OrderRecord[])
-        localStorage.setItem("messmate_phone", q)
-        setPhone(q)
+        setSearchedFor(q)
+        activePhoneRef.current = normalizedPhone.length === 10 ? normalizedPhone : ""
+        // Only a real 10-digit mobile becomes "your" phone (alerts, chat and checkout use it)
+        if (cleanDigits.length >= 10 && isValidIndianPhone(normalizedPhone)) {
+          safeStorage.setItem("messmate_phone", normalizedPhone)
+          setPhone(normalizedPhone)
+        }
       }
     } catch {
-      setMessage("Could not retrieve orders at this time.")
+      setOrders([])
+      setMessage("Couldn't load your orders right now. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -2332,7 +2383,11 @@ function OrdersPage({
               )
             )
           } else if (payload.eventType === "INSERT") {
-            setOrders((prev) => [payload.new as OrderRecord, ...prev])
+            // The stream carries every student's orders; only show this phone's
+            const row = payload.new as OrderRecord
+            if (activePhoneRef.current && normalizePhone(row.customer_phone) === activePhoneRef.current) {
+              setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]))
+            }
           }
         }
       )
@@ -2429,16 +2484,25 @@ function OrdersPage({
             <h2>Checking orders...</h2>
             <p>Connecting to campus database in real time.</p>
           </div>
+        ) : message ? (
+          <div className="empty-state" style={{ marginTop: 24 }}>
+            <span>
+              <Icon name="receipt" size={28} />
+            </span>
+            <h2>Couldn't load orders</h2>
+            <p>{message}</p>
+            <PrimaryButton onClick={() => go("home")}>Browse the menu</PrimaryButton>
+          </div>
         ) : orders.length === 0 ? (
           <div className="empty-state" style={{ marginTop: 24 }}>
             <span>
               <Icon name="receipt" size={28} />
             </span>
-            <h2>No orders found</h2>
+            <h2>{searchedFor ? "No orders found" : "Look up your orders"}</h2>
             <p>
-              {searchInput
-                ? `No orders found for "${searchInput}". Please check the phone number and try again.`
-                : "Enter your phone number above to see active deliveries and past orders."}
+              {searchedFor
+                ? `No orders found for "${searchedFor}". Please check the number and try again.`
+                : "Enter your 10-digit phone number above to see active deliveries and past orders."}
             </p>
             <PrimaryButton onClick={() => go("home")}>Browse the menu</PrimaryButton>
           </div>
@@ -2695,7 +2759,7 @@ const FAQ_ITEMS = [
     label: "Where is my 4-digit PIN?",
     question: "Where do I find my 4-digit Pickup PIN?",
     answer:
-      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Recite this PIN at the campus pickup counter to verify and collect your food!",
+      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Show this PIN at your pickup point (Kalam Room 341 or Asima Room 110) to collect your food!",
   },
   {
     id: "payment_verify",
@@ -2755,82 +2819,6 @@ const FAQ_ITEMS = [
   },
 ]
 
-function getAutomatedAnswer(query: string): string {
-  const q = query.toLowerCase()
-  if (q.includes("pin") || q.includes("code") || q.includes("pickup code") || q.includes("verification code")) {
-    return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it to the counter staff to collect your order!"
-  }
-  if (q.includes("utr") || q.includes("verify") || q.includes("verification") || q.includes("fraud") || q.includes("phonepe") || q.includes("upi")) {
-    return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
-  }
-  if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
-    return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
-  }
-  if (q.includes("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
-    return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
-  }
-  if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
-    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
-  }
-  if (
-    q.includes("track") ||
-    q.includes("status") ||
-    q.includes("where is my order") ||
-    q.includes("where is my food") ||
-    q.includes("where is my delivery") ||
-    q.includes("where is order") ||
-    q.includes("order progress")
-  ) {
-    return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
-  }
-  if (
-    q.includes("delivery") ||
-    q.includes("timing") ||
-    q.includes("time") ||
-    q.includes("when") ||
-    q.includes("slot")
-  ) {
-    return `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
-  }
-  if (
-    q.includes("pickup point") ||
-    q.includes("pickup location") ||
-    q.includes("where to collect") ||
-    q.includes("where to pick") ||
-    q.includes("where is pickup") ||
-    q.includes("pickup station") ||
-    q.includes("kalam") ||
-    q.includes("apj block") ||
-    q.includes("asima") ||
-    (q.includes("pickup") && !q.includes("pin"))
-  ) {
-    return "Pickups are available at Kalam (Room 341) and Asima (Room 110). Select your preferred spot during checkout!"
-  }
-  if (
-    q.includes("fruit") ||
-    q.includes("bowl") ||
-    q.includes("price") ||
-    q.includes("cost") ||
-    q.includes("portion")
-  ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits, and you can leave out any fruit you don't want.`
-  }
-  if (
-    q.includes("pickle") ||
-    q.includes("shelf") ||
-    q.includes("mango") ||
-    q.includes("gongura") ||
-    q.includes("garlic") ||
-    q.includes("lemon") ||
-    q.includes("expiry")
-  ) {
-    return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
-  }
-  if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
-    return `Orders can be modified before prep starts. Please click 'Talk to Team' below so the ${SUPPORT_NAME} can update your order right away!`
-  }
-  return `Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the ${SUPPORT_NAME}.`
-}
 
 function mergeSupportMessages(
   existing: SupportMsg[],
@@ -2905,14 +2893,14 @@ function SupportChatWidget({
   customerName?: string
 }) {
   // 1. Initial saved messages from localStorage
-  const savedCleanPhone = (customerPhone || localStorage.getItem("messmate_phone") || "")
+  const savedCleanPhone = (customerPhone || safeStorage.getItem("messmate_phone", "") || "")
     .replace(/\D/g, "")
     .slice(-10)
 
   const initialLocalMessages = useMemo(() => {
     try {
       if (savedCleanPhone) {
-        const saved = localStorage.getItem(`messmate_chat_${savedCleanPhone}`)
+        const saved = safeStorage.getItem(`messmate_chat_${savedCleanPhone}`)
         if (saved) {
           const parsed = JSON.parse(saved)
           const sanitized = Array.isArray(parsed)
@@ -2974,10 +2962,10 @@ function SupportChatWidget({
 
   // Request form state - restored from customer prop or localStorage
   const [name, setName] = useState(
-    customerName || localStorage.getItem("messmate_customer_name") || ""
+    customerName || safeStorage.getItem("messmate_customer_name", "") || ""
   )
   const [phone, setPhone] = useState(
-    customerPhone || localStorage.getItem("messmate_phone") || ""
+    customerPhone || safeStorage.getItem("messmate_phone", "") || ""
   )
   const [issue, setIssue] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
@@ -3014,6 +3002,15 @@ function SupportChatWidget({
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [faqHistory, liveMessages, view])
 
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [isOpen])
+
   // Follow the latest checkout details, unless a live chat is already running on a number.
   useEffect(() => {
     if (liveMessagesRef.current.length > 0) return
@@ -3037,6 +3034,7 @@ function SupportChatWidget({
         const incomingPhone = (incoming.phone || "").replace(/\D/g, "").slice(-10)
 
         if (incomingPhone && currentPhone && incomingPhone === currentPhone) {
+          const isNew = mergeSupportMessages(liveMessagesRef.current, [incoming]).length > liveMessagesRef.current.length
           setLiveMessages((prev) => {
             const next = mergeSupportMessages(prev, [incoming])
             saveChatToLocal(currentPhone, next)
@@ -3044,7 +3042,7 @@ function SupportChatWidget({
           })
           if (incoming.sender === "support") {
             setView("live")
-            if (!isOpenRef.current) {
+            if (!isOpenRef.current && isNew) {
               setUnreadCount((c) => c + 1)
             }
           }
@@ -3070,7 +3068,8 @@ function SupportChatWidget({
   // Database fetch & Postgres changes when student phone is available
   useEffect(() => {
     const clean = phone?.replace(/\D/g, "").slice(-10)
-    if (!clean || !supabase) return
+    // Wait for a full number; partial input would subscribe on every keystroke
+    if (!clean || clean.length !== 10 || !supabase) return
 
     supabase
       .from("support_messages")
@@ -3101,6 +3100,7 @@ function SupportChatWidget({
         (payload) => {
           const newMsg = payload.new as SupportMsg
           if (newMsg.phone === clean) {
+            const isNew = mergeSupportMessages(liveMessagesRef.current, [newMsg]).length > liveMessagesRef.current.length
             setLiveMessages((prev) => {
               const next = mergeSupportMessages(prev, [newMsg])
               saveChatToLocal(clean, next)
@@ -3108,7 +3108,7 @@ function SupportChatWidget({
             })
             if (newMsg.sender === "support") {
               setView("live")
-              if (!isOpenRef.current) {
+              if (!isOpenRef.current && isNew) {
                 setUnreadCount((c) => c + 1)
               }
             }
@@ -3142,7 +3142,7 @@ function SupportChatWidget({
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
-    const answer = getAutomatedAnswer(query)
+    const answer = getFaqResponse(query)
 
     setFaqHistory((prev) => [
       ...prev,
@@ -3160,8 +3160,8 @@ function SupportChatWidget({
       } catch {}
     }
     setLiveMessages([])
-    setName(customerName || localStorage.getItem("messmate_customer_name") || "")
-    setPhone(customerPhone || localStorage.getItem("messmate_phone") || "")
+    setName(customerName || safeStorage.getItem("messmate_customer_name", "") || "")
+    setPhone(customerPhone || safeStorage.getItem("messmate_phone", "") || "")
     setIssue("")
     setView("faq")
   }
@@ -3179,11 +3179,16 @@ function SupportChatWidget({
       setFormError("Please enter a valid 10-digit mobile number.")
       return
     }
+    // Without a connection nothing would reach the team, so don't promise a callback
+    if (!supabase) {
+      setFormError("Live support isn't available right now. Please use the WhatsApp or Call buttons at the top of this chat.")
+      return
+    }
 
     setIsSubmitting(true)
     const activePhone = cleanPhone
-    localStorage.setItem("messmate_phone", activePhone)
-    localStorage.setItem("messmate_customer_name", name.trim())
+    safeStorage.setItem("messmate_phone", activePhone)
+    safeStorage.setItem("messmate_customer_name", name.trim())
 
     const issueText = issue.trim() || `Requested ${SUPPORT_NAME} callback.`
 
@@ -3239,10 +3244,19 @@ function SupportChatWidget({
   const handleSendLiveMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!liveInput.trim()) return
+    if (!supabase) {
+      alert("Live chat isn't available right now. Please use the WhatsApp or Call buttons at the top of this chat.")
+      return
+    }
+    const cleanPhone = (phone || safeStorage.getItem("messmate_phone", "") || "").replace(/\D/g, "").slice(-10)
+    // Messages need a full phone number or they can't be saved or answered
+    if (cleanPhone.length !== 10) {
+      setFormError("Please enter your name and 10-digit mobile number first.")
+      setView("request")
+      return
+    }
     const text = liveInput.trim()
     setLiveInput("")
-
-    const cleanPhone = (phone || localStorage.getItem("messmate_phone") || "").replace(/\D/g, "").slice(-10)
 
     const optimistic: SupportMsg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -3252,29 +3266,24 @@ function SupportChatWidget({
       message: text,
       created_at: new Date().toISOString(),
     }
-    const next = mergeSupportMessages(liveMessages, [optimistic])
-    setLiveMessages(next)
-    saveChatToLocal(cleanPhone, next)
+    setLiveMessages((prev) => {
+      const next = mergeSupportMessages(prev, [optimistic])
+      saveChatToLocal(cleanPhone, next)
+      return next
+    })
 
-    if (supabase) {
-      const bc = supabase.channel("messmate_support_broadcast")
-      bc.send({
-        type: "broadcast",
-        event: "support_msg",
-        payload: optimistic,
-      })
-
-      try {
-        await supabase.from("support_messages").insert({
-          phone: cleanPhone,
-          customer_name: name || "Student",
-          sender: "customer",
-          message: text,
-        })
-      } catch (err) {
-        console.warn("DB notice:", err)
-      }
-    }
+    supabase.channel("messmate_support_broadcast").send({
+      type: "broadcast",
+      event: "support_msg",
+      payload: optimistic,
+    })
+    const { error } = await supabase.from("support_messages").insert({
+      phone: cleanPhone,
+      customer_name: name || "Student",
+      sender: "customer",
+      message: text,
+    })
+    if (error) console.warn("Support message not saved:", error.message)
   }
 
   return (
@@ -3301,7 +3310,7 @@ function SupportChatWidget({
                 <Icon name="chat" size={17} />
               </div>
               <div className="support-header-text">
-                <strong>{SUPPORT_NAME}</strong>
+                <strong>{BRAND} Support</strong>
                 <small>
                   <span className="support-header-dot" /> {CONTACT_PHONE}
                 </small>
@@ -3482,6 +3491,7 @@ function SupportChatWidget({
                   <label>Your Issue / Question (Optional)</label>
                   <textarea
                     placeholder="What do you need help with? (e.g. delivery query, change room number...)"
+                    maxLength={2000}
                     value={issue}
                     onChange={(e) => setIssue(e.target.value)}
                   />
@@ -3518,6 +3528,7 @@ function SupportChatWidget({
 
           {view === "live" && (
             <>
+              {liveMessages.some((m) => m.sender === "customer") && (
               <div className="support-status-banner">
                 <div className="support-status-badge">
                   <Icon name="check" size={14} />
@@ -3535,6 +3546,7 @@ function SupportChatWidget({
                   New
                 </button>
               </div>
+              )}
 
               <div className="support-body">
                 {liveMessages.length === 0 ? (
@@ -3561,7 +3573,7 @@ function SupportChatWidget({
                             ? "Happy Tummy Bot"
                             : SUPPORT_NAME}
                       </span>
-                      <div>{msg.message}</div>
+                      <div>{rebrand(msg.message)}</div>
                       <span className="chat-bubble-time">
                         {new Date(msg.created_at).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -3581,6 +3593,7 @@ function SupportChatWidget({
                 <input
                   type="text"
                   placeholder="Type a message..."
+                  maxLength={2000}
                   value={liveInput}
                   onChange={(e) => setLiveInput(e.target.value)}
                 />
@@ -3629,24 +3642,24 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Real-time Sold Out items state
-  const [soldOutItems, setSoldOutItems] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem("messmate_menu_inventory")
-      if (saved) {
-        const items: any[] = JSON.parse(saved)
-        return new Set(items.filter((i) => !i.is_available).map((i) => i.name))
-      }
-    } catch (e) {
-      console.warn("Could not read inventory cache", e)
-    }
-    return new Set()
-  })
+  const [soldOutItems, setSoldOutItems] = useState<Set<string>>(() => new Set())
 
   // Live Ready & Cancelled Alert state
   const [activeReadyOrder, setActiveReadyOrder] = useState<any>(null)
-  const [dismissedReadyIds, setDismissedReadyIds] = useState<Set<string>>(new Set())
+  const [dismissedReadyIds, setDismissedReadyIds] = useState<Set<string>>(
+    () => new Set(safeStorage.getJson<string[]>("ht_dismissed_ready", [])),
+  )
   const [activeCancelledOrder, setActiveCancelledOrder] = useState<any>(null)
-  const [dismissedCancelledIds, setDismissedCancelledIds] = useState<Set<string>>(new Set())
+  const [dismissedCancelledIds, setDismissedCancelledIds] = useState<Set<string>>(
+    () => new Set(safeStorage.getJson<string[]>("ht_dismissed_cancelled", [])),
+  )
+  // Dismissed banners stay dismissed after a reload
+  useEffect(() => {
+    safeStorage.setJson("ht_dismissed_ready", [...dismissedReadyIds])
+    safeStorage.setJson("ht_dismissed_cancelled", [...dismissedCancelledIds])
+  }, [dismissedReadyIds, dismissedCancelledIds])
+  // What the confirmation screen shows; the cart itself is emptied once the order is placed
+  const [orderedItems, setOrderedItems] = useState<CartItem[]>([])
 
   // Count one anonymous visit per browser session for the admin's Store Visitors card (random id, no personal data).
   useEffect(() => {
@@ -3659,14 +3672,22 @@ export default function App() {
     }
     let visitorId = safeStorage.getItem("ht_visitor_id")
     if (!visitorId) {
-      visitorId = crypto.randomUUID()
+      // randomUUID only exists on https/localhost; plain-http testing would otherwise crash the page
+      visitorId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
       safeStorage.setItem("ht_visitor_id", visitorId)
     }
     supabase
       .from("site_visits")
       .insert({ visitor_id: visitorId })
       .then(({ error }) => {
-        if (error) console.warn("Visit not logged:", error.message)
+        if (!error) return
+        console.warn("Visit not logged:", error.message)
+        try {
+          sessionStorage.removeItem("ht_visit_logged") // try again on the next load
+        } catch {}
       })
   }, [])
 
@@ -3689,29 +3710,35 @@ export default function App() {
         }
       })
 
-    // 2. Realtime broadcast channel
+    // 2. Live updates: the admin's broadcast, plus the table itself in case a broadcast is missed
+    const applyStock = (row?: { id?: string; is_available?: boolean }) => {
+      const match = row?.id ? DEFAULT_MENU_ITEMS.find((i) => i.id === row.id) : undefined
+      if (!match || typeof row?.is_available !== "boolean") return
+      setSoldOutItems((prev) => {
+        const next = new Set(prev)
+        if (row.is_available) {
+          next.delete(match.name)
+        } else {
+          next.add(match.name)
+        }
+        return next
+      })
+    }
     const stockChannel = supabase
       .channel("menu_stock_updates")
-      .on("broadcast", { event: "stock_update" }, ({ payload }) => {
-        if (payload?.id) {
-          const match = DEFAULT_MENU_ITEMS.find((i) => i.id === payload.id)
-          if (match) {
-            setSoldOutItems((prev) => {
-              const next = new Set(prev)
-              if (payload.is_available) {
-                next.delete(match.name)
-              } else {
-                next.add(match.name)
-              }
-              return next
-            })
-          }
-        }
-      })
+      .on("broadcast", { event: "stock_update" }, ({ payload }) => applyStock(payload))
+      .subscribe()
+    // Own channel, so a table that isn't set up for realtime can't break the broadcast above
+    const stockTableChannel = supabase
+      .channel("menu_inventory_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_inventory" }, (payload) =>
+        applyStock(payload.new as { id?: string; is_available?: boolean }),
+      )
       .subscribe()
 
     return () => {
       supabase?.removeChannel(stockChannel)
+      supabase?.removeChannel(stockTableChannel)
     }
   }, [])
 
@@ -3719,8 +3746,9 @@ export default function App() {
   useEffect(() => {
     const client = supabase
     if (!client) return
-    const phone = details.phone || localStorage.getItem("messmate_phone")
-    if (!phone) return
+    const phone = normalizePhone(details.phone || safeStorage.getItem("messmate_phone", ""))
+    // Wait for a full number; partial input would query and resubscribe on every keystroke
+    if (phone.length !== 10) return
 
     const checkOrderAlerts = async () => {
       // 1. Ready orders
@@ -3768,7 +3796,7 @@ export default function App() {
       .channel("student_order_alerts")
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "orders" },
+        { event: "UPDATE", schema: "public", table: "orders", filter: `customer_phone=eq.${phone}` },
         (payload) => {
           const updated = payload.new as any
           if (updated.customer_phone === phone) {
@@ -3805,7 +3833,7 @@ export default function App() {
 
     setScreen(next)
 
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    window.scrollTo({ top: 0, behavior: "instant" })
   }
 
   const add = (item: CartItem) => {
@@ -3836,12 +3864,12 @@ export default function App() {
   // 1-Click Reorder Handler
   const handleReorder = (items: CartItem[]) => {
     if (!Array.isArray(items) || items.length === 0) return
-    const current = repriceForReorder(items)
+    const current = repriceForReorder(items).filter((item) => !soldOutItems.has(item.name))
     if (current.length < items.length) {
       alert(
         current.length
-          ? "Some items from this order are no longer on the menu, so they were skipped."
-          : "None of the items from this order are on the menu anymore.",
+          ? "Some items from this order are sold out or no longer on the menu, so they were skipped."
+          : "None of the items from this order are available right now.",
       )
     }
     if (current.length === 0) return
@@ -3854,6 +3882,10 @@ export default function App() {
     if (!cart || cart.length === 0) {
       alert("Your cart is empty! Please add items before checking out.")
       go("home")
+      return
+    }
+    if (!supabase) {
+      alert("Ordering isn't available right now, so your order was not placed. If you already paid, please tap Support to reach us.")
       return
     }
     setIsSubmitting(true)
@@ -3923,6 +3955,8 @@ export default function App() {
             .single()
           data = retry.data
           error = retry.error
+          // The random PIN wasn't saved, so show the one tracking and the kitchen will work out
+          if (data?.order_number) setOrderPin(getPickupPin({ order_number: data.order_number }))
         }
 
         if (error) {
@@ -3947,6 +3981,7 @@ export default function App() {
             safeStorage.setItem("messmate_room", details.room.trim())
           }
           // Clear cart so subsequent orders start fresh
+          setOrderedItems(cart)
           setCart([])
           go("confirmation")
         }
@@ -3970,10 +4005,21 @@ export default function App() {
                 <Icon name="bell" size={16} />
               </span>
               <div>
-                <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
-                <p>
-                  At <u>{activeReadyOrder.hostel || "Campus Station"}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
-                </p>
+                {activeReadyOrder.fulfilment === "delivery" ? (
+                  <>
+                    <strong>Order #{activeReadyOrder.order_number} is ready and heading to your room!</strong>
+                    <p>
+                      To <u>{activeReadyOrder.hostel}, Room {activeReadyOrder.room}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
+                    <p>
+                      At <u>{activeReadyOrder.hostel || "your pickup point"}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             <div className="alert-banner-actions">
@@ -4117,7 +4163,7 @@ export default function App() {
             fulfilment={fulfilment}
             details={details}
             slot={slot}
-            items={cart}
+            items={orderedItems}
             orderNumber={orderNumber}
             paymentMethod={paymentMethodName}
             pickupPoint={pickupPoint}

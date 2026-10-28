@@ -49,7 +49,6 @@ test("Admin revenue counts only money actually collected, and the parts add up",
   assert.equal(s.allTimeRevenue, 205) // today's 175 + yesterday's 30
   assert.equal(s.allTimeTotalOrders, 3)
   assert.equal(s.pendingUtrs, 1) // only the unverified claim; the flagged one is decided
-  assert.equal(s.deliveries, 1)
   assert.equal(s.avgRating, "—") // no fake 5.0 when nobody has rated
 })
 
@@ -61,4 +60,22 @@ test("Admin rating averages real reviews only", () => {
   const s = computeStats(orders, [], [], now)
   assert.equal(s.avgRating, "4.5")
   assert.equal(s.ratedCount, 2)
+})
+
+test("Admin support badge counts only chats still waiting for a reply", () => {
+  const msg = (id: string, phone: string, sender: string, minute: number): any => ({
+    id,
+    phone,
+    sender,
+    customer_name: "Test",
+    message: "hi",
+    created_at: new Date(`2026-10-28T19:${String(minute).padStart(2, "0")}:00`).toISOString(),
+  })
+  const messages = [
+    msg("1", "9876543210", "customer", 1),
+    msg("2", "+91 98765 43210", "support", 2), // answered; same student, phone typed differently
+    msg("3", "9123456780", "customer", 3),
+    msg("ack-4", "9123456780", "support", 4), // the student screen's own auto-note isn't a reply
+  ]
+  assert.equal(computeStats([], messages, [], now).pendingCallbacks, 1)
 })

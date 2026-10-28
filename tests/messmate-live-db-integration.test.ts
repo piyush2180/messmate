@@ -52,13 +52,13 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
       hostel: "Kalam Room-341",
       room: "",
       fulfilment: "pickup",
-      slot: "8:00 - 8:30 PM",
+      slot: "8:00–8:30 PM",
       items: [
-        { id: "mango", name: "Mango Pickle (Avakaya)", weight: "100g", price: 65, quantity: 1 }
+        { id: "pickle-Mango Pickle (Avakaya)-50g", kind: "pickle", name: "Mango Pickle (Avakaya)", detail: "50g", price: 40, quantity: 1 }
       ],
-      subtotal: 65,
+      subtotal: 40,
       delivery_fee: 0,
-      total: 65,
+      total: 40,
       payment_method: "counter",
       payment_status: "pending",
       pickup_code: "8888",
@@ -71,7 +71,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
     assert.ok(data, "Should return created order record")
     assert.ok(data.id, "Created order should have UUID id")
     assert.ok(data.order_number, "Created order should have sequential order_number")
-    assert.equal(data.total, 65)
+    assert.equal(data.total, 40)
     assert.equal(data.status, "placed")
 
     testOrderId = data.id
@@ -85,7 +85,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
       hostel: "Fake Hostel",
       room: "0",
       fulfilment: "pickup",
-      slot: "8:00 - 8:30 PM",
+      slot: "8:00–8:30 PM",
       items: [{ id: "mango", name: "Mango Pickle (Avakaya)", price: -100, quantity: 1 }],
       subtotal: -100,
       delivery_fee: 0,
@@ -107,11 +107,11 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
       hostel: "Kalam",
       room: "101",
       fulfilment: "delivery",
-      slot: "8:00 - 8:30 PM",
-      items: [{ id: "garlic", name: "Garlic Pickle", price: 65, quantity: 1 }],
-      subtotal: 65,
-      delivery_fee: 7,
-      total: 72,
+      slot: "8:00–8:30 PM",
+      items: [{ id: "pickle-Tomato Pickle-50g", kind: "pickle", name: "Tomato Pickle", detail: "50g", price: 40, quantity: 1 }],
+      subtotal: 40,
+      delivery_fee: 5,
+      total: 45,
       payment_method: "counter",
       payment_status: "pending",
       status: "placed"
@@ -125,7 +125,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
     assert.ok(supabase)
     assert.ok(testOrderId, "Requires testOrderId from previous test")
 
-    // Attempt to tamper with price of placed order from ₹65 down to ₹1
+    // Attempt to tamper with price of placed order from ₹40 down to ₹1
     const { error } = await supabase
       .from("orders")
       .update({ total: 1, subtotal: 1 })
@@ -195,7 +195,7 @@ describe("Live Supabase Integration & Security Controls QA", { skip: !hasLiveCon
       .from("support_messages")
       .insert({
         phone: testPhone,
-        customer_name: "Mess Support Team",
+        customer_name: "Happy Tummy Co. Support Team",
         sender: "support",
         message: "Please collect from the Kalam Room-341 counter!"
       })

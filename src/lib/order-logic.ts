@@ -1,4 +1,4 @@
-import { FRUIT_BOWL_PRICE } from "./inventory.ts"
+import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, packOptions, pickleProducts } from "./inventory.ts"
 
 export type SupportMsg = {
   id: string
@@ -87,29 +87,49 @@ export function getPickupPin(order: { pickup_code?: string; order_number?: numbe
 
 /**
  * Determines whether a student can cancel an order based on its current kitchen status.
- * Orders can only be cancelled while in 'pending' status (before kitchen begins preparation).
+ * Orders can only be cancelled while 'placed' (before the kitchen starts preparing).
  */
 export function canCancelOrder(status: string | undefined | null): boolean {
   if (!status) return false
   const s = String(status).toLowerCase().trim()
-  return s === "pending"
+  return s === "placed"
 }
 
+// Matches SUPPORT_NAME in App.tsx (the name support replies are stored under)
+const SUPPORT_TEAM = "Happy Tummy Co. Support Team"
+const BOWL_FRUIT_COUNT = DEFAULT_MENU_ITEMS.filter((item) => item.category === "Fruits").length
+
 /**
- * Automated FAQ bot query resolver for instant student support responses.
+ * Instant answers in the support chat. Checked in order: the first matching topic wins,
+ * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
  */
 export function getFaqResponse(query: string): string {
   const q = (query || "").toLowerCase().trim()
-  if (!q) {
-    return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the Happy Tummy Co. Support Team."
+  // Whole words only, so "pineapple" isn't "pin" and "rate of" isn't a rating
+  const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
+  if (q.includes("cancel") || q.includes("refund") || q.includes("change")) {
+    return `Orders can be modified before prep starts. Please tap 'Talk to our Support Team' below so the ${SUPPORT_TEAM} can update your order right away!`
   }
-
-  // 1. PIN & pickup code queries
-  if (q.includes("pin") || q.includes("pickup code") || q.includes("verification code")) {
-    return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it to the counter staff to collect your order!"
+  if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
+    return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"
   }
-
-  // 2. Order status & live tracking queries (prioritized over generic location queries)
+  if (q.includes("utr") || q.includes("verify") || q.includes("verification") || q.includes("fraud") || q.includes("phonepe") || q.includes("upi")) {
+    return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
+  }
+  if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
+    return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
+  }
+  if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\brates? (of|for)\b/.test(q)) {
+    const chicken = pickleProducts.find((p) => p.diet === "non_veg")
+    const veg = pickleProducts.find((p) => p.diet === "veg")
+    return `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}. Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
+  }
+  if (word("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
+    return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
+  }
+  if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
+    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
+  }
   if (
     q.includes("track") ||
     q.includes("status") ||
@@ -121,27 +141,8 @@ export function getFaqResponse(query: string): string {
   ) {
     return "Go to 'Track Orders' in the menu and enter your phone number to track live order progress from kitchen to delivery!"
   }
-
-  // 3. Payment, UPI, UTR verification
   if (
-    q.includes("utr") ||
-    q.includes("verify") ||
-    q.includes("verification") ||
-    q.includes("phonepe") ||
-    q.includes("upi")
-  ) {
-    return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
-  }
-
-  // 4. Cancellation & refund
-  if (q.includes("cancel") || q.includes("refund") || q.includes("change order")) {
-    return "Orders can be modified before prep starts. Please click 'Talk to Team' below so our Happy Tummy Co. Support Team can update your order right away!"
-  }
-
-  // 5. Delivery slot and timings
-  if (
-    q.includes("delivery timing") ||
-    q.includes("delivery slot") ||
+    q.includes("delivery") ||
     q.includes("timing") ||
     q.includes("time") ||
     q.includes("when") ||
@@ -149,8 +150,6 @@ export function getFaqResponse(query: string): string {
   ) {
     return `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
   }
-
-  // 6. Pickup station / location queries (precise matching, avoiding naked 'where')
   if (
     q.includes("pickup point") ||
     q.includes("pickup location") ||
@@ -165,17 +164,13 @@ export function getFaqResponse(query: string): string {
   ) {
     return "Pickups are available at Kalam (Room 341) and Asima (Room 110). Select your preferred spot during checkout!"
   }
-
-  // 7. Custom fruit bowl
   if (
     q.includes("fruit") ||
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with 8 fresh-cut fruits, including Apple, Banana, Papaya, Pomegranate, and Pineapple. You can leave out any fruit you don't want.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits, and you can leave out any fruit you don't want.`
   }
-
-  // 8. Homemade South Indian Pickles
   if (
     q.includes("pickle") ||
     q.includes("shelf") ||
@@ -187,24 +182,7 @@ export function getFaqResponse(query: string): string {
   ) {
     return "Our South Indian homemade veg pickles last 3–6 months; finish the chicken pickle within 3 months. Keep them cool and dry, refrigerate after opening and always use a dry spoon. Made small-batch with cold-pressed oils."
   }
-
-  // 9. Reorder
-  if (q.includes("reorder") || q.includes("again") || q.includes("repeat") || q.includes("previous")) {
-    return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
-  }
-
-  // 10. Rating
-  if (q.includes("rate") || q.includes("rating") || q.includes("review") || q.includes("feedback") || q.includes("stars")) {
-    return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
-  }
-
-  // 11. Sold out
-  if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
-    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
-  }
-
-  // Fallback
-  return "Thanks for asking! For order-specific requests or anything else, click 'Talk to Team' below to speak directly with the Happy Tummy Co. Support Team."
+  return `Thanks for asking! For order-specific requests or anything else, tap 'Talk to our Support Team' below to speak directly with the ${SUPPORT_TEAM}.`
 }
 
 /**

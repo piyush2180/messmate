@@ -914,7 +914,7 @@ button, input, select, textarea {
 /* Analytics Tab */
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
   gap: 20px;
 }
 
@@ -1754,6 +1754,7 @@ button, input, select, textarea {
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .revenue-toggle-btn:hover {

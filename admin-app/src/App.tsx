@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { supabase } from "./lib/supabase"
 import type {
   OrderRecord,
@@ -16,6 +16,10 @@ import logoUrl from "./assets/happy-tummy-logo.webp"
 // Support replies are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = "Happy Tummy Co. Support Team"
 const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
+// Messages saved before the rename still mention the old name in their text
+const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT_NAME).replace(/MessMate/g, "Happy Tummy Co.")
+// "1 order" / "2 orders"
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 // Web Audio API Ding chime for incoming orders
 function playOrderChime() {
@@ -53,64 +57,49 @@ function get10DigitPhone(raw: string | null | undefined): string {
   return digits.length > 10 ? digits.slice(-10) : digits
 }
 
+// Ids the apps give a message before the database assigns its own
+const isLocalId = (id: unknown) => /^(msg|local|admin|ack)-/.test(String(id))
+
+// The same message seen twice: a screen's local copy and the saved row. Two saved rows are always
+// distinct, even with the same text ("ok", "ok"). Cheap checks first: this runs for every pair.
+function isSameMessage(a: SupportMessage, b: SupportMessage): boolean {
+  if (a.sender !== b.sender || a.message.trim() !== b.message.trim()) return false
+  if (!isLocalId(a.id) && !isLocalId(b.id)) return false
+  const p1 = get10DigitPhone(a.phone)
+  const p2 = get10DigitPhone(b.phone)
+  if (p1 && p2 && p1 !== p2) return false
+  const t1 = new Date(a.created_at).getTime()
+  const t2 = new Date(b.created_at).getTime()
+  return isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
+}
+
 function mergeSupportMessages(
   existing: SupportMessage[],
   incomingList: SupportMessage[]
 ): SupportMessage[] {
-  let result = [...existing]
+  const result = [...existing]
 
   for (const incoming of incomingList) {
-    if (!incoming || !incoming.message) continue
+    // A malformed row or broadcast must not crash the dashboard
+    if (!incoming || !incoming.id || typeof incoming.message !== "string" || !incoming.message) continue
 
-    // 1. Direct ID match
     const exactIndex = result.findIndex((m) => m.id === incoming.id)
     if (exactIndex !== -1) {
       result[exactIndex] = { ...result[exactIndex], ...incoming }
       continue
     }
 
-    // 2. Fuzzy match for optimistic local messages vs canonical server messages
-    const fuzzyIndex = result.findIndex((m) => {
-      const sameSender = m.sender === incoming.sender
-      const p1 = (m.phone || "").replace(/\D/g, "").slice(-10)
-      const p2 = (incoming.phone || "").replace(/\D/g, "").slice(-10)
-      const samePhone = !p1 || !p2 || p1 === p2
-      const sameText = m.message.trim() === incoming.message.trim()
-      const t1 = new Date(m.created_at).getTime()
-      const t2 = new Date(incoming.created_at).getTime()
-      const sameTimeWindow = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
-
-      return sameSender && samePhone && sameText && sameTimeWindow
-    })
-
-    if (fuzzyIndex !== -1) {
-      const existingMsg = result[fuzzyIndex]
-      const incomingIsCanonical =
-        !incoming.id.startsWith("msg-") &&
-        !incoming.id.startsWith("local-") &&
-        !incoming.id.startsWith("admin-")
-      result[fuzzyIndex] = incomingIsCanonical ? incoming : existingMsg
-    } else {
+    const fuzzyIndex = result.findIndex((m) => isSameMessage(m, incoming))
+    if (fuzzyIndex === -1) {
       result.push(incoming)
+    } else if (!isLocalId(incoming.id)) {
+      result[fuzzyIndex] = incoming // the saved row replaces the local copy
     }
   }
 
-  // Deduplicate any repeated messages with identical content in close proximity
   const deduped: SupportMessage[] = []
   for (const msg of result) {
-    const isDup = deduped.some((d) => {
-      if (d.id === msg.id) return true
-      const sameSender = d.sender === msg.sender
-      const p1 = (d.phone || "").replace(/\D/g, "").slice(-10)
-      const p2 = (msg.phone || "").replace(/\D/g, "").slice(-10)
-      const samePhone = !p1 || !p2 || p1 === p2
-      const sameText = d.message.trim() === msg.message.trim()
-      const t1 = new Date(d.created_at).getTime()
-      const t2 = new Date(msg.created_at).getTime()
-      const sameTime = isNaN(t1) || isNaN(t2) || Math.abs(t1 - t2) < 90000
-      return sameSender && samePhone && sameText && sameTime
-    })
-    if (!isDup) deduped.push(msg)
+    if (!deduped.some((d) => d.id === msg.id || isSameMessage(d, msg))) deduped.push(msg)
   }
 
   return deduped.sort(
@@ -121,6 +110,7 @@ function mergeSupportMessages(
 export default function App() {
   const [tab, setTab] = useState<DashboardTab>("orders")
   const [orders, setOrders] = useState<OrderRecord[]>([])
+  const [ordersError, setOrdersError] = useState(false)
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>(() => {
     try {
       const saved = localStorage.getItem("messmate_admin_support_messages")
@@ -145,13 +135,26 @@ export default function App() {
   })
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
+  const [visitStatsState, setVisitStatsState] = useState<"loading" | "ready" | "missing" | "error">("loading")
+  // Ticks every minute so "today" numbers and "Today, …" labels roll over at midnight
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
 
   // Store visitor totals from the visit_stats() SQL function; refreshed whenever Analytics opens.
   useEffect(() => {
     if (!supabase || tab !== "analytics") return
     supabase.rpc("visit_stats").then(({ data, error }) => {
-      if (error) console.warn("Visitor stats unavailable:", error.message)
-      setVisitStats(error ? null : (data as VisitStats))
+      if (error) {
+        console.warn("Visitor stats unavailable:", error.message)
+        // PGRST202 / 42883: the visit_stats() function hasn't been created yet
+        setVisitStatsState(error.code === "PGRST202" || error.code === "42883" ? "missing" : "error")
+        return
+      }
+      setVisitStats(data as VisitStats)
+      setVisitStatsState("ready")
     })
   }, [tab])
 
@@ -184,10 +187,10 @@ export default function App() {
   const [slotFilter, setSlotFilter] = useState<string>("all")
   const [revenuePeriod, setRevenuePeriod] = useState<"today" | "all">("today")
 
-  // Support thread state
+  // Support thread state (mobile = the CSS single-pane layout, max-width: 768px)
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return window.innerWidth < 768
+      return window.innerWidth <= 768
     }
     return false
   })
@@ -196,7 +199,7 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
+      setIsMobile(window.innerWidth <= 768)
     }
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
@@ -211,6 +214,8 @@ export default function App() {
       .select("*")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
+        if (error) console.error("Failed to load orders:", error.message)
+        setOrdersError(Boolean(error))
         if (!error && data) {
           try {
             const cachedRatings = JSON.parse(localStorage.getItem("messmate_cached_ratings") || "{}")
@@ -267,7 +272,9 @@ export default function App() {
     supabase
       .from("support_messages")
       .select("*")
-      .order("created_at", { ascending: true })
+      // Newest first so the row limit drops old chats, not new ones (the merge re-sorts oldest first)
+      .order("created_at", { ascending: false })
+      .limit(1000)
       .then(({ data, error }) => {
         if (!error && data) {
           setSupportMessages((prev) => {
@@ -318,9 +325,16 @@ export default function App() {
         }
       })
       .on("broadcast", { event: "sync_history" }, ({ payload }) => {
-        if (Array.isArray(payload) && payload.length > 0) {
+        // Only messages a student screen hasn't saved yet: saved ones come from the database (so deleted
+        // chats stay deleted), and "ack-" is the student's own automatic note, not a staff reply
+        const unsaved = Array.isArray(payload)
+          ? (payload as SupportMessage[]).filter(
+              (m) => /^(msg|local)-/.test(String(m?.id)) && Date.now() - new Date(m.created_at).getTime() < 5 * 60 * 1000,
+            )
+          : []
+        if (unsaved.length > 0) {
           setSupportMessages((prev) => {
-            const next = mergeSupportMessages(prev, payload as SupportMessage[])
+            const next = mergeSupportMessages(prev, unsaved)
             saveAdminSupportToLocal(next)
             return next
           })
@@ -407,62 +421,59 @@ export default function App() {
   // Toggle Item Stock (Sold Out / In Stock)
   const handleToggleStock = async (itemId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus
-    const updatedInventory = inventory.map((item) =>
-      item.id === itemId ? { ...item, is_available: newStatus } : item
-    )
-    setInventory(updatedInventory)
-    localStorage.setItem("messmate_menu_inventory", JSON.stringify(updatedInventory))
+    const setStock = (available: boolean) =>
+      setInventory((prev) => {
+        const next = prev.map((item) => (item.id === itemId ? { ...item, is_available: available } : item))
+        try {
+          localStorage.setItem("messmate_menu_inventory", JSON.stringify(next))
+        } catch {}
+        return next
+      })
+    setStock(newStatus)
 
-    if (supabase) {
-      // 1. Broadcast to all active student screens instantly
-      try {
-        const stockChannel = supabase.channel("menu_stock_updates")
-        stockChannel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            stockChannel.send({
-              type: "broadcast",
-              event: "stock_update",
-              payload: { id: itemId, is_available: newStatus },
-            })
-          }
-        })
-      } catch (err) {
-        console.warn("Stock broadcast notice:", err)
-      }
-
-      // 2. Persist to table if table exists
-      try {
-        const itemObj = updatedInventory.find((i) => i.id === itemId)
-        if (itemObj) {
-          await supabase.from("menu_inventory").upsert({
-            id: itemObj.id,
-            name: itemObj.name,
-            category: itemObj.category,
-            is_available: newStatus,
-            updated_at: new Date().toISOString(),
-          })
-        }
-      } catch (err) {
-        // Table might not exist yet; broadcast and localStorage already succeeded
-      }
+    const itemObj = inventory.find((i) => i.id === itemId)
+    if (!supabase || !itemObj) return
+    const { error } = await supabase.from("menu_inventory").upsert({
+      id: itemObj.id,
+      name: itemObj.name,
+      category: itemObj.category,
+      is_available: newStatus,
+      updated_at: new Date().toISOString(),
+    })
+    if (error) {
+      console.error("Failed to save stock change:", error.message)
+      setStock(currentStatus)
+      alert("Couldn't save the stock change. Please check the connection and try again.")
+      return
     }
+    // Tell open student screens and other admin devices now. This returns the channel the stock
+    // effect above already joined, so send directly: subscribing to it again never fires.
+    supabase.channel("menu_stock_updates").send({
+      type: "broadcast",
+      event: "stock_update",
+      payload: { id: itemId, is_available: newStatus },
+    })
   }
 
   // Update Order Status
   const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
+    const previous = orders.find((o) => o.id === orderId)?.status
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
     )
 
-    if (supabase) {
-      try {
-        await supabase
-          .from("orders")
-          .update({ status: nextStatus })
-          .eq("id", orderId)
-      } catch (err) {
-        console.error("Failed to update order status:", err)
+    if (!supabase) return
+    // supabase-js reports failures (even offline) in `error` instead of throwing
+    const { error } = await supabase.from("orders").update({ status: nextStatus }).eq("id", orderId)
+    if (error) {
+      console.error("Failed to update order status:", error.message)
+      // Undo just this change, unless a newer update already replaced it
+      if (previous) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId && o.status === nextStatus ? { ...o, status: previous } : o))
+        )
       }
+      alert("Couldn't save the order status. Please check the connection and try again.")
     }
   }
 
@@ -490,17 +501,24 @@ export default function App() {
         if (error && error.code === "42703") {
           const cleanMethod = (orderToUpdate.payment_method || "").replace(/\s*\[(VERIFIED|FAILED)\]/g, "")
           const updatedMethod = `${cleanMethod} [${verified ? "VERIFIED" : "FAILED"}]`
-          await supabase
+          const fallback = await supabase
             .from("orders")
             .update({ payment_method: updatedMethod })
             .eq("id", orderId)
+          if (fallback.error) throw fallback.error
         } else if (error) {
           throw error
         }
       } catch (err) {
         console.error("Failed to update payment verification:", err)
-        // Put the card back so it never shows a payment status the database doesn't have
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? orderToUpdate : o)))
+        // Put only the payment badge back, so a status change that arrived meanwhile stays
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === orderId
+              ? { ...o, payment_status: orderToUpdate.payment_status, payment_method: orderToUpdate.payment_method }
+              : o
+          )
+        )
         alert("Couldn't save the payment status. Please try again.")
       }
     }
@@ -513,14 +531,16 @@ export default function App() {
       if (fulfilmentFilter !== "all" && order.fulfilment !== fulfilmentFilter) return false
       if (slotFilter !== "all" && order.slot !== slotFilter) return false
 
-      if (search.trim()) {
-        const q = search.toLowerCase()
+      const q = search.trim().toLowerCase()
+      if (q) {
         const orderNumStr = `#${order.order_number}`
         const pin = getPickupPin(order)
         const matchNum = orderNumStr.includes(q)
         const matchPin = pin.includes(q)
         const matchName = (order.customer_name || "").toLowerCase().includes(q)
-        const matchPhone = (order.customer_phone || "").toLowerCase().includes(q)
+        // "+91 98765 43210" or "98765-43210" still finds the stored 10 digits
+        const phoneQuery = /^[\d\s+()-]+$/.test(q) ? get10DigitPhone(q) : ""
+        const matchPhone = phoneQuery !== "" && get10DigitPhone(order.customer_phone).includes(phoneQuery)
         const matchHostel = (order.hostel || "").toLowerCase().includes(q)
         const matchRoom = (order.room || "").toLowerCase().includes(q)
         return matchNum || matchPin || matchName || matchPhone || matchHostel || matchRoom
@@ -531,7 +551,21 @@ export default function App() {
   }, [orders, statusFilter, fulfilmentFilter, slotFilter, search])
 
   // KPI Calculations & Analytics Breakdown
-  const stats = useMemo(() => computeStats(orders, supportMessages, inventory), [orders, supportMessages, inventory])
+  const stats = useMemo(
+    () => computeStats(orders, supportMessages, inventory, now),
+    [orders, supportMessages, inventory, now],
+  )
+
+  // Analytics charts use the same period as the money cards; cancelled orders are left out
+  const chartOrders = useMemo(() => {
+    const startOfToday = new Date(now).setHours(0, 0, 0, 0)
+    return orders.filter(
+      (o) => o.status !== "cancelled" && (revenuePeriod === "all" || new Date(o.created_at).getTime() >= startOfToday),
+    )
+  }, [orders, revenuePeriod, now])
+  const chartDeliveries = chartOrders.filter((o) => o.fulfilment === "delivery").length
+  const chartPickups = chartOrders.filter((o) => o.fulfilment === "pickup").length
+  const periodLabel = revenuePeriod === "all" ? "All time" : "Today"
 
   // Support Threads grouped by clean 10-digit phone
   const supportThreads = useMemo(() => {
@@ -541,7 +575,7 @@ export default function App() {
       if (!cleanPhone) return
       if (!threads[cleanPhone]) {
         threads[cleanPhone] = {
-          customerName: msg.customer_name || "Student",
+          customerName: "Student",
           messages: [],
           latestAt: msg.created_at,
         }
@@ -551,6 +585,7 @@ export default function App() {
         threads[cleanPhone].latestAt = msg.created_at
       }
       if (
+        msg.sender === "customer" &&
         msg.customer_name &&
         msg.customer_name !== "Student" &&
         !SUPPORT_NAMES.includes(msg.customer_name)
@@ -585,16 +620,27 @@ export default function App() {
     }
   }, [isMobile, supportThreads, selectedPhone])
 
+  const threadMessagesRef = useRef<HTMLDivElement>(null)
   const activeThread = useMemo(() => {
     if (!selectedPhone) return null
     const cleanSelected = get10DigitPhone(selectedPhone) || selectedPhone
     return supportThreads.find((t) => (get10DigitPhone(t.phone) || t.phone) === cleanSelected) || null
   }, [supportThreads, selectedPhone])
 
+  // Open a chat at its newest message, and follow new ones as they arrive
+  useEffect(() => {
+    const el = threadMessagesRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [tab, activeThread?.phone, activeThread?.messages.length])
+
   // Send Admin Reply to Support Thread
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPhone || !adminReplyText.trim()) return
+    if (!supabase) {
+      alert("Not connected to the database, so the reply can't be sent.")
+      return
+    }
 
     const reply = adminReplyText.trim()
     setAdminReplyText("")
@@ -603,36 +649,41 @@ export default function App() {
     const optimistic: SupportMessage = {
       id: `admin-reply-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       phone: targetPhone,
-      customer_name: activeThread?.customerName || "Student",
+      customer_name: SUPPORT_NAME,
       sender: "support",
       message: reply,
       created_at: new Date().toISOString(),
     }
-    const next = mergeSupportMessages(supportMessages, [optimistic])
-    setSupportMessages(next)
-    saveAdminSupportToLocal(next)
+    setSupportMessages((prev) => {
+      const next = mergeSupportMessages(prev, [optimistic])
+      saveAdminSupportToLocal(next)
+      return next
+    })
 
-    if (supabase) {
-      // 1. Broadcast to student screen in real-time
-      const bc = supabase.channel("messmate_support_broadcast")
-      bc.send({
-        type: "broadcast",
-        event: "support_msg",
-        payload: optimistic,
+    const { error } = await supabase.from("support_messages").insert({
+      phone: targetPhone,
+      customer_name: SUPPORT_NAME,
+      sender: "support",
+      message: reply,
+    })
+    if (error) {
+      console.error("Reply not saved:", error.message)
+      // Take the bubble back and return the text, so nothing looks sent that wasn't
+      setSupportMessages((prev) => {
+        const next = prev.filter((m) => m.id !== optimistic.id)
+        saveAdminSupportToLocal(next)
+        return next
       })
-
-      // 2. Attempt saving to DB table
-      try {
-        await supabase.from("support_messages").insert({
-          phone: targetPhone,
-          customer_name: SUPPORT_NAME,
-          sender: "support",
-          message: reply,
-        })
-      } catch (err) {
-        console.warn("DB notice (table might not exist yet):", err)
-      }
+      setAdminReplyText(reply)
+      alert("Couldn't send the reply. Please check the connection and try again.")
+      return
     }
+    // Saved: show it on the student's screen straight away
+    supabase.channel("messmate_support_broadcast").send({
+      type: "broadcast",
+      event: "support_msg",
+      payload: optimistic,
+    })
   }
 
   // Filtered inventory list
@@ -675,7 +726,7 @@ export default function App() {
               <span>Menu & Stock</span>
               {stats.soldOutCount > 0 && (
                 <span className="nav-counter" style={{ background: "#d90429", color: "#fff" }}>
-                  {stats.soldOutCount} Sold
+                  {stats.soldOutCount} sold out
                 </span>
               )}
             </button>
@@ -850,7 +901,7 @@ export default function App() {
                 >
                   <option value="all">All Fulfilment</option>
                   <option value="delivery">Hostel Room Delivery</option>
-                  <option value="pickup">Campus Pickup Table</option>
+                  <option value="pickup">Campus pickup</option>
                 </select>
 
                 <select
@@ -869,20 +920,28 @@ export default function App() {
             {/* Orders Feed (Responsive Cards) */}
             {filteredOrders.length === 0 ? (
               <div className="empty-state">
-                <p>No orders found matching this filter.</p>
-                <button
-                  type="button"
-                  className="action-btn secondary"
-                  style={{ width: "auto", padding: "8px 20px" }}
-                  onClick={() => {
-                    setStatusFilter("all")
-                    setFulfilmentFilter("all")
-                    setSlotFilter("all")
-                    setSearch("")
-                  }}
-                >
-                  Reset All Filters
-                </button>
+                <p>
+                  {ordersError
+                    ? "Couldn't load orders. Check the connection and reload the page."
+                    : orders.length === 0
+                      ? "No orders yet."
+                      : "No orders match these filters."}
+                </p>
+                {orders.length > 0 && (
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    style={{ width: "auto", padding: "8px 20px" }}
+                    onClick={() => {
+                      setStatusFilter("all")
+                      setFulfilmentFilter("all")
+                      setSlotFilter("all")
+                      setSearch("")
+                    }}
+                  >
+                    Reset All Filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="orders-feed-grid">
@@ -986,7 +1045,7 @@ export default function App() {
                       </div>
                       <span className="inbox-item-phone">{get10DigitPhone(thread.phone)}</span>
                       <div className="inbox-item-preview">
-                        {thread.messages[thread.messages.length - 1]?.message || "Requested contact"}
+                        {rebrand(thread.messages[thread.messages.length - 1]?.message || "Requested contact")}
                       </div>
                     </div>
                   ))
@@ -1024,7 +1083,7 @@ export default function App() {
                     </a>
                   </div>
 
-                  <div className="thread-messages">
+                  <div className="thread-messages" ref={threadMessagesRef}>
                     {activeThread.messages.map((m) => (
                       <div
                         key={m.id}
@@ -1035,7 +1094,7 @@ export default function App() {
                             ? activeThread.customerName
                             : SUPPORT_NAME}
                         </div>
-                        <div>{m.message}</div>
+                        <div>{rebrand(m.message)}</div>
                         <div style={{ fontSize: 10, textAlign: "right", marginTop: 4, opacity: 0.7 }}>
                           {formatWhen(m.created_at)}
                         </div>
@@ -1047,6 +1106,7 @@ export default function App() {
                     <input
                       type="text"
                       placeholder="Type a message to the student (syncs to their screen in real-time)..."
+                      maxLength={2000}
                       value={adminReplyText}
                       onChange={(e) => setAdminReplyText(e.target.value)}
                       className="thread-reply-input"
@@ -1079,31 +1139,41 @@ export default function App() {
                 <div>
                   <span>Store Visitors</span>
                   <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
-                    People who opened the student website (one visit per browser session)
+                    Phones and laptops that opened the student website (a visit is one browser-tab session)
                   </div>
                 </div>
               </div>
-              {visitStats ? (
+              {visitStatsState === "ready" && visitStats ? (
                 <div className="analytics-financial-grid">
                   <div className="fin-metric-box">
                     <small>Today</small>
                     <strong>{visitStats.today_visitors}</strong>
-                    <span>people · {visitStats.today_visits} visits</span>
+                    <span>
+                      {visitStats.today_visitors === 1 ? "visitor" : "visitors"} · {plural(visitStats.today_visits, "visit", "visits")}
+                    </span>
                   </div>
                   <div className="fin-metric-box">
                     <small>Last 7 Days</small>
                     <strong>{visitStats.week_visitors}</strong>
-                    <span>people · {visitStats.week_visits} visits</span>
+                    <span>
+                      {visitStats.week_visitors === 1 ? "visitor" : "visitors"} · {plural(visitStats.week_visits, "visit", "visits")}
+                    </span>
                   </div>
                   <div className="fin-metric-box highlight">
                     <small>All Time</small>
                     <strong>{visitStats.total_visitors}</strong>
-                    <span>people · {visitStats.total_visits} visits</span>
+                    <span>
+                      {visitStats.total_visitors === 1 ? "visitor" : "visitors"} · {plural(visitStats.total_visits, "visit", "visits")}
+                    </span>
                   </div>
                 </div>
               ) : (
                 <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>
-                  Visitor counts appear once the site_visits SQL has been run in Supabase.
+                  {visitStatsState === "missing"
+                    ? "Visitor counts appear once the site_visits SQL has been run in Supabase."
+                    : visitStatsState === "error"
+                      ? "Couldn't load visitor counts. Open this tab again to retry."
+                      : "Loading visitor counts…"}
                 </p>
               )}
             </div>
@@ -1114,8 +1184,8 @@ export default function App() {
                 <div>
                   <span>
                     {revenuePeriod === "all"
-                      ? "All-Time Complete Financial Settlement & Revenue"
-                      : "Daily Financial Settlement & Cash Flow"}
+                      ? "All-Time Revenue"
+                      : "Daily Cash Flow"}
                   </span>
                   <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
                     {revenuePeriod === "all"
@@ -1137,7 +1207,7 @@ export default function App() {
                       className={`revenue-toggle-btn ${revenuePeriod === "all" ? "active" : ""}`}
                       onClick={() => setRevenuePeriod("all")}
                     >
-                      All Time Complete Revenue
+                      All Time
                     </button>
                   </div>
                   <span className="brand-pill">Verified vs Cash</span>
@@ -1149,21 +1219,24 @@ export default function App() {
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeUpiRevenue : stats.todayUpiRevenue).toLocaleString()}
                   </strong>
-                  <span>{revenuePeriod === "all" ? stats.allTimeUpiCount : stats.todayUpiCount} verified orders</span>
+                  <span>{plural(revenuePeriod === "all" ? stats.allTimeUpiCount : stats.todayUpiCount, "verified order", "verified orders")}</span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Paid at Counter</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeCashRevenue : stats.todayCashRevenue).toLocaleString()}
                   </strong>
-                  <span>{revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount} handed-over orders</span>
+                  <span>{plural(revenuePeriod === "all" ? stats.allTimeCashCount : stats.todayCashCount, "handed-over order", "handed-over orders")}</span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Delivery Fees</small>
                   <strong>
                     ₹{(revenuePeriod === "all" ? stats.allTimeDeliveryFees : stats.todayDeliveryFees).toLocaleString()}
                   </strong>
-                  <span>{revenuePeriod === "all" ? stats.allTimePaidDeliveries : stats.todayPaidDeliveries} paid room deliveries</span>
+                  <span>
+                    {plural(revenuePeriod === "all" ? stats.allTimePaidDeliveries : stats.todayPaidDeliveries, "paid room delivery", "paid room deliveries")}
+                    {" "}· already counted in UPI + counter
+                  </span>
                 </div>
                 <div className="fin-metric-box">
                   <small>Still to Collect</small>
@@ -1179,8 +1252,8 @@ export default function App() {
                   </strong>
                   <span>
                     {revenuePeriod === "all"
-                      ? `${stats.allTimeTotalOrders} paid orders (all time)`
-                      : `${stats.todayUpiCount + stats.todayCashCount} paid orders today`}
+                      ? `${plural(stats.allTimeTotalOrders, "paid order", "paid orders")} (all time)`
+                      : `${plural(stats.todayUpiCount + stats.todayCashCount, "paid order", "paid orders")} today`}
                   </span>
                 </div>
               </div>
@@ -1188,18 +1261,18 @@ export default function App() {
 
             <div className="analytics-card">
               <div className="analytics-card-title">
-                <span>Fulfilment Ratio</span>
+                <span>Fulfilment Ratio · {periodLabel}</span>
               </div>
               <div className="analytics-bar-row">
                 <div className="analytics-bar-header">
                   <span>Hostel Room Delivery</span>
-                  <span>{stats.deliveries} orders</span>
+                  <span>{plural(chartDeliveries, "order", "orders")}</span>
                 </div>
                 <div className="analytics-progress-track">
                   <div
                     className="analytics-progress-fill"
                     style={{
-                      width: `${(stats.deliveries / Math.max(stats.deliveries + stats.pickups, 1)) * 100}%`,
+                      width: `${(chartDeliveries / Math.max(chartDeliveries + chartPickups, 1)) * 100}%`,
                       background: "#bc6c25",
                     }}
                   />
@@ -1207,14 +1280,14 @@ export default function App() {
               </div>
               <div className="analytics-bar-row">
                 <div className="analytics-bar-header">
-                  <span>Campus Pickup (Station)</span>
-                  <span>{stats.pickups} orders</span>
+                  <span>Campus Pickup</span>
+                  <span>{plural(chartPickups, "order", "orders")}</span>
                 </div>
                 <div className="analytics-progress-track">
                   <div
                     className="analytics-progress-fill"
                     style={{
-                      width: `${(stats.pickups / Math.max(stats.deliveries + stats.pickups, 1)) * 100}%`,
+                      width: `${(chartPickups / Math.max(chartDeliveries + chartPickups, 1)) * 100}%`,
                       background: "var(--olive)",
                     }}
                   />
@@ -1224,16 +1297,16 @@ export default function App() {
 
             <div className="analytics-card">
               <div className="analytics-card-title">
-                <span>Evening Slots Volume</span>
+                <span>Evening Slots Volume · {periodLabel}</span>
               </div>
               {["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"].map((slotName) => {
-                const count = orders.filter((o) => o.slot === slotName && o.status !== "cancelled").length
-                const pct = (count / Math.max(orders.length, 1)) * 100
+                const count = chartOrders.filter((o) => o.slot === slotName).length
+                const pct = (count / Math.max(chartOrders.length, 1)) * 100
                 return (
                   <div key={slotName} className="analytics-bar-row">
                     <div className="analytics-bar-header">
                       <span>{slotName}</span>
-                      <span>{count} orders</span>
+                      <span>{plural(count, "order", "orders")}</span>
                     </div>
                     <div className="analytics-progress-track">
                       <div className="analytics-progress-fill" style={{ width: `${pct}%` }} />
@@ -1328,7 +1401,7 @@ function OrderCard({
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                   <circle cx="12" cy="10" r="3" />
                 </svg>
-                {order.hostel || "Campus Pickup Table"}
+                {order.hostel || "Campus pickup"}
               </span>
             )}
           </span>
@@ -1351,14 +1424,14 @@ function OrderCard({
 
       {/* Items List */}
       <div className="card-items-block">
-        {(order.items || []).map((item, idx) => (
+        {(Array.isArray(order.items) ? order.items : []).filter(Boolean).map((item, idx) => (
           <div key={idx} className="card-item-entry">
             <span className="item-title">
-              <strong className="item-qty-tag">{item.quantity}×</strong>
-              <span>{item.name}</span>
-              {item.detail && <small className="item-subdetail">({item.detail})</small>}
+              <strong className="item-qty-tag">{Number(item.quantity)}×</strong>
+              <span>{String(item.name ?? "")}</span>
+              {item.detail && <small className="item-subdetail">({String(item.detail)})</small>}
             </span>
-            <span className="item-price-tag">₹{item.price * item.quantity}</span>
+            <span className="item-price-tag">₹{Number(item.price) * Number(item.quantity)}</span>
           </div>
         ))}
       </div>

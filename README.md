@@ -420,11 +420,14 @@ Staff checks Soundbox / Bank App ──► Clicks "Verify Payment" ──► Ord
 
 ## 🧪 Automated QA & Testing Suite
 
-Happy Tummy Co. includes 55 automated unit, financial, security, and live database integration tests executed via the native Node.js test runner:
+Happy Tummy Co. includes offline unit tests (menu, money, bot, admin stats) and live database integration tests, run with the native Node.js test runner:
 
 ```bash
-# Run the entire test suite
+# Offline tests: safe to run anytime, touch no database
 npm test
+
+# Live database tests: they WRITE test orders and messages to the Supabase project in .env
+npm run test:live
 ```
 
 ### Verified Test Suites
@@ -438,9 +441,9 @@ npm test
 2. **Deterministic Pickup PIN Algorithm (6 Tests)**: Preserves explicit codes, calculates 4-digit PINs deterministically, tests zero/negative/undefined order numbers, and fuzzes 1,000 random order numbers.
 3. **Order Subtotals & Delivery Fees (4 Tests)**: Empty cart handling, ₹0 campus pickup, ₹5 room delivery, and negative quantity protections.
 4. **Menu Pricing & Reorder (2 Tests)**: ₹40/50g pickles (₹70 chicken), fixed ₹60 fruit bowl, separate cart lines per pickle, and reorders re-priced at today's menu.
-5. **Order Cancellation Policy (1 Test)**: Restricts cancellation strictly to pending orders.
+5. **Order Cancellation Policy (1 Test)**: Restricts cancellation strictly to placed orders (before the kitchen starts).
 6. **Support Message Deduplication & Sorting (4 Tests)**: Exact ID deduplication, optimistic-to-server merging, chronological ascending order sorting, and rapid double-click filtering.
-7. **Automated FAQ Intelligence Bot (7 Tests)**: Tests delivery timing, pickup spots, fruit pricing, shelf life, order tracking, cancellation queries, and fallback routing.
+7. **Automated FAQ Intelligence Bot (10 Tests)**: Tests the bot the support chat really uses: delivery timing, pickup spots, menu prices, whole-word matching, shelf life, order tracking, refunds, and fallback routing.
 8. **UPI UTR Reference Validation (4 Tests)**: Enforces 12-digit numeric constraint, rejects malformed lengths, and blocks dummy patterns (`000000000000`, `123456789012`).
 9. **Order Tracking Phone Normalization (1 Test)**: Normalizes varied customer phone inputs to find matching orders.
 10. **Empty Cart Defense (1 Test)**: Detects and rejects empty order submissions.
