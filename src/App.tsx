@@ -1768,9 +1768,6 @@ function Fulfilment({
                     </div>
                   </div>
                 </div>
-                <div className="availability">
-                  <span></span>Pickup available every day
-                </div>
                 {/* Asima has one pickup window per morning, so the hours are shown, not picked */}
                 <div className="time-section">
                   <h2>Pickup time</h2>
