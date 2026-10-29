@@ -2290,13 +2290,16 @@ function Confirmation({
             </div>
           </div>
         </section>
-        <div className="sms-note">
-          <Icon name="shield" size={18} />
-          <span>
-            Follow live updates in Track your order with{" "}
-            <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
-          </span>
-        </div>
+        {/* Asima collects near the mess with the PIN, so it doesn't need the tracking hint */}
+        {fulfilment !== "pickup" && (
+          <div className="sms-note">
+            <Icon name="shield" size={18} />
+            <span>
+              Follow live updates in Track your order with{" "}
+              <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
+            </span>
+          </div>
+        )}
         {(fulfilment === "pickup" ? ASIMA_CONTACTS : [CONTACT_PHONE]).map((phone, i) => {
           const digits = phone.replace(/\D/g, "")
           return (
