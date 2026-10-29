@@ -102,3 +102,16 @@ test("Admin money handles no-shows, refunds and counter sales added by hand", ()
   assert.equal(s.todayCounterSales, 2)
   assert.equal(s.active, 0)
 })
+
+test("Spent adds up expenses for today and all time, kept apart from money collected", () => {
+  const expense = (amount: number, at: string): any => ({ id: `expense-${amount}`, amount, note: null, created_at: at })
+  const orders = [order({ id: "counter-done", status: "delivered", total: 70 })]
+  const s = computeStats(orders, [], [], now, [], [expense(300, today(9)), expense(45.5, today(12)), expense(200, yesterday)])
+
+  assert.equal(s.spentToday, 345.5)
+  assert.equal(s.spentAllTime, 545.5) // plus yesterday's ₹200
+  assert.equal(s.todayExpenseCount, 2)
+  assert.equal(s.allTimeExpenseCount, 3)
+  assert.equal(s.revenue, 70) // spending doesn't change what was collected
+  assert.equal(computeStats(orders, [], [], now).spentToday, 0) // no expenses passed in
+})

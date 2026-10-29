@@ -367,3 +367,41 @@ begin
     alter publication supabase_realtime add table public.store_status;
   end if;
 end $$;
+
+-- ============================================================================
+-- 9. Expenses (admin Dashboard → Spent, Analytics → Expenses)
+-- Money staff spend on fruit, packaging, gas and so on. Staff only, like counter sales.
+-- ============================================================================
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  amount numeric not null check (amount > 0 and amount <= 100000),
+  note text check (note is null or length(note) <= 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_expenses_created_at on public.expenses (created_at desc);
+
+alter table public.expenses enable row level security;
+
+drop policy if exists "Staff can view expenses" on public.expenses;
+create policy "Staff can view expenses" on public.expenses for select to authenticated using (public.is_staff());
+drop policy if exists "Staff can add expenses" on public.expenses;
+create policy "Staff can add expenses" on public.expenses for insert to authenticated with check (amount > 0 and public.is_staff());
+drop policy if exists "Staff can remove expenses" on public.expenses;
+create policy "Staff can remove expenses" on public.expenses for delete to authenticated using (public.is_staff());
+
+revoke all on public.expenses from anon;
+grant select, insert, delete on public.expenses to authenticated;
+
+-- Live updates: a counter sale or expense added on one phone shows on the others
+do $$
+declare t text;
+begin
+  foreach t in array array['counter_sales', 'expenses'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;

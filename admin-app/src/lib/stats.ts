@@ -1,4 +1,4 @@
-import type { CounterSale, MenuItemStock, OrderRecord, SupportMessage } from "../types"
+import type { CounterSale, Expense, MenuItemStock, OrderRecord, SupportMessage } from "../types"
 
 /** Dashboard numbers. Revenue counts only money actually collected; see isCollected. */
 export function computeStats(
@@ -7,6 +7,7 @@ export function computeStats(
   inventory: MenuItemStock[],
   now: Date = new Date(),
   counterSales: CounterSale[] = [],
+  expenses: Expense[] = [],
 ) {
   // "Today" starts at local midnight (the kitchen's day), not when the UTC date changes.
   const startOfToday = new Date(now).setHours(0, 0, 0, 0)
@@ -31,7 +32,9 @@ export function computeStats(
   const refundDue = orders.filter((o) => o.status === "cancelled" && isUpi(o) && isVerified(o) && !isRefunded(o))
   // Sales staff typed in at the counter; they count as counter money
   const salesToday = counterSales.filter((s) => new Date(s.created_at).getTime() >= startOfToday)
-  const sumSales = (list: CounterSale[]) => list.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+  const sumAmounts = (list: CounterSale[]) => list.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+  // Money staff spent; kept apart from money collected
+  const expensesToday = expenses.filter((e) => new Date(e.created_at).getTime() >= startOfToday)
 
   const collectedToday = nonCancelledToday.filter(isCollected)
   const collectedAllTime = nonCancelledAllTime.filter(isCollected)
@@ -64,21 +67,21 @@ export function computeStats(
   const soldOutCount = inventory.filter((i) => !i.is_available).length
 
   return {
-    revenue: sumTotal(collectedToday) + sumSales(salesToday),
-    allTimeRevenue: sumTotal(collectedAllTime) + sumSales(counterSales),
+    revenue: sumTotal(collectedToday) + sumAmounts(salesToday),
+    allTimeRevenue: sumTotal(collectedAllTime) + sumAmounts(counterSales),
     toCollectToday: toCollect(nonCancelledToday),
     toCollectAllTime: toCollect(nonCancelledAllTime),
     active,
     pendingCallbacks,
     todayUpiRevenue: sumTotal(todayUpiOrders),
     todayUpiCount: todayUpiOrders.length,
-    todayCashRevenue: sumTotal(todayCashOrders) + sumSales(salesToday),
+    todayCashRevenue: sumTotal(todayCashOrders) + sumAmounts(salesToday),
     todayCashCount: todayCashOrders.length,
     todayDeliveryFees: sumFees(collectedToday),
     todayPaidDeliveries: collectedToday.filter((o) => o.fulfilment === "delivery").length,
     allTimeUpiRevenue: sumTotal(allTimeUpiOrders),
     allTimeUpiCount: allTimeUpiOrders.length,
-    allTimeCashRevenue: sumTotal(allTimeCashOrders) + sumSales(counterSales),
+    allTimeCashRevenue: sumTotal(allTimeCashOrders) + sumAmounts(counterSales),
     allTimeCashCount: allTimeCashOrders.length,
     allTimeDeliveryFees: sumFees(collectedAllTime),
     allTimePaidDeliveries: collectedAllTime.filter((o) => o.fulfilment === "delivery").length,
@@ -88,6 +91,10 @@ export function computeStats(
     refundsDueCount: refundDue.length,
     todayCounterSales: salesToday.length,
     allTimeCounterSales: counterSales.length,
+    spentToday: sumAmounts(expensesToday),
+    spentAllTime: sumAmounts(expenses),
+    todayExpenseCount: expensesToday.length,
+    allTimeExpenseCount: expenses.length,
     ratedCount: ratedOrders.length,
     avgRating,
     soldOutCount,

@@ -75,3 +75,6 @@ export type CounterSale = {
   note: string | null
   created_at: string
 }
+
+// Money staff spent (fruit, packaging, gas…); same shape as a counter sale
+export type Expense = CounterSale

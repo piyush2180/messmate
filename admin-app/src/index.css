@@ -1954,3 +1954,11 @@ button, input, select, textarea {
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nav-tab-btn, .brand-title, .brand-pill { white-space: nowrap; }
 }
+
+/* An odd card out fills its row in the two-column layouts (5 summary cards, 7 money boxes) */
+@media (max-width: 1023px) {
+  .kpi-grid > .kpi-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) {
+  .analytics-financial-grid > .fin-metric-box:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}

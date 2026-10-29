@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js"
 import { supabase } from "./lib/supabase"
 import type {
   CounterSale,
+  Expense,
   OrderRecord,
   OrderStatus,
   PaymentStatus,
@@ -131,6 +132,9 @@ function mergeSupportMessages(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )
 }
+
+// Money staff type in by hand, by table
+const ENTRY_LABEL = { counter_sales: "counter sale", expenses: "expense" } as const
 
 // Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {
@@ -270,6 +274,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [saleAmount, setSaleAmount] = useState("")
   const [saleNote, setSaleNote] = useState("")
   const [savingSale, setSavingSale] = useState(false)
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expensesState, setExpensesState] = useState<"loading" | "ready" | "missing" | "error">("loading")
+  const [expenseAmount, setExpenseAmount] = useState("")
+  const [expenseNote, setExpenseNote] = useState("")
+  const [savingExpense, setSavingExpense] = useState(false)
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
   const [visitStatsState, setVisitStatsState] = useState<"loading" | "ready" | "missing" | "error">("loading")
   // Ticks every minute so "today" numbers and "Today, …" labels roll over at midnight
@@ -459,25 +468,31 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [])
 
-  // Counter sales staff typed in; also re-fetched after a reconnect
-  const loadCounterSales = () => {
+  // Counter sales and expenses staff typed in; also re-fetched after a reconnect
+  const loadEntries = (
+    table: keyof typeof ENTRY_LABEL,
+    setRows: (rows: CounterSale[]) => void,
+    setState: (state: "ready" | "missing" | "error") => void,
+  ) => {
     if (!supabase) return
     supabase
-      .from("counter_sales")
+      .from(table)
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000)
       .then(({ data, error }) => {
         if (error) {
-          console.warn("Counter sales unavailable:", error.message)
-          // PGRST205 / 42P01: the counter_sales table hasn't been created yet
-          setCounterSalesState(error.code === "PGRST205" || error.code === "42P01" ? "missing" : "error")
+          console.warn(`${table} unavailable:`, error.message)
+          // PGRST205 / 42P01: the table hasn't been created yet
+          setState(error.code === "PGRST205" || error.code === "42P01" ? "missing" : "error")
           return
         }
-        setCounterSales((data as CounterSale[]).map((s) => ({ ...s, amount: Number(s.amount) })))
-        setCounterSalesState("ready")
+        setRows((data as CounterSale[]).map((s) => ({ ...s, amount: Number(s.amount) })))
+        setState("ready")
       })
   }
+  const loadCounterSales = () => loadEntries("counter_sales", setCounterSales, setCounterSalesState)
+  const loadExpenses = () => loadEntries("expenses", setExpenses, setExpensesState)
 
   const loadStoreStatus = () => {
     if (!supabase) return
@@ -519,6 +534,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     loadCounterSales()
+    loadExpenses()
     loadStoreStatus()
     const storeChannel = supabase
       ?.channel("admin_store_status")
@@ -527,10 +543,36 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
       })
       .subscribe()
+    // A counter sale or expense added or removed on another phone shows up here too
+    let moneyJoined = false
+    const moneyChannel = supabase?.channel("admin_money")
+    for (const [table, setRows] of [
+      ["counter_sales", setCounterSales],
+      ["expenses", setExpenses],
+    ] as const) {
+      moneyChannel
+        ?.on("postgres_changes", { event: "INSERT", schema: "public", table }, (payload) => {
+          const row = payload.new as CounterSale
+          setRows((prev) => (prev.some((s) => s.id === row.id) ? prev : [{ ...row, amount: Number(row.amount) }, ...prev]))
+        })
+        .on("postgres_changes", { event: "DELETE", schema: "public", table }, (payload) => {
+          const id = (payload.old as { id?: string }).id
+          setRows((prev) => prev.filter((s) => s.id !== id))
+        })
+    }
+    moneyChannel?.subscribe((status) => {
+      // Rejoined after the connection dropped: fetch whatever changed in between
+      if (status === "SUBSCRIBED" && moneyJoined) {
+        loadCounterSales()
+        loadExpenses()
+      }
+      if (status === "SUBSCRIBED") moneyJoined = true
+    })
     const refresh = () => {
       loadOrders()
       loadSupport()
       loadCounterSales()
+      loadExpenses()
       loadStoreStatus()
     }
     const onOnline = () => {
@@ -547,6 +589,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     document.addEventListener("visibilitychange", onVisible)
     return () => {
       if (storeChannel) supabase?.removeChannel(storeChannel)
+      if (moneyChannel) supabase?.removeChannel(moneyChannel)
       window.removeEventListener("online", onOnline)
       window.removeEventListener("offline", onOffline)
       document.removeEventListener("visibilitychange", onVisible)
@@ -715,41 +758,68 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-  const handleAddCounterSale = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const amount = Math.round(Number(saleAmount) * 100) / 100
+  // Saves a counter sale or an expense; false when it wasn't saved
+  const addEntry = async (
+    table: keyof typeof ENTRY_LABEL,
+    rawAmount: string,
+    note: string,
+    setRows: React.Dispatch<React.SetStateAction<CounterSale[]>>,
+  ) => {
+    const amount = Math.round(Number(rawAmount) * 100) / 100
     if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
       alert("Enter an amount between ₹1 and ₹1,00,000.")
-      return
+      return false
     }
-    if (!supabase) return
-    setSavingSale(true)
+    if (!supabase) return false
     const { data, error } = await supabase
-      .from("counter_sales")
-      .insert({ amount, note: saleNote.trim() || null })
+      .from(table)
+      .insert({ amount, note: note.trim() || null })
       .select()
       .single()
-    setSavingSale(false)
     if (error || !data) {
-      console.error("Counter sale not saved:", error?.message)
-      alert("Couldn't save the counter sale. Please try again.")
-      return
+      console.error(`${table} not saved:`, error?.message)
+      alert(`Couldn't save the ${ENTRY_LABEL[table]}. Please try again.`)
+      return false
     }
     const saved = data as CounterSale
-    setCounterSales((prev) => [{ ...saved, amount: Number(saved.amount) }, ...prev])
-    setSaleAmount("")
-    setSaleNote("")
+    // The live update may already have added it
+    setRows((prev) => (prev.some((s) => s.id === saved.id) ? prev : [{ ...saved, amount: Number(saved.amount) }, ...prev]))
+    return true
   }
 
-  const handleRemoveCounterSale = async (sale: CounterSale) => {
-    if (!supabase || !confirm(`Remove the ₹${sale.amount} counter sale${sale.note ? ` (${sale.note})` : ""}?`)) return
-    const { error } = await supabase.from("counter_sales").delete().eq("id", sale.id)
+  const removeEntry = async (
+    table: keyof typeof ENTRY_LABEL,
+    entry: CounterSale,
+    setRows: React.Dispatch<React.SetStateAction<CounterSale[]>>,
+  ) => {
+    if (!supabase || !confirm(`Remove the ₹${entry.amount} ${ENTRY_LABEL[table]}${entry.note ? ` (${entry.note})` : ""}?`)) return
+    const { error } = await supabase.from(table).delete().eq("id", entry.id)
     if (error) {
-      console.error("Counter sale not removed:", error.message)
+      console.error(`${table} not removed:`, error.message)
       alert("Couldn't remove it. Please try again.")
       return
     }
-    setCounterSales((prev) => prev.filter((s) => s.id !== sale.id))
+    setRows((prev) => prev.filter((s) => s.id !== entry.id))
+  }
+
+  const handleAddCounterSale = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingSale(true)
+    if (await addEntry("counter_sales", saleAmount, saleNote, setCounterSales)) {
+      setSaleAmount("")
+      setSaleNote("")
+    }
+    setSavingSale(false)
+  }
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingExpense(true)
+    if (await addEntry("expenses", expenseAmount, expenseNote, setExpenses)) {
+      setExpenseAmount("")
+      setExpenseNote("")
+    }
+    setSavingExpense(false)
   }
 
   // Filtered Orders
@@ -780,13 +850,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   // KPI Calculations & Analytics Breakdown
   const stats = useMemo(
-    () => computeStats(orders, supportMessages, inventory, now, counterSales),
-    [orders, supportMessages, inventory, now, counterSales],
+    () => computeStats(orders, supportMessages, inventory, now, counterSales, expenses),
+    [orders, supportMessages, inventory, now, counterSales, expenses],
   )
   const todaysSales = useMemo(() => {
     const startOfToday = new Date(now).setHours(0, 0, 0, 0)
     return counterSales.filter((s) => new Date(s.created_at).getTime() >= startOfToday)
   }, [counterSales, now])
+  const todaysExpenses = useMemo(() => {
+    const startOfToday = new Date(now).setHours(0, 0, 0, 0)
+    return expenses.filter((s) => new Date(s.created_at).getTime() >= startOfToday)
+  }, [expenses, now])
   // Latest student reviews, newest order first
   const reviews = useMemo(
     () =>
@@ -1063,6 +1137,23 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               {revenuePeriod === "all"
                 ? `₹${stats.allTimeUpiRevenue.toLocaleString()} UPI · ₹${stats.allTimeCashRevenue.toLocaleString()} counter · ₹${stats.toCollectAllTime.toLocaleString()} still to collect`
                 : `₹${stats.todayUpiRevenue.toLocaleString()} UPI · ₹${stats.todayCashRevenue.toLocaleString()} counter · ₹${stats.toCollectToday.toLocaleString()} still to collect`}
+            </span>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span>{revenuePeriod === "all" ? "Spent (All Time)" : "Spent Today"}</span>
+              <div className="kpi-icon-wrap blue">₹</div>
+            </div>
+            <div className="kpi-value">
+              ₹{(revenuePeriod === "all" ? stats.spentAllTime : stats.spentToday).toLocaleString()}
+            </div>
+            <span className="kpi-subtext">
+              {revenuePeriod === "all"
+                ? `${plural(stats.allTimeExpenseCount, "expense", "expenses")} added so far`
+                : stats.todayExpenseCount > 0
+                  ? `${plural(stats.todayExpenseCount, "expense", "expenses")} added today`
+                  : "Nothing spent today"}
             </span>
           </div>
 
@@ -1552,6 +1643,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       : `${plural(stats.todayUpiCount + stats.todayCashCount, "paid order", "paid orders")}${stats.todayCounterSales ? ` + ${plural(stats.todayCounterSales, "counter sale", "counter sales")}` : ""} today`}
                   </span>
                 </div>
+                <div className="fin-metric-box">
+                  <small>Total Spent</small>
+                  <strong>
+                    ₹{(revenuePeriod === "all" ? stats.spentAllTime : stats.spentToday).toLocaleString()}
+                  </strong>
+                  <span>
+                    {revenuePeriod === "all"
+                      ? `${plural(stats.allTimeExpenseCount, "expense", "expenses")} (all time)`
+                      : `${plural(stats.todayExpenseCount, "expense", "expenses")} today`}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -1613,7 +1715,84 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                           <strong>₹{sale.amount.toLocaleString()}</strong>
                           <span>{sale.note || "Counter sale"}</span>
                           <small>{formatWhen(sale.created_at)}</small>
-                          <button type="button" className="action-btn-small flag-btn" onClick={() => handleRemoveCounterSale(sale)}>
+                          <button
+                            type="button"
+                            className="action-btn-small flag-btn"
+                            onClick={() => removeEntry("counter_sales", sale, setCounterSales)}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Money spent: fruit, packaging, gas and so on */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <div>
+                  <span>Expenses</span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    Money spent on fruit, packaging, gas and so on. They add into Spent.
+                  </div>
+                </div>
+              </div>
+              {expensesState === "missing" ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>
+                  Run the expenses SQL in Supabase to start adding expenses.
+                </p>
+              ) : (
+                <>
+                  <form className="counter-sale-form" onSubmit={handleAddExpense}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      step="any"
+                      placeholder="Amount (₹)"
+                      aria-label="Expense amount in rupees"
+                      value={expenseAmount}
+                      onChange={(e) => setExpenseAmount(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      maxLength={200}
+                      placeholder="What for? (optional)"
+                      aria-label="What the money was spent on"
+                      value={expenseNote}
+                      onChange={(e) => setExpenseNote(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      className="action-btn primary"
+                      disabled={savingExpense || !expenseAmount}
+                      style={{ flex: "0 0 auto", padding: "10px 20px" }}
+                    >
+                      {savingExpense ? "Adding…" : "Add"}
+                    </button>
+                  </form>
+                  {expensesState === "error" && (
+                    <p style={{ fontSize: 12, color: "var(--red)", margin: "10px 0 0" }}>
+                      Couldn't load expenses. Reload the page to try again.
+                    </p>
+                  )}
+                  {todaysExpenses.length === 0 ? (
+                    <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>No expenses added today.</p>
+                  ) : (
+                    <ul className="counter-sale-list">
+                      {todaysExpenses.map((expense) => (
+                        <li key={expense.id}>
+                          <strong>₹{expense.amount.toLocaleString()}</strong>
+                          <span>{expense.note || "Expense"}</span>
+                          <small>{formatWhen(expense.created_at)}</small>
+                          <button
+                            type="button"
+                            className="action-btn-small flag-btn"
+                            onClick={() => removeEntry("expenses", expense, setExpenses)}
+                          >
                             Remove
                           </button>
                         </li>
