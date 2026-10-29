@@ -10,6 +10,8 @@ import {
   getFaqResponse,
   slotsForHostel,
   ALL_SLOTS,
+  ASIMA_ROOM,
+  fulfilmentFor,
   KALAM_ROOM,
   normalizeKalamRoom,
   splitKalamRoom,
@@ -33,6 +35,7 @@ import {
   repriceForReorder,
   PREORDER_TAG,
   hasPreorderLine,
+  mixesPreorder,
   MAX_LEFT_OUT,
   toggleLeftOut,
   type CartItem,
@@ -356,17 +359,19 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 // ============================================================================
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
-  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup near the mess 8:30–9:30 AM/)
+  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) from Room 104 or 210/)
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
-  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup near the mess 8:30–9:30 AM/)
+  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) from Room 104 or 210/)
 })
 
-test("FAQ Bot - resolves pickup location queries: Asima picks up near the mess, Kalam gets room delivery", () => {
+test("FAQ Bot - resolves pickup location queries: Asima fruit orders are collected from Room 104 or 210, pickle-only orders and Kalam get room delivery", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
-  assert.match(reply, /near the Asima mess/)
+  assert.match(reply, /picked up from Room 104 or 210/)
+  assert.match(reply, /pickle-only orders come to your room \(₹5\)/)
   assert.match(reply, /Kalam orders come straight to your room/)
+  assert.doesNotMatch(reply, /mess/) // pickup moved away from the mess
   assert.doesNotMatch(reply, /Room-341|Asima - 110/) // the old pickup counters are gone
   assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
 })
@@ -842,6 +847,22 @@ test("Kalam room - 3 digits plus A or B, saved together like 214A", () => {
   assert.equal(normalizeKalamRoom("1203"), "") // an older 4-digit saved room is asked for again
 })
 
+test("Asima room numbers can be anything for now, just not blank", () => {
+  assert.equal(ASIMA_ROOM.test("104"), true)
+  assert.equal(ASIMA_ROOM.test("G-12"), true)
+  assert.equal(ASIMA_ROOM.test(""), false)
+  assert.equal(ASIMA_ROOM.test("   "), false)
+})
+
+test("Fulfilment - Kalam is always room delivery; at Asima a fruit bowl order is picked up and a pickle-only order is delivered", () => {
+  const pickle = { kind: "pickle" }
+  const fruit = { kind: "fruit" }
+  assert.equal(fulfilmentFor("Kalam", [pickle, fruit]), "delivery")
+  assert.equal(fulfilmentFor("Asima", [pickle]), "delivery")
+  assert.equal(fulfilmentFor("Asima", [fruit]), "pickup")
+  assert.equal(fulfilmentFor("Asima", [pickle, fruit]), "pickup") // one trip to Room 104 or 210 covers both
+})
+
 test("Fruit bowl - at most 2 fruits can be left out; tapping a left-out fruit adds it back", () => {
   assert.equal(MAX_LEFT_OUT, 2)
   let out = toggleLeftOut([], "Banana")
@@ -856,4 +877,12 @@ test("Preorder - an order's preorder pickle lines are recognised, so Track Order
   assert.equal(hasPreorderLine([{ detail: `50g${PREORDER_TAG}` }, { detail: "All fruits" }]), true)
   assert.equal(hasPreorderLine([{ detail: "50g" }, { detail: "Without Papaya" }]), false)
   assert.equal(hasPreorderLine(null), false) // a bad row from the database doesn't crash the page
+})
+
+test("Preorder - fruit bowls and preordered pickles can't share an order, since they go out on different days", () => {
+  const cart = [{ kind: "pickle" }, { kind: "fruit" }]
+  assert.equal(mixesPreorder(cart, true), true)
+  assert.equal(mixesPreorder(cart, false), false) // pickles in stock: one order is fine
+  assert.equal(mixesPreorder([{ kind: "pickle" }, { kind: "pickle" }], true), false)
+  assert.equal(mixesPreorder([{ kind: "fruit" }], true), false)
 })

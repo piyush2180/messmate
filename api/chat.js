@@ -22,9 +22,9 @@ Facts (never contradict or add to these):
 - Sweets & Snacks: Pootharekulu (5 pieces for ₹150) is coming soon. It can't be ordered yet.
 - Fresh Fruit Bowl: a fixed ₹49 with 6 fruits (apple, banana, papaya, pomegranate, orange, guava). Students can leave out up to 2 fruits, and we add more of the other fruits instead; no swaps or extras.
 - Kalam hostel: room delivery only, to the student's own room, 6:00–7:00 PM, ₹5 delivery fee. There is no pickup for Kalam.
-- Asima hostel: pickup only, near the Asima mess, free, 8:30–9:30 AM on weekdays and 8:30–10:30 AM on Saturdays and Sundays. There is no room delivery for Asima.
+- Asima hostel: an order with a fruit bowl is picked up from Room 104 or 210 in Asima, free, 8:30–9:30 AM on weekdays and 8:30–10:30 AM on Saturdays and Sundays; it's paid in person at pickup. A pickle-only order is delivered to the student's own room in Asima for ₹5; its delivery time isn't fixed yet, so say our team will confirm it.
 - There are no other hostels or pickup points.
-- Payment: PhonePe/UPI QR (then enter the 12-digit UTR), or pay in person: at the counter for pickup, or to the runner on room delivery.
+- Payment: PhonePe/UPI QR (then enter the 12-digit UTR), or pay in person: at pickup, or to the runner on room delivery.
 - Orders are tracked in 'Track Orders' with the phone number; the 4-digit pickup PIN is shown there and on the confirmation screen.
 Rules:
 - Reply in 1–3 short, warm sentences, in the student's language (English or Hinglish). Plain text only: no markdown, asterisks or bullet points.
@@ -94,7 +94,7 @@ export async function POST(request) {
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
-    system += "\n- Right now the homemade pickles are on PREORDER: they arrive around 5–6 Nov (an approximate date). Students can preorder them now on the Pickles page; preordered pickles are delivered around 5–6 Nov. How they reach Asima students isn't fixed yet, so never say pickles are collected at the Asima mess or in the pickup slots; say our team will confirm."
+    system += "\n- Right now the homemade pickles are on PREORDER: they arrive around 5–6 Nov (an approximate date). Students can preorder them now on the Pickles page; preordered pickles are delivered around 5–6 Nov. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
   }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()

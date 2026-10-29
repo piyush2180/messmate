@@ -135,6 +135,9 @@ export const PICKLES_ARRIVAL_SHORT = "5–6 Nov"
 export const PICKLES_ARRIVAL = `${PICKLES_ARRIVAL_SHORT} (approx)`
 export const hasPreorderLine = (items: Array<{ detail?: string }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => String(item?.detail ?? "").includes(PREORDER_TAG))
+// Fruit bowls go out within a day but preordered pickles only on PICKLES_ARRIVAL, and an order has one status, so they're ordered apart
+export const mixesPreorder = (items: Array<{ kind?: string }>, preorder: boolean) =>
+  preorder && items.some((item) => item.kind === "fruit") && items.some((item) => item.kind === "pickle")
 
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   return items.flatMap((item) => {

@@ -42,7 +42,7 @@
 
 ## 🚀 Overview
 
-**Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, with room delivery in Kalam and pickup near the Asima mess.
+**Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, with room delivery in Kalam and Asima and pickup from Room 104 or 210 in Asima.
 
 The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live kitchen sound alerts, live item availability toggling, and two-way in-app support chat without page reloads.
 
@@ -160,13 +160,15 @@ Happy Tummy Co. Monorepo
 - **Fixed-Price Fruit Bowl**:
   - One ₹49 bowl with 6 fresh-cut fruits (Apple, Banana, Papaya, Pomegranate, Orange, Guava).
   - Students tap any fruit to leave it out (we add more of the others); sold-out fruits are left out automatically. The price stays ₹49.
-  - Shows each hostel's times: Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM (weekends till 10:30 AM).
+  - Shows each hostel's times: Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM (weekends till 10:30 AM) from Room 104 or 210.
 - **Slide-Out Cart Drawer**:
   - Quantity increment/decrement controls with automatic zero-item removal guards.
   - Subtotal calculation shielded against floating-point precision errors.
 - **Fulfilment by hostel**:
-  - **Kalam: Room Delivery (₹5 runner fee)**, to the student's room (room number is digits only), in a *6:00–6:30 PM* or *6:30–7:00 PM* slot.
-  - **Asima: Pickup near the Asima mess (free)**, 8:30–9:30 AM on weekdays and 8:30–10:30 AM at weekends (one window, nothing to pick).
+  - **Kalam: Room Delivery (₹5 runner fee)**, to the student's room (3 digits plus A or B), in a *6:00–6:30 PM* or *6:30–7:00 PM* slot.
+  - **Asima: Pickup from Room 104 or 210 (free)** for any order with a fruit bowl, 8:30–9:30 AM on weekdays and 8:30–10:30 AM at weekends (one window, nothing to pick), paid in person at pickup.
+  - **Asima: Room Delivery (₹5)** for pickle-only orders, to the student's room (any room number for now); there's no set delivery time yet.
+  - While pickles are on preorder, fruit bowls and pickles are ordered separately (they go out on different days).
 - **UPI & Cash Settlement**:
   - 1-tap mobile UPI intent link (`upi://pay`) to launch payment apps directly (PhonePe, Google Pay, Paytm).
   - 1-click UPI ID copy.

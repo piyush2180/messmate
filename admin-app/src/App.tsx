@@ -2017,7 +2017,8 @@ function OrderCard({
           <span className="order-time-text">
             {formatWhen(order.created_at)}
           </span>
-          <span className="order-slot-pill">{order.slot}</span>
+          {/* Asima room delivery has no set time yet, so those orders have no slot */}
+          {order.slot && <span className="order-slot-pill">{order.slot}</span>}
         </div>
       </div>
 

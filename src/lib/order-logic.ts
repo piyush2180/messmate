@@ -43,8 +43,14 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
   return /^[6-9]\d{9}$/.test(clean) && !/^(\d)\1{9}$/.test(clean)
 }
 
-// Room delivery fee in ₹ (campus pickup is free). The orders.delivery_fee CHECK constraint must allow it.
+// Room delivery fee in ₹ (Kalam, and Asima pickle-only orders); pickup is free. The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
+// Asima orders with a fruit bowl are collected from one of these rooms
+export const ASIMA_PICKUP = "Room 104 or 210"
+
+/** Kalam always gets room delivery. At Asima an order with a fruit bowl is collected from ASIMA_PICKUP; pickle-only orders go to the room. */
+export const fulfilmentFor = (hostel: string, items: Array<{ kind?: string }>): "pickup" | "delivery" =>
+  hostel === "Asima" && items.some((item) => item.kind === "fruit") ? "pickup" : "delivery"
 
 // Pickup and delivery times depend on the hostel: Asima in the morning, Kalam in the evening.
 // Kalam students pick a half-hour slot; Asima has one pickup window per morning (nothing to pick).
@@ -57,6 +63,8 @@ export const ASIMA_WEEKEND = ["8:30–10:30 AM"]
 export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND, ...HOSTEL_SLOTS.Kalam]
 // Kalam rooms are a 3-digit number plus side A or B, saved together like "214A"
 export const KALAM_ROOM = /^\d{3}[AB]$/
+// Asima room numbers can be anything for now, as long as one is given
+export const ASIMA_ROOM = /\S/
 export function splitKalamRoom(room: string): { digits: string; side: string } {
   const raw = String(room || "").toUpperCase()
   const digits = raw.replace(/\D/g, "")
@@ -68,9 +76,10 @@ export const normalizeKalamRoom = (room: string) => {
   return digits + side
 }
 
-// Kalam gets room delivery only, Asima collects near its mess only
+// Asima's hours are its pickup window; Asima room delivery has no set time yet
 export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
-export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup near the mess ${HOSTEL_HOURS.Asima}`
+// The fruit page splits this on ", " into one line per hostel
+export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup ${HOSTEL_HOURS.Asima} from ${ASIMA_PICKUP}`
 
 /**
  * The slots a hostel offers for its next service. Asima's next morning is today until that
@@ -183,7 +192,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
   }
   if (aboutPaying) {
-    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or pay in person: at the counter for pickup, or to the runner on room delivery."
+    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or pay in person: at pickup, or to the runner on room delivery."
   }
   if (q.includes("reorder") || word("again") || q.includes("repeat") || q.includes("previous")) {
     return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
@@ -198,7 +207,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
       const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder for ${PICKLES_ARRIVAL}` : ""}.`
-      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Kalam room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
+      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; Asima pickup from ${ASIMA_PICKUP} is free.`
     }
   }
   if (ratingTalk) {
@@ -228,7 +237,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return `Times depend on your hostel: ${SERVICE_HOURS}. Kalam room delivery is ₹${DELIVERY_FEE}, and Asima pickup is free!`
+    return `Times depend on your hostel: ${SERVICE_HOURS}. Room delivery is ₹${DELIVERY_FEE}, and Asima pickup is free!`
   }
   if (
     q.includes("pickup point") ||
@@ -242,7 +251,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return `Asima orders are picked up near the Asima mess (free), and Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`
+    return `At Asima, orders with a fruit bowl are picked up from ${ASIMA_PICKUP} (free) and pickle-only orders come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`
   }
   if (
     q.includes("fruit") ||
