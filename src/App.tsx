@@ -29,6 +29,9 @@ import {
   DELIVERY_FEE,
   HOSTEL_HOURS,
   HOSTEL_SLOTS,
+  KALAM_ROOM,
+  normalizeKalamRoom,
+  splitKalamRoom,
   SERVICE_HOURS,
   slotsForHostel,
   calculateOrderTotals,
@@ -1518,17 +1521,18 @@ function Checkout({
 
   const cleanPhone = details.phone.replace(/\D/g, "")
   const isPhoneValid = isValidIndianPhone(cleanPhone)
-  // The room only matters for Kalam room delivery; Asima pickup is near the mess.
+  // The room only matters for Kalam room delivery (3 digits + A or B); Asima pickup is near the mess.
+  const room = splitKalamRoom(details.room)
   const isComplete = Boolean(
     details.name.trim() &&
     isPhoneValid &&
-    (fulfilment === "pickup" || details.room.trim())
+    (fulfilment === "pickup" || KALAM_ROOM.test(details.room))
   )
   const missing = !details.name.trim()
     ? "Please enter your name to continue"
     : !isPhoneValid
       ? "Please enter a valid 10-digit mobile number"
-      : `Please enter your ${DELIVERY_HOSTEL} room number`
+      : `Please enter your 3-digit ${DELIVERY_HOSTEL} room number and choose A or B`
 
   return (
     <>
@@ -1629,9 +1633,16 @@ function Checkout({
                     label={`Room number in ${DELIVERY_HOSTEL}`}
                     placeholder="e.g. 214"
                     inputMode="numeric"
-                    maxLength={4}
-                    value={details.room}
-                    onChange={(v) => set("room", v.replace(/\D/g, ""))}
+                    maxLength={3}
+                    value={room.digits}
+                    onChange={(v) => set("room", v.replace(/\D/g, "").slice(0, 3) + room.side)}
+                  />
+                  <Field
+                    label="A or B"
+                    placeholder="Choose A or B"
+                    options={["A", "B"]}
+                    value={room.side}
+                    onChange={(v) => set("room", room.digits + v)}
                   />
                 </div>
               )}
@@ -3809,7 +3820,7 @@ export default function App() {
     phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
     // Only keep a saved hostel that is one of ours (older saves were free text).
     hostel: DELIVERY_HOSTEL, // room delivery only goes to Kalam
-    room: (safeStorage.getItem("messmate_room", "") || "").replace(/\D/g, ""),
+    room: normalizeKalamRoom(safeStorage.getItem("messmate_room", "") || ""),
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">(restored.fulfilment)

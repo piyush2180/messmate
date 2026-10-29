@@ -55,6 +55,19 @@ export const HOSTEL_SLOTS: Record<string, string[]> = {
 // Asima runs an hour longer on Saturday and Sunday mornings
 export const ASIMA_WEEKEND = ["8:30–10:30 AM"]
 export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND, ...HOSTEL_SLOTS.Kalam]
+// Kalam rooms are a 3-digit number plus side A or B, saved together like "214A"
+export const KALAM_ROOM = /^\d{3}[AB]$/
+export function splitKalamRoom(room: string): { digits: string; side: string } {
+  const raw = String(room || "").toUpperCase()
+  const digits = raw.replace(/\D/g, "")
+  // An older saved room with more digits can't be trusted as a 3-digit one, so it's asked for again
+  return { digits: digits.length <= 3 ? digits : "", side: /[AB]$/.test(raw) ? raw.slice(-1) : "" }
+}
+export const normalizeKalamRoom = (room: string) => {
+  const { digits, side } = splitKalamRoom(room)
+  return digits + side
+}
+
 // Kalam gets room delivery only, Asima collects near its mess only
 export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
 export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup near the mess ${HOSTEL_HOURS.Asima}`

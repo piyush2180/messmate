@@ -10,6 +10,9 @@ import {
   getFaqResponse,
   slotsForHostel,
   ALL_SLOTS,
+  KALAM_ROOM,
+  normalizeKalamRoom,
+  splitKalamRoom,
   getSmallTalkReply,
   FAQ_FALLBACK,
   mergeSupportMessages,
@@ -822,4 +825,15 @@ test("FAQ Bot - Sweets & Snacks says Pootharekulu is coming soon, with its price
   assert.match(getFaqResponse("do you have pootharekulu?"), /coming soon/i)
   assert.match(getFaqResponse("price of sweets?"), /Pootharekulu: 5 pcs for ₹150/)
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
+})
+
+test("Kalam room - 3 digits plus A or B, saved together like 214A", () => {
+  assert.equal(KALAM_ROOM.test("214A"), true)
+  assert.equal(KALAM_ROOM.test("214B"), true)
+  assert.equal(KALAM_ROOM.test("214"), false) // side not chosen yet
+  assert.equal(KALAM_ROOM.test("21A"), false) // only 2 digits
+  assert.equal(KALAM_ROOM.test("2145A"), false)
+  assert.deepEqual(splitKalamRoom("214a"), { digits: "214", side: "A" })
+  assert.equal(normalizeKalamRoom("214"), "214") // typed number, side still to pick
+  assert.equal(normalizeKalamRoom("1203"), "") // an older 4-digit saved room is asked for again
 })
