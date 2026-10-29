@@ -9,6 +9,7 @@ import {
   POOTHAREKULU_PACK,
   POOTHAREKULU_PRICE,
   PICKLES_ARRIVAL,
+  PICKLES_ARRIVAL_SHORT,
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
@@ -23,8 +24,6 @@ import {
 } from "./lib/inventory"
 import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
-// Our own fruit bowl in its Happy Tummy Co. packaging
-import fruitImage from "./assets/fruit-bowl.webp"
 // Pootharekulu photo the owner supplied
 import pootharekuluImage from "./assets/pootharekulu.webp"
 import {
@@ -51,6 +50,9 @@ import {
   sanitizeInput,
   generateOrderFingerprint,
 } from "./lib/order-logic"
+
+// A real plate of cut fruit; free to use under the Unsplash License.
+const fruitImage = "https://images.unsplash.com/photo-1641642400143-6be68f1a0918?auto=format&fit=crop&w=800&h=800&q=80"
 
 type Screen =
   | "home"
@@ -140,6 +142,8 @@ const ASIMA_CONTACTS = ["+91 82527 48806", "+91 99081 81705"]
 // Our only hostels: Kalam gets room delivery only; Asima collects near its mess only
 const DELIVERY_HOSTEL = "Kalam"
 const PICKUP_POINTS = [{ name: "Near Asima Mess", hostel: "Asima" }]
+// A placed pickup order shows the student its hostel, not the spot (pickles may not be handed over at the mess)
+const pickupHostel = (point: string) => PICKUP_POINTS.find((p) => p.name === point)?.hostel ?? point
 // The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
 const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
   slotsForHostel(fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? ""))
@@ -169,7 +173,13 @@ const sized = (url: string, width: number) => url.replace(/width=\d+/, `width=${
 
 // A pickle line's text while pickles are on Preorder (the placed order gets PREORDER_TAG instead)
 const preorderDetail = (item: CartItem, preorder: boolean) =>
-  preorder && item.kind === "pickle" ? `${item.detail} · Preorder, delivered on ${PICKLES_ARRIVAL}` : item.detail
+  preorder && item.kind === "pickle" ? (
+    <>
+      {item.detail} · Preorder, delivered on <strong>{PICKLES_ARRIVAL}</strong>
+    </>
+  ) : (
+    item.detail
+  )
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
@@ -623,7 +633,7 @@ function BottomBar({ children }: { children: ReactNode }) {
 
 const CATEGORY_LOOK = {
   pickle: { number: "01", eyebrow: "Mess meal upgrade", alt: "Homemade pickle in a bowl" },
-  fruit: { number: "02", eyebrow: "Made fresh for you", alt: "Happy Tummy Co. fresh fruit bowl" },
+  fruit: { number: "02", eyebrow: "Made fresh for you", alt: "Fresh mixed fruit bowl" },
   sweet: { number: "03", eyebrow: "Something sweet", alt: "Pootharekulu rolls" },
 }
 
@@ -916,7 +926,8 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
-                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving {PICKLES_ARRIVAL}</span>}
+                  {/* A phone-width card has no room for "(approx)"; the pickle's own page and the cart show it */}
+                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving {PICKLES_ARRIVAL_SHORT}</span>}
                 </div>
                 <div className="product-info">
                   <div className="product-meta-row">
@@ -1135,7 +1146,7 @@ function FruitBuilder({
                 <p>{fruits.length} fruits in every bowl. Tap up to {MAX_LEFT_OUT} you'd rather skip.</p>
               </div>
               <div className="bowl-thumb">
-                <img src={fruitImage} alt="Happy Tummy Co. fresh fruit bowl" />
+                <img src={fruitImage} alt="Fresh mixed fruit bowl" />
               </div>
             </section>
             <div className="builder-note">
@@ -2251,7 +2262,7 @@ function Confirmation({
               </small>
               <strong>
                 {fulfilment === "pickup"
-                  ? pickupPoint
+                  ? pickupHostel(pickupPoint)
                   : `${details.hostel}, Room ${details.room}`}
               </strong>
             </div>
@@ -2305,7 +2316,7 @@ function Confirmation({
             <div className="preorder-date-note">
               <Icon name="clock" size={16} />
               <span>
-                Your pickles will be {fulfilment === "pickup" ? "ready to collect" : "delivered"} on <strong>{PICKLES_ARRIVAL}</strong>.
+                Your pickles will be delivered on <strong>{PICKLES_ARRIVAL}</strong>.
               </span>
             </div>
           )}
@@ -2860,7 +2871,7 @@ function OrdersPage({
                         <div>
                           <strong>
                             {order.fulfilment === "pickup"
-                              ? `${order.hostel} Pickup Point`
+                              ? pickupHostel(order.hostel)
                               : `${order.hostel}, Room ${order.room}`}
                           </strong>
                           <div
@@ -2898,7 +2909,7 @@ function OrdersPage({
                       <div className="preorder-date-note">
                         <Icon name="clock" size={16} />
                         <span>
-                          Pickles in this order will be {order.fulfilment === "pickup" ? "ready to collect" : "delivered"} on{" "}
+                          Pickles in this order will be delivered on{" "}
                           <strong>{PICKLES_ARRIVAL}</strong>.
                         </span>
                       </div>

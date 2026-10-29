@@ -205,7 +205,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
   }
   if (picklesSoon && /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)) {
-    return `Our homemade pickles arrive on ${PICKLES_ARRIVAL}! Preorder them now on the Pickles page and they'll be with you on ${PICKLES_ARRIVAL}.`
+    return `Our homemade pickles arrive on ${PICKLES_ARRIVAL}, so preorder them now on the Pickles page and we'll deliver them then!`
   }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
     return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared before every delivery slot!"

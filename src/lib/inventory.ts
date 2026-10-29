@@ -131,7 +131,8 @@ export function bowlLeftOut(id: string): string[] {
 // Pickle lines ordered while pickles are on Preorder carry this after the pack size, so the kitchen sees it
 export const PREORDER_TAG = " · Preorder"
 // When preordered pickles arrive; shown while the admin's Preorder switch is on (keep api/chat.js in step)
-export const PICKLES_ARRIVAL = "5 Nov"
+export const PICKLES_ARRIVAL_SHORT = "5–6 Nov"
+export const PICKLES_ARRIVAL = `${PICKLES_ARRIVAL_SHORT} (approx)`
 export const hasPreorderLine = (items: Array<{ detail?: string }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => String(item?.detail ?? "").includes(PREORDER_TAG))
 

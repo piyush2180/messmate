@@ -782,12 +782,12 @@ test("Support merge - the same text sent twice is two messages once both are sav
 
 test("FAQ Bot - while pickles are on Preorder, pickle questions give the arrival date and say they can be preordered", () => {
   const reply = getFaqResponse("do you have pickles?", true)
-  assert.match(reply, /arrive on 5 Nov/)
+  assert.match(reply, /arrive on 5–6 Nov \(approx\)/)
   assert.match(reply, /preorder/i)
-  assert.match(getFaqResponse("when will mango achar be back?", true), /5 Nov/) // not the delivery-times answer
+  assert.match(getFaqResponse("when will mango achar be back?", true), /5–6 Nov/) // not the delivery-times answer
   const price = getFaqResponse("how much does it cost?", true)
   assert.match(price, /₹40 each/)
-  assert.match(price, /on preorder for 5 Nov/)
+  assert.match(price, /on preorder for 5–6 Nov \(approx\)\./)
   assert.match(price, /fixed ₹49/)
   // Back on sale: the usual answers
   assert.match(getFaqResponse("do you have pickles?"), /Mango Pickle/)

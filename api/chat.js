@@ -94,7 +94,7 @@ export async function POST(request) {
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
-    system += "\n- Right now the homemade pickles are on PREORDER: they arrive on 5 Nov. Students can preorder them now on the Pickles page; preordered pickles are delivered (Kalam) or ready to collect (Asima) on 5 Nov."
+    system += "\n- Right now the homemade pickles are on PREORDER: they arrive around 5–6 Nov (an approximate date). Students can preorder them now on the Pickles page; preordered pickles are delivered around 5–6 Nov."
   }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()
