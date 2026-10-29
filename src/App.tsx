@@ -143,10 +143,12 @@ const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 // The Asima team handles Asima orders; their numbers show on Asima order confirmations
 const ASIMA_CONTACTS = ["+91 82527 48806", "+91 99081 81705"]
 
-// Our only hostels. Kalam gets room delivery; Asima orders are collected from Room 104 or 210,
-// and pickle-only orders can come to the room instead (see fulfilmentFor)
-const ASIMA_PICKUP_POINT = `Asima, ${ASIMA_PICKUP}`
-const PICKUP_POINTS = [{ name: ASIMA_PICKUP_POINT, hostel: "Asima" }]
+// Our only hostels. Kalam gets room delivery. In Asima, fruit bowl orders are collected near the mess, and
+// pickle-only orders from Room 104 or 210 unless they choose room delivery (see fulfilmentFor)
+const MESS_PICKUP = "Near Asima Mess"
+const ROOMS_PICKUP = `Asima, ${ASIMA_PICKUP}`
+const pickupPointFor = (items: Array<{ kind?: string }> | null | undefined) =>
+  Array.isArray(items) && items.some((item) => item.kind === "fruit") ? MESS_PICKUP : ROOMS_PICKUP
 // Each hostel remembers its own room, so a saved Kalam room never fills in the Asima box
 const roomKey = (hostel: string) => (hostel === "Asima" ? "messmate_room_asima" : "messmate_room")
 const savedRoom = (hostel: string) => {
@@ -763,7 +765,7 @@ function Home({
                 <h3>Homemade Pickles & Fresh Cut Bowls</h3>
                 <p>
                   Instant upgrade for bland mess food. Delivered to your room, or
-                  ready for pickup from {ASIMA_PICKUP} in Asima.
+                  ready for pickup in Asima.
                 </p>
                 <div className="feature-stats">
                   <div className="stat-item">
@@ -1677,18 +1679,19 @@ function Checkout({
                 <span className="fulfilment-icon">
                   <Icon name="location" />
                 </span>
-                <span>
-                  <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
-                  {/* The morning window is for fruit bowls; pickle orders have no set time yet */}
-                  {hasFruit ? (
+                {/* Fruit bowls are collected near the mess in the morning window; pickle orders from Room 104 or 210, with no set time yet */}
+                {hasFruit ? (
+                  <span>
+                    <strong>Asima · {MESS_PICKUP}</strong>
                     <em>FREE · {HOSTEL_HOURS.Asima}</em>
-                  ) : (
-                    <>
-                      <small>Collect it from {ASIMA_PICKUP}.</small>
-                      <em>FREE</em>
-                    </>
-                  )}
-                </span>
+                  </span>
+                ) : (
+                  <span>
+                    <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
+                    <small>Collect it from {ASIMA_PICKUP}.</small>
+                    <em>FREE</em>
+                  </span>
+                )}
                 <span className="radio">{asimaPickup && <span />}</span>
               </button>
               {!hasFruit && (
@@ -1822,7 +1825,7 @@ function Fulfilment({
     </div>
   )
 
-  const selectedPoint = PICKUP_POINTS.find((p) => p.name === pickupPoint) || PICKUP_POINTS[0]
+  const atMess = pickupPoint === MESS_PICKUP
 
   return (
     <>
@@ -1838,12 +1841,16 @@ function Fulfilment({
           <div className="eyebrow">Step 2 of 3</div>
           <h1>
             {fulfilment === "pickup"
-              ? `See you at ${ASIMA_PICKUP}.`
+              ? atMess
+                ? "See you near the mess."
+                : `See you at ${ASIMA_PICKUP}.`
               : "Coming to your door."}
           </h1>
           <p>
             {fulfilment === "pickup"
-              ? `Collect it from ${ASIMA_PICKUP} in Asima${slots.length ? " during pickup hours" : ""}.`
+              ? atMess
+                ? "Collect it near the Asima mess during pickup hours."
+                : `Collect it from ${ASIMA_PICKUP} in Asima.`
               : `Fresh food, straight to your room in ${details.hostel}.${slots.length ? " Pick a time that suits you." : ""}`}
           </p>
         </section>
@@ -1866,7 +1873,7 @@ function Fulfilment({
                     </span>
                     <div>
                       <small>PICKUP POINT</small>
-                      <strong>{selectedPoint.name}</strong>
+                      <strong>{pickupPoint}</strong>
                     </div>
                   </div>
                 </div>
@@ -1962,7 +1969,7 @@ function Payment({
   const [chosenMethod, setMethodState] = useState<"upi" | "counter">(() =>
     safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
   )
-  // Asima fruit orders are paid in person when collected from Room 104 or 210, never online
+  // Asima fruit orders are paid in person when collected near the mess, never online
   const payAtPickupOnly = fulfilment === "pickup" && items.some((item) => item.kind === "fruit")
   const method = payAtPickupOnly ? "counter" : chosenMethod
   const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
@@ -2034,7 +2041,7 @@ function Payment({
           <h1>Complete your payment</h1>
           <p>
             {payAtPickupOnly
-              ? `Pay when you collect your order from ${ASIMA_PICKUP}.`
+              ? "Pay when you collect your order near the Asima mess."
               : fulfilment === "delivery"
                 ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
                 : "Scan & pay via PhonePe QR, or pay at the counter."}
@@ -2045,7 +2052,7 @@ function Payment({
             <section className="payment-methods">
               <h2>{payAtPickupOnly ? "Payment" : "Select payment method"}</h2>
               {payAtPickupOnly ? (
-                <p className="pay-at-pickup-note">Asima fruit bowl orders are paid when you collect them from {ASIMA_PICKUP}, by cash or scan.</p>
+                <p className="pay-at-pickup-note">Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan.</p>
               ) : (
                 <button
                   type="button"
@@ -2947,9 +2954,9 @@ function OrdersPage({
                         </div>
                         <div>
                           <strong>
-                            {/* Asima pickup moved to Room 104 or 210, so older pickup orders show the new spot too */}
+                            {/* Fruit bowl orders are collected near the mess, pickle orders (older ones too) from Room 104 or 210 */}
                             {order.fulfilment === "pickup"
-                              ? ASIMA_PICKUP_POINT
+                              ? pickupPointFor(order.items)
                               : `${order.hostel}, Room ${order.room}`}
                           </strong>
                           <div
@@ -3109,7 +3116,7 @@ const FAQ_ITEMS = [
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      `At Asima, orders are picked up from ${ASIMA_PICKUP} (free), or pickle-only orders can come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`,
+      `At Asima, fruit bowls are picked up near the Asima mess (free). Pickle-only orders are picked up from ${ASIMA_PICKUP} (free) or come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`,
   },
   {
     id: "sold_out",
@@ -3920,7 +3927,6 @@ type SavedSession = {
   hostel: string
   asimaDelivery?: boolean
   fulfilment?: "pickup" | "delivery"
-  pickupPoint: string
   slot: string
   savedAt: number
 }
@@ -3939,7 +3945,6 @@ function restoreSession() {
     // Sessions saved before Asima had room delivery only kept fulfilment, and delivery meant Kalam
     hostel: fresh.hostel === "Kalam" || fresh.fulfilment === "delivery" ? "Kalam" : "Asima",
     asimaDelivery: fresh.asimaDelivery === true,
-    pickupPoint: PICKUP_POINTS.find((p) => p.name === fresh.pickupPoint)?.name ?? PICKUP_POINTS[0].name,
     // An old or unknown slot becomes the hostel's first slot (see orderSlot)
     slot: fresh.slot && ALL_SLOTS.includes(fresh.slot) ? fresh.slot : "",
   }
@@ -3963,8 +3968,7 @@ export default function App() {
   // An Asima student's pick between pickup and room delivery (fruit bowl orders are always picked up)
   const [asimaDelivery, setAsimaDelivery] = useState(restored.asimaDelivery)
   const fulfilment = fulfilmentFor(details.hostel, cart, asimaDelivery)
-  // One pickup spot (Room 104 or 210 in Asima), kept in state so saved sessions and orders carry its name
-  const [pickupPoint] = useState(restored.pickupPoint)
+  const pickupPoint = pickupPointFor(cart)
 
   const [slot, setSlot] = useState(restored.slot)
 
@@ -3975,11 +3979,10 @@ export default function App() {
       selectedProduct,
       hostel: details.hostel,
       asimaDelivery,
-      pickupPoint,
       slot,
       savedAt: Date.now(),
     })
-  }, [screen, cart, selectedProduct, details.hostel, asimaDelivery, pickupPoint, slot])
+  }, [screen, cart, selectedProduct, details.hostel, asimaDelivery, slot])
 
   // The phone's Back button steps back through the screens instead of leaving the site.
   // nav mirrors the browser history (one screen per step) so the on-screen back arrows can use it too.
@@ -4091,7 +4094,11 @@ export default function App() {
   // What the confirmation screen shows; the cart itself is emptied once the order is placed
   const [orderedItems, setOrderedItems] = useState<CartItem[]>([])
   // How the placed order is handed over, for the confirmation (fulfilment follows the cart, which is emptied)
-  const [placed, setPlaced] = useState<{ fulfilment: "pickup" | "delivery"; slot: string }>({ fulfilment: "delivery", slot: "" })
+  const [placed, setPlaced] = useState<{ fulfilment: "pickup" | "delivery"; slot: string; pickupPoint: string }>({
+    fulfilment: "delivery",
+    slot: "",
+    pickupPoint: "",
+  })
 
   // Count one anonymous visit per browser session for the admin's Store Visitors card (random id, no personal data).
   useEffect(() => {
@@ -4467,7 +4474,7 @@ export default function App() {
           safeStorage.removeItem("ht_pay_method")
           safeStorage.removeItem("ht_pay_utr")
           setOrderedItems(orderItems)
-          setPlaced({ fulfilment, slot: orderSlot })
+          setPlaced({ fulfilment, slot: orderSlot, pickupPoint })
           setCart([])
           go("confirmation")
         }
@@ -4662,7 +4669,7 @@ export default function App() {
             items={orderedItems}
             orderNumber={orderNumber}
             paymentMethod={paymentMethodName}
-            pickupPoint={pickupPoint}
+            pickupPoint={placed.pickupPoint}
             pickupPin={orderPin}
             isCancelled={activeCancelledOrder?.order_number === orderNumber}
           />

@@ -45,10 +45,10 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
 
 // Room delivery fee in ₹ (Kalam, and Asima pickle-only orders); pickup is free. The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
-// Asima orders are collected from one of these rooms
+// Asima pickle-only orders are collected from one of these rooms (fruit bowls near the Asima mess)
 export const ASIMA_PICKUP = "Room 104 or 210"
 
-/** Kalam always gets room delivery. Asima orders are collected from ASIMA_PICKUP, unless a pickle-only order asks for room delivery. */
+/** Kalam always gets room delivery. Asima orders are picked up (fruit bowls near the mess, pickles from ASIMA_PICKUP), unless a pickle-only order asks for room delivery. */
 export const fulfilmentFor = (
   hostel: string,
   items: Array<{ kind?: string }>,
@@ -83,7 +83,7 @@ export const normalizeKalamRoom = (room: string) => {
 // Asima's hours are its pickup window; Asima room delivery has no set time yet
 export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
 // The fruit page splits this on ", " into one line per hostel
-export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup ${HOSTEL_HOURS.Asima} from ${ASIMA_PICKUP}`
+export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup ${HOSTEL_HOURS.Asima} near the mess`
 
 /**
  * The slots a hostel offers for its next service. Asima's next morning is today until that
@@ -211,7 +211,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
       const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder for ${PICKLES_ARRIVAL}` : ""}.`
-      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; Asima pickup from ${ASIMA_PICKUP} is free.`
+      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
     }
   }
   if (ratingTalk) {
@@ -255,7 +255,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return `At Asima, orders are picked up from ${ASIMA_PICKUP} (free), or pickle-only orders can come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`
+    return `At Asima, fruit bowls are picked up near the Asima mess (free). Pickle-only orders are picked up from ${ASIMA_PICKUP} (free) or come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`
   }
   if (
     q.includes("fruit") ||

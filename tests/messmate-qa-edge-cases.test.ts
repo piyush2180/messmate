@@ -359,20 +359,19 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 // ============================================================================
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
-  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) from Room 104 or 210/)
+  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) near the mess/)
   assert.match(reply1, /Asima pickle orders don't have a set time yet/) // the morning window is for fruit bowls
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
-  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) from Room 104 or 210/)
+  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) near the mess/)
 })
 
-test("FAQ Bot - resolves pickup location queries: Asima fruit orders are collected from Room 104 or 210, pickle-only orders and Kalam get room delivery", () => {
+test("FAQ Bot - resolves pickup location queries: Asima fruit near the mess, Asima pickles from Room 104 or 210 or to the room, Kalam to the room", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
-  assert.match(reply, /picked up from Room 104 or 210/)
-  assert.match(reply, /pickle-only orders can come to your room \(₹5\)/)
+  assert.match(reply, /fruit bowls are picked up near the Asima mess/)
+  assert.match(reply, /Pickle-only orders are picked up from Room 104 or 210 \(free\) or come to your room \(₹5\)/)
   assert.match(reply, /Kalam orders come straight to your room/)
-  assert.doesNotMatch(reply, /mess/) // pickup moved away from the mess
   assert.doesNotMatch(reply, /Room-341|Asima - 110/) // the old pickup counters are gone
   assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
 })
