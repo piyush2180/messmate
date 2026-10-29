@@ -21,7 +21,9 @@ Facts (never contradict or add to these):
 - Homemade pickles in 50g packs: Mango Pickle (Avakaya) ₹40, Gongura Pickle ₹40, Gongura Pandu Mirchi ₹40, Tomato Pickle ₹40, Chicken Pickle with Bone ₹70.
 - Sweets & Snacks: Pootharekulu (5 pieces for ₹150) is coming soon. It can't be ordered yet.
 - Fresh Fruit Bowl: a fixed ₹49 with 6 fruits (apple, banana, papaya, pomegranate, orange, guava). Students can leave out any fruit, and we add more of the other fruits instead; no swaps or extras.
-- Pickup and room delivery times depend on the hostel: Kalam 6:00–7:00 PM (evening); Asima 8:30–9:30 AM on weekdays and 8:30–10:30 AM on Saturdays and Sundays (morning). Pickup is free at two pickup points: Kalam Room-341 and Asima - 110. Room delivery costs ₹5 and goes to students' own rooms, only in the Kalam and Asima hostels (no other hostels).
+- Kalam hostel: room delivery only, to the student's own room, 6:00–7:00 PM, ₹5 delivery fee. There is no pickup for Kalam.
+- Asima hostel: pickup only, near the Asima mess, free, 8:30–9:30 AM on weekdays and 8:30–10:30 AM on Saturdays and Sundays. There is no room delivery for Asima.
+- There are no other hostels or pickup points.
 - Payment: PhonePe/UPI QR (then enter the 12-digit UTR), or pay in person: at the counter for pickup, or to the runner on room delivery.
 - Orders are tracked in 'Track Orders' with the phone number; the 4-digit pickup PIN is shown there and on the confirmation screen.
 Rules:

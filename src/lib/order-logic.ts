@@ -54,7 +54,9 @@ export const HOSTEL_SLOTS: Record<string, string[]> = {
 // Asima runs an hour longer on Saturday and Sunday mornings
 export const ASIMA_WEEKEND_EXTRA = ["9:30–10:00 AM", "10:00–10:30 AM"]
 export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND_EXTRA, ...HOSTEL_SLOTS.Kalam]
-export const SERVICE_HOURS = "Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM (weekends till 10:30 AM)"
+// Kalam gets room delivery only, Asima collects near its mess only
+export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
+export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup near the mess ${HOSTEL_HOURS.Asima}`
 
 /**
  * The slots a hostel offers for its next service. Asima's next morning is today until that
@@ -226,7 +228,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return "Pickups are available at Kalam Room-341 and Asima - 110. Select your preferred spot during checkout!"
+    return `Asima orders are picked up near the Asima mess (free), and Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`
   }
   if (
     q.includes("fruit") ||

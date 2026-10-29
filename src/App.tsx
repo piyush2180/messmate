@@ -26,6 +26,7 @@ import pootharekuluImage from "./assets/pootharekulu.webp"
 import {
   ALL_SLOTS,
   DELIVERY_FEE,
+  HOSTEL_HOURS,
   SERVICE_HOURS,
   slotsForHostel,
   calculateOrderTotals,
@@ -126,11 +127,9 @@ const CONTACT_PHONE = "+91 83091 22630"
 const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 
 // Our only hostels; the pickup counters are inside them.
-const HOSTELS = ["Kalam", "Asima"]
-const PICKUP_POINTS = [
-  { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block", hostel: "Kalam" },
-  { name: "Asima - 110", desc: "Asima Hostel Ground Floor", hostel: "Asima" },
-]
+// Kalam gets room delivery only; Asima collects near its mess only
+const DELIVERY_HOSTEL = "Kalam"
+const PICKUP_POINTS = [{ name: "Near Asima Mess", desc: "Right by the Asima mess", hostel: "Asima" }]
 // The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
 const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
   slotsForHostel(fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? ""))
@@ -734,8 +733,8 @@ function Home({
                 <div className="feature-badge">Hostel Delivery & Pickup</div>
                 <h3>Homemade Pickles & Fresh Cut Bowls</h3>
                 <p>
-                  Instant upgrade for bland mess food. Delivered to your room, or
-                  ready for pickup at Kalam Room-341 or Asima - 110.
+                  Instant upgrade for bland mess food. Delivered to your room in
+                  Kalam, or ready for pickup near the Asima mess.
                 </p>
                 <div className="feature-stats">
                   <div className="stat-item">
@@ -1518,17 +1517,17 @@ function Checkout({
 
   const cleanPhone = details.phone.replace(/\D/g, "")
   const isPhoneValid = isValidIndianPhone(cleanPhone)
-  // Hostel and room only matter for room delivery; pickup uses the chosen pickup point.
+  // The room only matters for Kalam room delivery; Asima pickup is near the mess.
   const isComplete = Boolean(
     details.name.trim() &&
     isPhoneValid &&
-    (fulfilment === "pickup" || (details.hostel.trim() && details.room.trim()))
+    (fulfilment === "pickup" || details.room.trim())
   )
   const missing = !details.name.trim()
     ? "Please enter your name to continue"
     : !isPhoneValid
       ? "Please enter a valid 10-digit mobile number"
-      : "Please choose your hostel and room number"
+      : `Please enter your ${DELIVERY_HOSTEL} room number`
 
   return (
     <>
@@ -1583,27 +1582,10 @@ function Checkout({
             <section className="receive-section">
               <div className="section-heading">
                 <div>
-                  <div className="eyebrow">Choose one</div>
+                  <div className="eyebrow">Choose your hostel</div>
                   <h2>How would you like it?</h2>
                 </div>
               </div>
-              <button
-                className={`fulfilment-card ${
-                  fulfilment === "pickup" ? "selected" : ""
-                }`}
-                aria-pressed={fulfilment === "pickup"}
-                onClick={() => setFulfilment("pickup")}
-              >
-                <span className="fulfilment-icon">
-                  <Icon name="location" />
-                </span>
-                <span>
-                  <strong>Campus pickup</strong>
-                  <small>Pick it up, nice and easy.</small>
-                  <em>FREE · {SERVICE_HOURS}</em>
-                </span>
-                <span className="radio">{fulfilment === "pickup" && <span />}</span>
-              </button>
               <button
                 className={`fulfilment-card ${
                   fulfilment === "delivery" ? "selected" : ""
@@ -1615,25 +1597,35 @@ function Checkout({
                   <Icon name="bag" />
                 </span>
                 <span>
-                  <strong>Room delivery</strong>
-                  <small>Right to your hostel room.</small>
-                  <em>+₹{DELIVERY_FEE} delivery fee</em>
+                  <strong>Kalam · Room delivery</strong>
+                  <small>Right to your room in Kalam.</small>
+                  <em>+₹{DELIVERY_FEE} · {HOSTEL_HOURS.Kalam}</em>
                 </span>
                 <span className="radio">
                   {fulfilment === "delivery" && <span />}
                 </span>
               </button>
+              <button
+                className={`fulfilment-card ${
+                  fulfilment === "pickup" ? "selected" : ""
+                }`}
+                aria-pressed={fulfilment === "pickup"}
+                onClick={() => setFulfilment("pickup")}
+              >
+                <span className="fulfilment-icon">
+                  <Icon name="location" />
+                </span>
+                <span>
+                  <strong>Asima · Pickup near the mess</strong>
+                  <small>Collect it near the Asima mess.</small>
+                  <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                </span>
+                <span className="radio">{fulfilment === "pickup" && <span />}</span>
+              </button>
               {fulfilment === "delivery" && (
                 <div className="form-grid delivery-fields">
                   <Field
-                    label="Hostel"
-                    placeholder="Select hostel"
-                    options={HOSTELS}
-                    value={details.hostel}
-                    onChange={(v) => set("hostel", v)}
-                  />
-                  <Field
-                    label="Room number"
+                    label={`Room number in ${DELIVERY_HOSTEL}`}
                     placeholder="e.g. 214"
                     inputMode="numeric"
                     maxLength={4}
@@ -1653,15 +1645,15 @@ function Checkout({
               <div className="selected-delivery-preview">
                 <strong>
                   {fulfilment === "pickup"
-                    ? "Hostel Pickup (Free)"
-                    : `Room Delivery (+₹${DELIVERY_FEE})`}
+                    ? "Asima Pickup (Free)"
+                    : `Kalam Room Delivery (+₹${DELIVERY_FEE})`}
                 </strong>
                 <p>
                   {fulfilment === "pickup"
                     ? pickupPoint
-                    : details.hostel && details.room
+                    : details.room
                       ? `${details.hostel}, Room ${details.room}`
-                      : "Direct to your hostel room door"}
+                      : "Direct to your room door in Kalam"}
                 </p>
               </div>
               <div className="desktop-checkout-cta">
@@ -1696,7 +1688,6 @@ function Fulfilment({
   slot,
   setSlot,
   pickupPoint,
-  setPickupPoint,
 }: {
   go: (screen: Screen) => void
   fulfilment: "pickup" | "delivery"
@@ -1704,7 +1695,6 @@ function Fulfilment({
   slot: string
   setSlot: (value: string) => void
   pickupPoint: string
-  setPickupPoint: (value: string) => void
 }) {
   const slots = slotsFor(fulfilment, details.hostel, pickupPoint)
 
@@ -1728,8 +1718,7 @@ function Fulfilment({
     </div>
   )
 
-  const pickupPoints = PICKUP_POINTS
-  const selectedPoint = pickupPoints.find(p => p.name === pickupPoint) || pickupPoints[0]
+  const selectedPoint = PICKUP_POINTS.find((p) => p.name === pickupPoint) || PICKUP_POINTS[0]
 
   return (
     <>
@@ -1745,13 +1734,13 @@ function Fulfilment({
           <div className="eyebrow">Step 2 of 3</div>
           <h1>
             {fulfilment === "pickup"
-              ? "Meet you on campus."
+              ? "See you near the mess."
               : "Coming to your door."}
           </h1>
           <p>
             {fulfilment === "pickup"
-              ? "Choose a pickup point and time that works for you."
-              : "Fresh food, straight to your room. Pick a time that suits you."}
+              ? "Collect it near the Asima mess. Pick a time that works for you."
+              : "Fresh food, straight to your room in Kalam. Pick a time that suits you."}
           </p>
         </section>
         <div className="fulfilment-layout">
@@ -1780,23 +1769,6 @@ function Fulfilment({
                 </div>
                 <div className="availability">
                   <span></span>Pickup available every day
-                </div>
-                <div className="time-section" style={{ marginBottom: "24px" }}>
-                  <h2>Choose a pickup point</h2>
-                  <div className="slot-list">
-                    {pickupPoints.map((pt) => (
-                      <button
-                        key={pt.name}
-                        className={pickupPoint === pt.name ? "selected" : ""}
-                        aria-pressed={pickupPoint === pt.name}
-                        onClick={() => setPickupPoint(pt.name)}
-                      >
-                        <Icon name="location" size={18} />
-                        {pt.name}
-                        <span className="radio">{pickupPoint === pt.name && <span />}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
                 {slotPicker("Choose a pickup time")}
               </>
@@ -2937,7 +2909,7 @@ const FAQ_ITEMS = [
     label: "Where is my 4-digit PIN?",
     question: "Where do I find my 4-digit Pickup PIN?",
     answer:
-      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Show this PIN at your pickup point (Kalam Room-341 or Asima - 110) to collect your food!",
+      "Your unique 4-digit Pickup PIN is displayed on your Order Confirmation screen and in the 'Track Orders' tab. Show this PIN when you collect your order near the Asima mess!",
   },
   {
     id: "payment_verify",
@@ -2972,7 +2944,7 @@ const FAQ_ITEMS = [
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      "Pick up from Kalam Room-341 (APJ Abdul Kalam Block) or Asima - 110 (ground floor). Choose your spot at checkout!",
+      `Asima orders are picked up near the Asima mess (free). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`,
   },
   {
     id: "sold_out",
@@ -3816,12 +3788,13 @@ export default function App() {
     name: safeStorage.getItem("messmate_customer_name", "") || "",
     phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
     // Only keep a saved hostel that is one of ours (older saves were free text).
-    hostel: HOSTELS.find((h) => h.toLowerCase() === (safeStorage.getItem("messmate_hostel", "") || "").trim().toLowerCase()) ?? "",
+    hostel: DELIVERY_HOSTEL, // room delivery only goes to Kalam
     room: (safeStorage.getItem("messmate_room", "") || "").replace(/\D/g, ""),
   }))
 
   const [fulfilment, setFulfilment] = useState<"pickup" | "delivery">(restored.fulfilment)
-  const [pickupPoint, setPickupPoint] = useState(restored.pickupPoint)
+  // One pickup spot (near the Asima mess), kept in state so saved sessions and orders carry its name
+  const [pickupPoint] = useState(restored.pickupPoint)
 
   const [slot, setSlot] = useState(restored.slot)
 
@@ -4477,7 +4450,6 @@ export default function App() {
             slot={orderSlot}
             setSlot={setSlot}
             pickupPoint={pickupPoint}
-            setPickupPoint={setPickupPoint}
           />
         )}
         {screen === "payment" && (

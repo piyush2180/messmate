@@ -350,17 +350,18 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 // ============================================================================
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
-  assert.match(reply1, /Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM/)
+  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup near the mess 8:30–9:30 AM/)
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
-  assert.match(reply2, /Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM/)
+  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup near the mess 8:30–9:30 AM/)
 })
 
-test("FAQ Bot - resolves pickup location queries", () => {
+test("FAQ Bot - resolves pickup location queries: Asima picks up near the mess, Kalam gets room delivery", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
-  assert.match(reply, /Kalam Room-341/)
-  assert.match(reply, /Asima - 110/)
+  assert.match(reply, /near the Asima mess/)
+  assert.match(reply, /Kalam orders come straight to your room/)
+  assert.doesNotMatch(reply, /Room-341|Asima - 110/) // the old pickup counters are gone
   assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
 })
 
