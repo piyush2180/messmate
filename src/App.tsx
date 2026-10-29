@@ -129,7 +129,7 @@ const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 // Our only hostels; the pickup counters are inside them.
 // Kalam gets room delivery only; Asima collects near its mess only
 const DELIVERY_HOSTEL = "Kalam"
-const PICKUP_POINTS = [{ name: "Near Asima Mess", desc: "Right by the Asima mess", hostel: "Asima" }]
+const PICKUP_POINTS = [{ name: "Near Asima Mess", hostel: "Asima" }]
 // The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
 const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
   slotsForHostel(fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? ""))
@@ -1763,7 +1763,6 @@ function Fulfilment({
                     <div>
                       <small>PICKUP POINT</small>
                       <strong>{selectedPoint.name}</strong>
-                      <p>{selectedPoint.desc}</p>
                     </div>
                   </div>
                 </div>
