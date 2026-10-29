@@ -14,8 +14,6 @@ export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
   { id: "fruit-pomegranate", name: "Pomegranate", category: "Fruits", is_available: true },
   { id: "fruit-orange", name: "Orange", category: "Fruits", is_available: true },
   { id: "fruit-guava", name: "Guava", category: "Fruits", is_available: true },
-  { id: "fruit-grapes", name: "Grapes", category: "Fruits", is_available: true },
-  { id: "fruit-pineapple", name: "Pineapple", category: "Fruits", is_available: true },
 ]
 
 export function getPickupPin(order: { pickup_code?: string; order_number?: number | string }): string {

@@ -2418,3 +2418,10 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
   .product-meta-row { gap: 3px; }
   .bottom-inner .primary-button { font-size: 11px; padding: 0 12px; }
 }
+
+/* Pickles on Preorder ("Arriving soon", admin switch) and the fruit bowl's top-up note */
+.arriving-soon-chip { position: absolute; z-index: 2; top: 18px; right: 18px; padding: 8px 12px; border-radius: 999px; background: var(--terracotta-dark); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.product-image-wrap .arriving-soon-chip { top: 10px; left: 10px; right: auto; padding: 5px 9px; font-size: 9px; }
+.arriving-soon-chip.inline { position: static; display: inline-block; margin-bottom: 10px; }
+.builder-topup-note { margin: 14px 0 0; }
+.summary-hours { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }

@@ -81,7 +81,7 @@ export const packOptions = [{ label: "50g", units: 1, note: "Just enough to star
 export type PackOption = (typeof packOptions)[number]
 
 export const FRUIT_BOWL_NAME = "Fresh Fruit Bowl"
-export const FRUIT_BOWL_PRICE = 60
+export const FRUIT_BOWL_PRICE = 49
 
 export function pickleCartItem(product: PickleProduct, pack: PackOption): CartItem {
   return {
@@ -116,6 +116,9 @@ export function bowlLeftOut(id: string): string[] {
   return id.startsWith("fruit-bowl") ? id.split("-no-").slice(1) : []
 }
 
+// Pickle lines ordered while pickles are on Preorder carry this after the pack size, so the kitchen sees it
+export const PREORDER_TAG = " · Preorder"
+
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   return items.flatMap((item) => {
     const quantity = Math.max(1, Math.floor(Number(item?.quantity)) || 1)
@@ -123,7 +126,8 @@ export function repriceForReorder(items: CartItem[]): CartItem[] {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
     }
     const product = pickleProducts.find((p) => p.name === item?.name)
-    const pack = packOptions.find((p) => p.label === item?.detail)
+    // A past preorder line reorders as a plain pack; whether it's a preorder is decided again at checkout
+    const pack = packOptions.find((p) => p.label === String(item?.detail ?? "").replace(PREORDER_TAG, ""))
     return product && pack ? [{ ...pickleCartItem(product, pack), quantity }] : []
   })
 }
@@ -141,8 +145,6 @@ export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
   { id: "fruit-pomegranate", name: "Pomegranate", category: "Fruits", is_available: true },
   { id: "fruit-orange", name: "Orange", category: "Fruits", is_available: true },
   { id: "fruit-guava", name: "Guava", category: "Fruits", is_available: true },
-  { id: "fruit-grapes", name: "Grapes", category: "Fruits", is_available: true },
-  { id: "fruit-pineapple", name: "Pineapple", category: "Fruits", is_available: true },
 ]
 
 export function getPickupPin(order: { pickup_code?: string; order_number?: number | string }): string {

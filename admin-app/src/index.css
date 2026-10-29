@@ -1962,3 +1962,7 @@ button, input, select, textarea {
 @media (max-width: 768px) {
   .analytics-financial-grid > .fin-metric-box:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* Pickles Preorder switch in Menu & Stock */
+.store-status-bar.soon { background: var(--amber-soft); border-color: var(--amber); color: #92400e; }
+.store-status-bar.soon .store-status-dot { background: var(--amber); }

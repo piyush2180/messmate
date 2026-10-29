@@ -135,6 +135,8 @@ function mergeSupportMessages(
 
 // Money staff type in by hand, by table
 const ENTRY_LABEL = { counter_sales: "counter sale", expenses: "expense" } as const
+// Pickup / delivery slots the store offers: Asima mornings, Kalam evenings (keep in step with src/lib/order-logic.ts)
+const SLOT_OPTIONS = ["8:30–9:00 AM", "9:00–9:30 AM", "6:00–6:30 PM", "6:30–7:00 PM"]
 
 // Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {
@@ -268,6 +270,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   // Open / Closed switch the student store follows (null until loaded)
   const [storeOpen, setStoreOpen] = useState<boolean | null>(null)
   const [storeStatusMissing, setStoreStatusMissing] = useState(false)
+  // Pickles Preorder switch ("Arriving soon" in the store); null until loaded, or while its SQL hasn't been run
+  const [picklesSoon, setPicklesSoon] = useState<boolean | null>(null)
 
   const [counterSales, setCounterSales] = useState<CounterSale[]>([])
   const [counterSalesState, setCounterSalesState] = useState<"loading" | "ready" | "missing" | "error">("loading")
@@ -498,7 +502,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     if (!supabase) return
     supabase
       .from("store_status")
-      .select("is_open")
+      .select("*")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -510,7 +514,24 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         }
         setStoreStatusMissing(false)
         setStoreOpen(data ? Boolean(data.is_open) : true)
+        // No row yet means pickles are on sale; a row without the column means its SQL hasn't been run
+        setPicklesSoon(!data ? false : typeof data.pickles_coming_soon === "boolean" ? data.pickles_coming_soon : null)
       })
+  }
+
+  const handleTogglePicklesSoon = async () => {
+    if (!supabase || picklesSoon === null) return
+    const next = !picklesSoon
+    if (next && !confirm("Put pickles on Preorder? Students will see \"Arriving soon\" and a Preorder button, and pickles they order will be marked Preorder.")) return
+    setPicklesSoon(next)
+    const { error } = await supabase
+      .from("store_status")
+      .upsert({ id: 1, pickles_coming_soon: next, updated_at: new Date().toISOString() })
+    if (error) {
+      console.error("Pickles switch not saved:", error.message)
+      setPicklesSoon(!next)
+      alert("Couldn't change the pickles switch. Please check the connection and try again.")
+    }
   }
 
   const handleToggleStore = async () => {
@@ -539,8 +560,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     const storeChannel = supabase
       ?.channel("admin_store_status")
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
-        const row = payload.new as { is_open?: boolean }
+        const row = payload.new as { is_open?: boolean; pickles_coming_soon?: boolean }
         if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+        if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
       })
       .subscribe()
     // A counter sale or expense added or removed on another phone shows up here too
@@ -1277,9 +1299,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   className="filter-select"
                 >
                   <option value="all">All Time Slots</option>
-                  <option value="8:00–8:30 PM">8:00–8:30 PM</option>
-                  <option value="8:30–9:00 PM">8:30–9:00 PM</option>
-                  <option value="9:00–9:30 PM">9:00–9:30 PM</option>
+                  {SLOT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1349,6 +1373,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 ))}
               </div>
             </div>
+
+            {picklesSoon === null ? (
+              storeOpen !== null && (
+                <div className="store-status-bar missing">Run the pickles SQL in Supabase to use the Preorder switch.</div>
+              )
+            ) : (
+              <div className={`store-status-bar ${picklesSoon ? "soon" : "open"}`}>
+                <span>
+                  <span className="store-status-dot" />
+                  {picklesSoon ? "Pickles are on Preorder: students see “Arriving soon”" : "Pickles are on sale"}
+                </span>
+                <button type="button" className="action-btn-small" onClick={handleTogglePicklesSoon}>
+                  {picklesSoon ? "Put pickles on sale" : "Switch to Preorder"}
+                </button>
+              </div>
+            )}
 
             <div className="inventory-grid">
               {filteredInventory.map((item) => (
@@ -1841,9 +1881,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             <div className="analytics-card">
               <div className="analytics-card-title">
-                <span>Evening Slots Volume · {periodLabel}</span>
+                <span>Slots Volume · {periodLabel}</span>
               </div>
-              {["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"].map((slotName) => {
+              {SLOT_OPTIONS.map((slotName) => {
                 const count = chartOrders.filter((o) => o.slot === slotName).length
                 const pct = (count / Math.max(chartOrders.length, 1)) * 100
                 return (

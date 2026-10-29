@@ -46,6 +46,14 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
 // Room delivery fee in ₹ (campus pickup is free). The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
 
+// Pickup and delivery times depend on the hostel: Asima in the morning, Kalam in the evening
+export const HOSTEL_SLOTS: Record<string, string[]> = {
+  Kalam: ["6:00–6:30 PM", "6:30–7:00 PM"],
+  Asima: ["8:30–9:00 AM", "9:00–9:30 AM"],
+}
+export const ALL_SLOTS = Object.values(HOSTEL_SLOTS).flat()
+export const SERVICE_HOURS = "Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM"
+
 /**
  * Calculates subtotal, delivery fee, and final total for an order.
  * Room delivery adds DELIVERY_FEE; campus pickup is free.
@@ -121,8 +129,9 @@ const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUI
 /**
  * Instant answers in the support chat. Checked in order: the first matching topic wins,
  * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
+ * picklesSoon: the admin has pickles on Preorder ("Arriving soon"); students can still order them.
  */
-export function getFaqResponse(query: string): string {
+export function getFaqResponse(query: string, picklesSoon = false): string {
   const q = (query || "").toLowerCase().trim()
   // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
   const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
@@ -153,14 +162,18 @@ export function getFaqResponse(query: string): string {
     if (!ratingTalk) {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
-      return `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}. Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
+      const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? ", on preorder while they're arriving soon" : ""}.`
+      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
     }
   }
   if (ratingTalk) {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
   }
+  if (picklesSoon && /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)) {
+    return "Our homemade pickles are arriving soon! You can preorder them now on the Pickles page, and we'll bring them to you as soon as they arrive."
+  }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
-    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared every morning for dinner delivery!"
+    return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared before every delivery slot!"
   }
   if (
     q.includes("track") ||
@@ -180,7 +193,7 @@ export function getFaqResponse(query: string): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
+    return `Pickup and room delivery times depend on your hostel: ${SERVICE_HOURS}. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
   }
   if (
     q.includes("pickup point") ||
@@ -201,7 +214,7 @@ export function getFaqResponse(query: string): string {
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits: ${BOWL_FRUITS}. You can leave out any fruit you don't want.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits: ${BOWL_FRUITS}. Leave out any fruit you don't want and we'll add more of the others.`
   }
   if (
     q.includes("pickle") ||

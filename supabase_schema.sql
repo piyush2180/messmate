@@ -337,12 +337,15 @@ grant select, insert, delete on public.counter_sales to authenticated;
 -- ============================================================================
 -- 8. Store Open / Closed (admin switch; the student store reads it live)
 -- One row. Closed: checkout pauses and the chat says "Unavailable at the moment".
+-- pickles_coming_soon: the store shows pickles as "Coming soon" and they can't be ordered (admin Menu & Stock).
 -- ============================================================================
 create table if not exists public.store_status (
   id int primary key default 1 check (id = 1),
   is_open boolean not null default true,
+  pickles_coming_soon boolean not null default false,
   updated_at timestamptz not null default now()
 );
+alter table public.store_status add column if not exists pickles_coming_soon boolean not null default false;
 insert into public.store_status (id) values (1) on conflict (id) do nothing;
 
 alter table public.store_status enable row level security;

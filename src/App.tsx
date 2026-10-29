@@ -5,6 +5,7 @@ import {
   DEFAULT_MENU_ITEMS,
   FRUIT_BOWL_NAME,
   FRUIT_BOWL_PRICE,
+  PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
   getPickupPin,
@@ -17,7 +18,10 @@ import {
 import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
 import {
+  ALL_SLOTS,
   DELIVERY_FEE,
+  HOSTEL_SLOTS,
+  SERVICE_HOURS,
   calculateOrderTotals,
   cleanPhoneInput,
   FAQ_FALLBACK,
@@ -109,7 +113,7 @@ const pickleImage =
   "https://cdn.shopify.com/s/files/1/0722/3872/7323/files/mango-pickle-scaled_f383ec5b-be63-4988-81c1-f2f381d76f8e.webp?width=1000"
 
 // A real bowl of cut fruit; free to use under the Unsplash License.
-// Unsplash photo of cut papaya, pomegranate, guava, pineapple, orange, banana and apple (our bowl's fruits)
+// Unsplash photo of a cut-fruit platter (papaya, pomegranate, guava, orange, banana, apple and a little pineapple)
 const fruitImage = "https://images.unsplash.com/photo-1641642400143-6be68f1a0918?auto=format&fit=crop&w=800&h=800&q=80"
 
 const BRAND = "Happy Tummy Co."
@@ -121,14 +125,16 @@ const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 // Our only hostels; the pickup counters are inside them.
 const HOSTELS = ["Kalam", "Asima"]
 const PICKUP_POINTS = [
-  { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block" },
-  { name: "Asima - 110", desc: "Asima Hostel Ground Floor" },
+  { name: "Kalam Room-341", desc: "Inside APJ Abdul Kalam Block", hostel: "Kalam" },
+  { name: "Asima - 110", desc: "Asima Hostel Ground Floor", hostel: "Asima" },
 ]
+// The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
+const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
+  HOSTEL_SLOTS[fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? "")] ?? ALL_SLOTS
 
 // Support messages are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = `${BRAND} Support Team`
 const SUPPORT_NAMES = [SUPPORT_NAME, "MessMate Support Team", "MessMate Support", "Campus Support Team"]
-const SLOTS = ["8:00–8:30 PM", "8:30–9:00 PM", "9:00–9:30 PM"]
 // What students see while the admin has the store switched to Closed
 const CLOSED_MESSAGE = "Unavailable at the moment"
 
@@ -140,9 +146,7 @@ const fruitSoldOut = (name: string, soldOut: Set<string>) =>
   soldOut.has(`Robusta ${name}`) ||
   (name === "Pomegranate" && soldOut.has("Pomegranate Pearls")) ||
   (name === "Orange" && soldOut.has("Nagpur Orange")) ||
-  (name === "Guava" && soldOut.has("Pink Guava")) ||
-  (name === "Grapes" && soldOut.has("Black Grapes")) ||
-  (name === "Pineapple" && soldOut.has("Queen Pineapple"))
+  (name === "Guava" && soldOut.has("Pink Guava"))
 
 // Menu names of the rows marked sold out (matched by id, so a renamed item keeps its flag)
 const soldOutNames = (rows: Array<{ id: string; name: string; is_available: boolean }>) =>
@@ -150,6 +154,10 @@ const soldOutNames = (rows: Array<{ id: string; name: string; is_available: bool
 
 // Supplier (Shopify) photo at a given width
 const sized = (url: string, width: number) => url.replace(/width=\d+/, `width=${width}`)
+
+// A pickle line's text while pickles are on Preorder (the placed order gets PREORDER_TAG instead)
+const preorderDetail = (item: CartItem, preorder: boolean) =>
+  preorder && item.kind === "pickle" ? `${item.detail} · Preorder, arriving soon` : item.detail
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
@@ -184,10 +192,6 @@ const fruits = [
   { name: "Orange", color: "#E99645", emoji: "O" },
 
   { name: "Guava", color: "#7A9A55", emoji: "G" },
-
-  { name: "Grapes", color: "#76608A", emoji: "G" },
-
-  { name: "Pineapple", color: "#D9A441", emoji: "P" },
 ]
 
 function Icon({
@@ -614,6 +618,7 @@ function CategoryCard({
   labels,
   cta,
   onClick,
+  soon = false,
 }: {
   type: "pickle" | "fruit"
   title: string
@@ -623,6 +628,7 @@ function CategoryCard({
   labels: string[]
   cta: string
   onClick: () => void
+  soon?: boolean
 }) {
   return (
     <article className={`category-card ${type}`} onClick={onClick} style={{ cursor: "pointer" }}>
@@ -638,6 +644,7 @@ function CategoryCard({
         <span className="category-number">
           {type === "pickle" ? "01" : "02"}
         </span>
+        {soon && <span className="arriving-soon-chip">Arriving soon</span>}
       </div>
       <div className="category-content">
         <div className="eyebrow">
@@ -666,10 +673,12 @@ function Home({
   go,
   cartCount,
   cartTotal,
+  picklesSoon = false,
 }: {
   go: (screen: Screen) => void
   cartCount: number
   cartTotal: number
+  picklesSoon?: boolean
 }) {
   return (
     <>
@@ -700,7 +709,7 @@ function Home({
                 className="primary-button hero-cta-btn"
                 onClick={() => go("pickles")}
               >
-                <span>Order Homemade Pickles</span>
+                <span>{picklesSoon ? "Preorder Homemade Pickles" : "Order Homemade Pickles"}</span>
                 <Icon name="arrow-right" size={18} />
               </button>
               <button
@@ -755,8 +764,9 @@ function Home({
             line="One spoon. Instant upgrade."
             image={pickleImage}
             labels={["Homemade", "South Indian", "Small-batch"]}
-            cta="Explore pickles"
+            cta={picklesSoon ? "Preorder pickles" : "Explore pickles"}
             onClick={() => go("pickles")}
+            soon={picklesSoon}
           />
           <CategoryCard
             type="fruit"
@@ -795,11 +805,13 @@ function PickleList({
   selectProduct,
   cartCount,
   soldOutItems,
+  preorder = false,
 }: {
   go: (screen: Screen) => void
   selectProduct: (name: string) => void
   cartCount: number
   soldOutItems?: Set<string>
+  preorder?: boolean
 }) {
   return (
     <>
@@ -836,6 +848,7 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
+                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving soon</span>}
                 </div>
                 <div className="product-info">
                   <div className="product-meta-row">
@@ -877,14 +890,17 @@ function PickleDetail({
   add,
   cartCount = 0,
   isSoldOut = false,
+  preorder = false,
 }: {
   go: (screen: Screen) => void
   productName: string
   add: (item: CartItem) => void
   cartCount?: number
   isSoldOut?: boolean
+  preorder?: boolean
 }) {
   const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
+  const addLabel = isSoldOut ? "Currently Sold Out" : preorder ? "Preorder" : "Add to cart"
   const pack = packOptions[0]
   const item = pickleCartItem(product, pack)
 
@@ -921,6 +937,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
+            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Arriving soon</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
@@ -972,11 +989,11 @@ function PickleDetail({
                   className="desktop-pack-tag"
                   style={isSoldOut ? { color: "#d90429", background: "#fee2e2" } : {}}
                 >
-                  {isSoldOut ? "Temporarily Sold Out" : "In stock today"}
+                  {isSoldOut ? "Temporarily Sold Out" : preorder ? "Arriving soon · preorder now" : "In stock today"}
                 </div>
               </div>
               <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
-                {isSoldOut ? "Currently Sold Out" : "Add to cart"}
+                {addLabel}
               </PrimaryButton>
             </div>
           </section>
@@ -988,7 +1005,7 @@ function PickleDetail({
           <strong>₹{item.price}</strong>
         </div>
         <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
-          {isSoldOut ? "Currently Sold Out" : "Add to cart"}
+          {addLabel}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -1060,8 +1077,7 @@ function FruitBuilder({
             <div className="builder-note">
               <Icon name="clock" size={18} />
               <span>
-                Delivery & pickup every evening, 8:00–9:30 PM. Pickup is free,
-                room delivery ₹{DELIVERY_FEE}.
+                Delivery & pickup: {SERVICE_HOURS}. Pickup is free, room delivery ₹{DELIVERY_FEE}.
               </span>
             </div>
             <div className="fruit-grid">
@@ -1102,6 +1118,10 @@ function FruitBuilder({
                 )
               })}
             </div>
+            <div className="builder-note builder-topup-note">
+              <Icon name="check" size={18} />
+              <span>Don't want a fruit? Leave it out and we'll add more of the other fruits, so your bowl stays just as full.</span>
+            </div>
           </div>
           <div className="builder-right-col">
             <div className="bowl-summary">
@@ -1129,7 +1149,11 @@ function FruitBuilder({
               </div>
               <div className="summary-row">
                 <span>Delivery & pickup</span>
-                <strong>8:00–9:30 PM</strong>
+                <strong className="summary-hours">
+                  {SERVICE_HOURS.split(", ").map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
+                </strong>
               </div>
               <div className="summary-row" style={{ paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.2)", fontSize: 13 }}>
                 <span>Fixed price</span>
@@ -1202,6 +1226,7 @@ function Cart({
   go,
   soldOutItems,
   storeOpen,
+  preorder = false,
 }: {
   items: CartItem[]
   updateQuantity: (id: string, quantity: number) => void
@@ -1209,6 +1234,7 @@ function Cart({
   go: (screen: Screen) => void
   soldOutItems: Set<string>
   storeOpen: boolean
+  preorder?: boolean
 }) {
   const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
   const ctaLabel = !storeOpen ? CLOSED_MESSAGE : blocked ? "Remove the sold-out item above" : "Go to checkout"
@@ -1266,7 +1292,7 @@ function Cart({
                           : "Fresh bowl"}
                       </span>
                       <h3>{item.name}</h3>
-                      <p>{item.detail}</p>
+                      <p>{preorderDetail(item, preorder)}</p>
                       {soldOutNote(item, soldOutItems) && (
                         <p className="cart-sold-out">{soldOutNote(item, soldOutItems)}</p>
                       )}
@@ -1515,7 +1541,7 @@ function Checkout({
                 <span>
                   <strong>Campus pickup</strong>
                   <small>Pick it up, nice and easy.</small>
-                  <em>FREE · 8:00–9:30 PM</em>
+                  <em>FREE · {SERVICE_HOURS}</em>
                 </span>
                 <span className="radio">{fulfilment === "pickup" && <span />}</span>
               </button>
@@ -1621,7 +1647,7 @@ function Fulfilment({
   pickupPoint: string
   setPickupPoint: (value: string) => void
 }) {
-  const slots = SLOTS
+  const slots = slotsFor(fulfilment, details.hostel, pickupPoint)
 
   const slotPicker = (heading: string) => (
     <div className="time-section">
@@ -1694,7 +1720,7 @@ function Fulfilment({
                   </div>
                 </div>
                 <div className="availability">
-                  <span></span>Pickup available today
+                  <span></span>Pickup available every day
                 </div>
                 <div className="time-section" style={{ marginBottom: "24px" }}>
                   <h2>Choose a pickup point</h2>
@@ -1771,6 +1797,7 @@ function Payment({
   isSubmitting,
   soldOutItems,
   storeOpen,
+  preorder = false,
 }: {
   go: (screen: Screen) => void
   items: CartItem[]
@@ -1779,6 +1806,7 @@ function Payment({
   isSubmitting: boolean
   soldOutItems: Set<string>
   storeOpen: boolean
+  preorder?: boolean
 }) {
   const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
   // Same calculation handlePay uses, so the amount shown is the amount saved.
@@ -2019,7 +2047,7 @@ function Payment({
                   <span className="order-qty">{item.quantity}×</span>
                   <span>
                     <strong>{item.name}</strong>
-                    <small>{item.detail}</small>
+                    <small>{preorderDetail(item, preorder)}</small>
                     {soldOutNote(item, soldOutItems) && (
                       <small className="cart-sold-out">{soldOutNote(item, soldOutItems)}</small>
                     )}
@@ -2878,7 +2906,7 @@ const FAQ_ITEMS = [
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      `Deliveries & pickups happen every evening between 8:00 PM and 9:30 PM. Pickup at Kalam or Asima is free, and room delivery is ₹${DELIVERY_FEE}.`,
+      `Pickup and room delivery times depend on your hostel: ${SERVICE_HOURS}. Pickup at Kalam or Asima is free, and room delivery is ₹${DELIVERY_FEE}.`,
   },
   {
     id: "pickup",
@@ -2892,14 +2920,14 @@ const FAQ_ITEMS = [
     label: "Sold out items",
     question: "What if an item is marked Sold Out?",
     answer:
-      "To ensure maximum freshness, our kitchen marks items 'Sold Out' as soon as daily batches run out. They are replenished every morning for the next evening dinner slot!",
+      "To ensure maximum freshness, our kitchen marks items 'Sold Out' as soon as daily batches run out. They are restocked before the next delivery slot!",
   },
   {
     id: "fruit",
     label: "Fruit bowl price & fruits",
     question: "How does the fruit bowl work?",
     answer:
-      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits: ${fruits.map((f) => f.name.toLowerCase()).join(", ")}, made right before evening pickup. Don't want a fruit? Tap it to leave it out before adding the bowl.`,
+      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits: ${fruits.map((f) => f.name.toLowerCase()).join(", ")}, cut fresh right before your slot. Don't want a fruit? Tap it to leave it out and we'll add more of the others.`,
   },
   {
     id: "pickle",
@@ -2917,6 +2945,7 @@ async function askAi(
   message: string,
   history: Array<{ sender: "user" | "bot"; text: string }>,
   storeOpen: boolean,
+  picklesSoon: boolean,
 ): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10000)
@@ -2929,6 +2958,7 @@ async function askAi(
         history: history.slice(-6).map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
         visitorId: safeStorage.getItem("ht_visitor_id", "") || undefined,
         storeOpen,
+        picklesSoon,
       }),
       signal: controller.signal,
     })
@@ -2946,10 +2976,12 @@ function SupportChatWidget({
   customerPhone = "",
   customerName = "",
   storeOpen = true,
+  picklesSoon = false,
 }: {
   customerPhone?: string
   customerName?: string
   storeOpen?: boolean
+  picklesSoon?: boolean
 }) {
   // 1. Initial saved messages from localStorage
   const savedCleanPhone = (customerPhone || safeStorage.getItem("messmate_phone", "") || "")
@@ -3197,7 +3229,7 @@ function SupportChatWidget({
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
-    const answer = getFaqResponse(query)
+    const answer = getFaqResponse(query, picklesSoon)
     const known = answer !== FAQ_FALLBACK
     const botId = `faq-b-${Date.now() + 1}`
 
@@ -3209,7 +3241,7 @@ function SupportChatWidget({
     if (known) return
     // No instant answer (a greeting, small talk…): the AI helper replies; if it can't, a built-in
     // small-talk reply, and otherwise a pointer to the team
-    const reply = (await askAi(query, faqHistory, storeOpen)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
+    const reply = (await askAi(query, faqHistory, storeOpen, picklesSoon)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
     setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply, showEscalate: true } : m)))
   }
 
@@ -3708,7 +3740,8 @@ function restoreSession() {
     selectedProduct: pickleProducts.find((p) => p.name === fresh.selectedProduct)?.name ?? pickleProducts[0].name,
     fulfilment: fresh.fulfilment === "delivery" ? ("delivery" as const) : ("pickup" as const),
     pickupPoint: PICKUP_POINTS.find((p) => p.name === fresh.pickupPoint)?.name ?? PICKUP_POINTS[0].name,
-    slot: fresh.slot && SLOTS.includes(fresh.slot) ? fresh.slot : "8:30–9:00 PM",
+    // An old or unknown slot becomes the hostel's first slot (see orderSlot)
+    slot: fresh.slot && ALL_SLOTS.includes(fresh.slot) ? fresh.slot : "",
   }
 }
 
@@ -3796,15 +3829,24 @@ export default function App() {
   }, [dismissedReadyIds, dismissedCancelledIds])
   // Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
   const [storeOpen, setStoreOpen] = useState(true)
+  // The admin's Preorder switch for pickles ("Arriving soon"); plain add-to-cart if it can't be read
+  const [picklesSoon, setPicklesSoon] = useState(false)
+  const applyStoreStatus = (row: { is_open?: unknown; pickles_coming_soon?: unknown } | null) => {
+    if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+    if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
+  }
   const refreshStoreStatus = () =>
     supabase
       ?.from("store_status")
-      .select("is_open")
+      .select("*")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data, error }) => {
-        if (!error && data) setStoreOpen(Boolean(data.is_open))
+        if (!error) applyStoreStatus(data)
       })
+  // The chosen time, or the hostel's first slot when it belongs to the other hostel
+  const slotOptions = slotsFor(fulfilment, details.hostel, pickupPoint)
+  const orderSlot = slotOptions.includes(slot) ? slot : slotOptions[0]
   useEffect(() => {
     const client = supabase
     if (!client) return
@@ -3812,8 +3854,7 @@ export default function App() {
     const channel = client
       .channel("store_status_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
-        const row = payload.new as { is_open?: boolean }
-        if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+        applyStoreStatus(payload.new as { is_open?: unknown; pickles_coming_soon?: unknown })
       })
       .subscribe()
     return () => {
@@ -4086,9 +4127,9 @@ export default function App() {
     setIsSubmitting(true)
 
     try {
-      // The kitchen may have closed, or sold something out, while this page was open
+      // The kitchen may have closed, sold something out, or put pickles on Preorder while this page was open
       const [{ data: status }, { data: stock }] = await Promise.all([
-        supabase.from("store_status").select("is_open").eq("id", 1).maybeSingle(),
+        supabase.from("store_status").select("*").eq("id", 1).maybeSingle(),
         supabase.from("menu_inventory").select("id, name, is_available"),
       ])
       if (status?.is_open === false) {
@@ -4105,6 +4146,12 @@ export default function App() {
           return
         }
       }
+      const preorder = typeof status?.pickles_coming_soon === "boolean" ? status.pickles_coming_soon : picklesSoon
+      setPicklesSoon(preorder)
+      // Pickles ordered on Preorder say so on the order, so the kitchen sends them once they arrive
+      const orderItems = preorder
+        ? cart.map((item) => (item.kind === "pickle" ? { ...item, detail: `${item.detail}${PREORDER_TAG}` } : item))
+        : cart
 
       const { subtotal, fee, total } = calculateOrderTotals(cart, fulfilment)
       const orderTotal = total
@@ -4138,8 +4185,8 @@ export default function App() {
           hostel: cleanHostel,
           room: cleanRoom,
           fulfilment,
-          slot,
-          items: cart,
+          slot: orderSlot,
+          items: orderItems,
           subtotal,
           delivery_fee: fee,
           total: orderTotal,
@@ -4201,7 +4248,7 @@ export default function App() {
           // Clear cart so subsequent orders start fresh
           safeStorage.removeItem("ht_pay_method")
           safeStorage.removeItem("ht_pay_utr")
-          setOrderedItems(cart)
+          setOrderedItems(orderItems)
           setCart([])
           go("confirmation")
         }
@@ -4307,13 +4354,14 @@ export default function App() {
         )}
 
         {screen === "home" && (
-          <Home go={go} cartCount={cartCount} cartTotal={total} />
+          <Home go={go} cartCount={cartCount} cartTotal={total} picklesSoon={picklesSoon} />
         )}
         {screen === "pickles" && (
           <PickleList
             go={go}
             cartCount={cartCount}
             soldOutItems={soldOutItems}
+            preorder={picklesSoon}
             selectProduct={(name) => {
               setSelectedProduct(name)
               go("pickle-detail")
@@ -4327,6 +4375,7 @@ export default function App() {
             add={add}
             cartCount={cartCount}
             isSoldOut={soldOutItems.has(selectedProduct)}
+            preorder={picklesSoon}
           />
         )}
         {screen === "fruit-builder" && (
@@ -4347,6 +4396,7 @@ export default function App() {
             go={go}
             soldOutItems={soldOutItems}
             storeOpen={storeOpen}
+            preorder={picklesSoon}
           />
         )}
         {screen === "checkout" && (
@@ -4364,7 +4414,7 @@ export default function App() {
             go={go}
             fulfilment={fulfilment}
             details={details}
-            slot={slot}
+            slot={orderSlot}
             setSlot={setSlot}
             pickupPoint={pickupPoint}
             setPickupPoint={setPickupPoint}
@@ -4379,6 +4429,7 @@ export default function App() {
             isSubmitting={isSubmitting}
             soldOutItems={soldOutItems}
             storeOpen={storeOpen}
+            preorder={picklesSoon}
           />
         )}
         {screen === "confirmation" && (
@@ -4386,7 +4437,7 @@ export default function App() {
             go={go}
             fulfilment={fulfilment}
             details={details}
-            slot={slot}
+            slot={orderSlot}
             items={orderedItems}
             orderNumber={orderNumber}
             paymentMethod={paymentMethodName}
@@ -4426,6 +4477,7 @@ export default function App() {
           customerPhone={details.phone}
           customerName={details.name}
           storeOpen={storeOpen}
+          picklesSoon={picklesSoon}
         />
       </div>
     </div>

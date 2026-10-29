@@ -8,6 +8,8 @@ import {
   getPickupPin,
   canCancelOrder,
   getFaqResponse,
+  HOSTEL_SLOTS,
+  ALL_SLOTS,
   getSmallTalkReply,
   FAQ_FALLBACK,
   mergeSupportMessages,
@@ -26,6 +28,7 @@ import {
   bowlLeftOut,
   fruitBowlCartItem,
   repriceForReorder,
+  PREORDER_TAG,
   type CartItem,
 } from "../src/lib/inventory.ts"
 
@@ -186,7 +189,7 @@ test("Order Totals - protects against negative quantities and float anomalies", 
   assert.equal(totals.total, 39.98)
 })
 
-test("Menu Pricing - pickles come only in 50g packs at ₹40 (chicken ₹70) and the fruit bowl is a fixed ₹60", () => {
+test("Menu Pricing - pickles come only in 50g packs at ₹40 (chicken ₹70) and the fruit bowl is a fixed ₹49", () => {
   const prices = Object.fromEntries(
     pickleProducts.map((product) => [product.name, packOptions.map((pack) => `${pack.label}=${pickleCartItem(product, pack).price}`)])
   )
@@ -203,10 +206,10 @@ test("Menu Pricing - pickles come only in 50g packs at ₹40 (chicken ₹70) and
   assert.notEqual(pickleCartItem(mango, packOptions[0]).id, pickleCartItem(chicken, packOptions[0]).id)
 
   const fullBowl = fruitBowlCartItem([])
-  assert.equal(fullBowl.price, 60)
+  assert.equal(fullBowl.price, 49)
   assert.equal(fullBowl.detail, "All fruits")
   const pickyBowl = fruitBowlCartItem(["Papaya", "Banana"])
-  assert.equal(pickyBowl.price, 60)
+  assert.equal(pickyBowl.price, 49)
   assert.equal(pickyBowl.detail, "Without Banana, Papaya")
   assert.notEqual(pickyBowl.id, fullBowl.id)
   assert.equal(fruitBowlCartItem(["Banana", "Papaya"]).id, pickyBowl.id) // Order of exclusions doesn't matter
@@ -226,7 +229,7 @@ test("Reorder - re-prices past items at today's menu and drops discontinued ones
     reordered.map((item) => [item.name, item.detail, item.price, item.quantity]),
     [
       ["Chicken Pickle with Bone", "50g", 70, 2],
-      ["Fresh Fruit Bowl", "Without Papaya", 60, 1], // Bad quantity from the database is clamped to 1
+      ["Fresh Fruit Bowl", "Without Papaya", 49, 1], // Bad quantity from the database is clamped to 1
     ]
   )
 })
@@ -347,11 +350,11 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 // ============================================================================
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
-  assert.match(reply1, /8:00 PM and 9:30 PM/)
+  assert.match(reply1, /Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM/)
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
-  assert.match(reply2, /8:00 PM and 9:30 PM/)
+  assert.match(reply2, /Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM/)
 })
 
 test("FAQ Bot - resolves pickup location queries", () => {
@@ -363,7 +366,7 @@ test("FAQ Bot - resolves pickup location queries", () => {
 
 test("FAQ Bot - resolves fruit bowl pricing", () => {
   const reply = getFaqResponse("How much does fruit bowl cost?")
-  assert.match(reply, /fixed ₹60/)
+  assert.match(reply, /fixed ₹49/)
 })
 
 test("FAQ Bot - resolves pickle shelf life and ingredients", () => {
@@ -394,7 +397,7 @@ test("FAQ Bot - answers price questions with real menu prices", () => {
 
 test("FAQ Bot - matches whole words, so fruit names don't trigger PIN or rating answers", () => {
   assert.doesNotMatch(getFaqResponse("is pineapple in the bowl?"), /PIN/)
-  assert.match(getFaqResponse("is pineapple in the bowl?"), /fixed ₹60/)
+  assert.match(getFaqResponse("is pineapple in the bowl?"), /fixed ₹49/)
   assert.match(getFaqResponse("where is my pin"), /4-digit Pickup PIN/)
   assert.doesNotMatch(getFaqResponse("I want to rate my order"), /PIN/)
   assert.match(getFaqResponse("I want to rate my order"), /star rating/)
@@ -747,7 +750,7 @@ test("FAQ Bot - common student questions get the right instant answer", () => {
   assert.match(getFaqResponse("my order is late"), /Track Orders/)
   assert.match(getFaqResponse("do you have lemon pickle?"), /Gongura Pandu Mirchi/)
   assert.doesNotMatch(getFaqResponse("do you have lemon pickle?"), /lemon/i)
-  assert.match(getFaqResponse("which fruits are in the bowl"), /apple, banana, papaya, pomegranate, orange, guava, grapes and pineapple/)
+  assert.match(getFaqResponse("which fruits are in the bowl"), /apple, banana, papaya, pomegranate, orange and guava/)
 })
 
 test("FAQ Bot - words inside other words don't trigger the wrong answer", () => {
@@ -768,4 +771,39 @@ test("Support merge - the same text sent twice is two messages once both are sav
   assert.equal(mergeSupportMessages([], [row("uuid-1"), row("uuid-2")]).length, 2)
   // a screen's own copy and its saved row are still one message
   assert.equal(mergeSupportMessages([row("msg-123")], [row("uuid-3")]).length, 1)
+})
+
+test("FAQ Bot - while pickles are on Preorder, pickle questions say they're arriving soon and can be preordered", () => {
+  const reply = getFaqResponse("do you have pickles?", true)
+  assert.match(reply, /arriving soon/i)
+  assert.match(reply, /preorder/i)
+  assert.match(getFaqResponse("when will mango achar be back?", true), /arriving soon/i) // not the delivery-times answer
+  const price = getFaqResponse("how much does it cost?", true)
+  assert.match(price, /₹40 each/)
+  assert.match(price, /on preorder/)
+  assert.match(price, /fixed ₹49/)
+  // Back on sale: the usual answers
+  assert.match(getFaqResponse("do you have pickles?"), /Mango Pickle/)
+  assert.doesNotMatch(getFaqResponse("how much does it cost?"), /preorder/)
+})
+
+test("Preorder - a past preorder pickle line reorders as a plain pack at today's price", () => {
+  const past: CartItem[] = [{ id: "pickle-Tomato Pickle-50g", name: "Tomato Pickle", detail: `50g${PREORDER_TAG}`, price: 40, quantity: 2, kind: "pickle" }]
+  assert.deepEqual(
+    repriceForReorder(past).map((i) => [i.name, i.detail, i.price, i.quantity]),
+    [["Tomato Pickle", "50g", 40, 2]],
+  )
+})
+
+test("Fruit bowl - six fruits, and leaving one out tops up the others", () => {
+  const reply = getFaqResponse("which fruits are in the bowl")
+  assert.match(reply, /6 fresh-cut fruits/)
+  assert.match(reply, /add more of the others/)
+  assert.doesNotMatch(reply, /grapes|pineapple/i)
+})
+
+test("Slots - Asima in the morning, Kalam in the evening", () => {
+  assert.deepEqual(HOSTEL_SLOTS.Asima, ["8:30–9:00 AM", "9:00–9:30 AM"])
+  assert.deepEqual(HOSTEL_SLOTS.Kalam, ["6:00–6:30 PM", "6:30–7:00 PM"])
+  assert.equal(ALL_SLOTS.length, 4)
 })

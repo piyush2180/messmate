@@ -19,8 +19,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const SYSTEM_PROMPT = `You are the friendly chat helper for Happy Tummy Co., a small homemade food service on campus.
 Facts (never contradict or add to these):
 - Homemade pickles in 50g packs: Mango Pickle (Avakaya) ₹40, Gongura Pickle ₹40, Gongura Pandu Mirchi ₹40, Tomato Pickle ₹40, Chicken Pickle with Bone ₹70.
-- Fresh Fruit Bowl: a fixed ₹60 with 8 fruits (apple, banana, papaya, pomegranate, orange, guava, grapes, pineapple). Students can leave out any fruit; no swaps or extras.
-- Pickup and room delivery every evening, 8:00–9:30 PM. Pickup is free at two pickup points: Kalam Room-341 and Asima - 110. Room delivery costs ₹5 and goes to students' own rooms, only in the Kalam and Asima hostels (no other hostels).
+- Fresh Fruit Bowl: a fixed ₹49 with 6 fruits (apple, banana, papaya, pomegranate, orange, guava). Students can leave out any fruit, and we add more of the other fruits instead; no swaps or extras.
+- Pickup and room delivery times depend on the hostel: Kalam 6:00–7:00 PM (evening), Asima 8:30–9:30 AM (morning). Pickup is free at two pickup points: Kalam Room-341 and Asima - 110. Room delivery costs ₹5 and goes to students' own rooms, only in the Kalam and Asima hostels (no other hostels).
 - Payment: PhonePe/UPI QR (then enter the 12-digit UTR), or pay in person: at the counter for pickup, or to the runner on room delivery.
 - Orders are tracked in 'Track Orders' with the phone number; the 4-digit pickup PIN is shown there and on the confirmation screen.
 Rules:
@@ -84,11 +84,14 @@ export async function POST(request) {
     : []
 
   const models = [...new Set([process.env.GROQ_MODEL || DEFAULT_MODEL, FALLBACK_MODEL])]
-  // The store says when the admin has switched it to Closed, so the helper doesn't invite orders then
-  const system =
-    body?.storeOpen === false
-      ? `${SYSTEM_PROMPT}\n- Right now the store is CLOSED and ordering is paused. If asked about ordering now, say we're unavailable at the moment and to check back later.`
-      : SYSTEM_PROMPT
+  // The store says when the admin has switched it to Closed, or put pickles on Preorder
+  let system = SYSTEM_PROMPT
+  if (body?.storeOpen === false) {
+    system += "\n- Right now the store is CLOSED and ordering is paused. If asked about ordering now, say we're unavailable at the moment and to check back later."
+  }
+  if (body?.picklesSoon === true) {
+    system += "\n- Right now the homemade pickles are ARRIVING SOON and on preorder: students can preorder them on the Pickles page, and they're brought over as soon as they arrive."
+  }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 9000) // one budget for all attempts
