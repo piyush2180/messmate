@@ -13,8 +13,8 @@ import {
   ASIMA_ROOM,
   fulfilmentFor,
   KALAM_ROOM,
-  normalizeKalamRoom,
-  splitKalamRoom,
+  normalizeRoom,
+  splitRoom,
   getSmallTalkReply,
   FAQ_FALLBACK,
   mergeSupportMessages,
@@ -842,16 +842,19 @@ test("Kalam room - 3 digits plus A or B, saved together like 214A", () => {
   assert.equal(KALAM_ROOM.test("214"), false) // side not chosen yet
   assert.equal(KALAM_ROOM.test("21A"), false) // only 2 digits
   assert.equal(KALAM_ROOM.test("2145A"), false)
-  assert.deepEqual(splitKalamRoom("214a"), { digits: "214", side: "A" })
-  assert.equal(normalizeKalamRoom("214"), "214") // typed number, side still to pick
-  assert.equal(normalizeKalamRoom("1203"), "") // an older 4-digit saved room is asked for again
+  assert.deepEqual(splitRoom("214a"), { digits: "214", side: "A" })
+  assert.equal(normalizeRoom("214"), "214") // typed number, side still to pick
+  assert.equal(normalizeRoom("1203"), "") // an older 4-digit saved room is asked for again
 })
 
-test("Asima room numbers can be anything for now, just not blank", () => {
-  assert.equal(ASIMA_ROOM.test("104"), true)
-  assert.equal(ASIMA_ROOM.test("G-12"), true)
-  assert.equal(ASIMA_ROOM.test(""), false)
-  assert.equal(ASIMA_ROOM.test("   "), false)
+test("Asima room - floor room 001–010 up to 501–510, plus block A–D", () => {
+  for (const ok of ["001A", "010B", "104C", "210D", "501A", "510D"]) assert.equal(ASIMA_ROOM.test(ok), true, ok)
+  assert.equal(ASIMA_ROOM.test("104"), false) // block not chosen yet
+  assert.equal(ASIMA_ROOM.test("000A"), false) // rooms start at 01
+  assert.equal(ASIMA_ROOM.test("011A"), false) // 10 rooms a floor
+  assert.equal(ASIMA_ROOM.test("601A"), false) // no 6th floor
+  assert.equal(ASIMA_ROOM.test("104E"), false) // blocks are A–D
+  assert.deepEqual(splitRoom("104d"), { digits: "104", side: "D" })
 })
 
 test("Fulfilment - Kalam is always room delivery; Asima picks up, and only pickle-only orders can choose room delivery", () => {

@@ -167,7 +167,7 @@ Happy Tummy Co. Monorepo
 - **Fulfilment by hostel**:
   - **Kalam: Room Delivery (₹5 runner fee)**, to the student's room (3 digits plus A or B), in a *6:00–6:30 PM* or *6:30–7:00 PM* slot.
   - **Asima fruit bowls: Pickup near the Asima mess (free)**, pickup only, 8:30–9:30 AM on weekdays and 8:30–10:30 AM at weekends (one window, nothing to pick), paid in person at pickup. An Asima order with a fruit bowl is all collected there.
-  - **Asima pickle-only orders: Pickup from Room 104 or 210 (free) or Room Delivery (₹5)** to the student's room (any room number for now). Neither has a set time yet.
+  - **Asima pickle-only orders: Pickup from Room 104 or 210 (free) or Room Delivery (₹5)** to the student's room: block A–D plus a floor room number, 001–010 up to 501–510 (saved like "104C"). Neither has a set time yet.
   - While pickles are on preorder, fruit bowls and pickles are ordered separately (they go out on different days).
 - **UPI & Cash Settlement**:
   - 1-tap mobile UPI intent link (`upi://pay`) to launch payment apps directly (PhonePe, Google Pay, Paytm).

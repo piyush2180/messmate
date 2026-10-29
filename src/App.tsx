@@ -37,8 +37,8 @@ import {
   HOSTEL_HOURS,
   HOSTEL_SLOTS,
   KALAM_ROOM,
-  normalizeKalamRoom,
-  splitKalamRoom,
+  normalizeRoom,
+  splitRoom,
   SERVICE_HOURS,
   slotsForHostel,
   calculateOrderTotals,
@@ -151,10 +151,7 @@ const pickupPointFor = (items: Array<{ kind?: string }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => item.kind === "fruit") ? MESS_PICKUP : ROOMS_PICKUP
 // Each hostel remembers its own room, so a saved Kalam room never fills in the Asima box
 const roomKey = (hostel: string) => (hostel === "Asima" ? "messmate_room_asima" : "messmate_room")
-const savedRoom = (hostel: string) => {
-  const room = safeStorage.getItem(roomKey(hostel), "") || ""
-  return hostel === "Asima" ? room.slice(0, 20) : normalizeKalamRoom(room)
-}
+const savedRoom = (hostel: string) => normalizeRoom(safeStorage.getItem(roomKey(hostel), "") || "")
 // The times on offer: Kalam's evening slots, or Asima's morning window for fruit bowls; Asima pickle orders have no set time yet
 const slotsFor = (hostel: string, items: CartItem[]) =>
   hostel !== "Asima" ? slotsForHostel(hostel) : items.some((item) => item.kind === "fruit") ? slotsForHostel("Asima") : []
@@ -1580,8 +1577,8 @@ function Checkout({
 
   const cleanPhone = details.phone.replace(/\D/g, "")
   const isPhoneValid = isValidIndianPhone(cleanPhone)
-  // The room only matters for room delivery: Kalam is 3 digits + A or B, Asima anything for now
-  const room = splitKalamRoom(details.room)
+  // The room only matters for room delivery: Kalam is 3 digits + side A or B, Asima a floor room (001–510) + block A–D
+  const room = splitRoom(details.room)
   const asima = details.hostel === "Asima"
   // Fruit bowls at Asima are only ever picked up, so room delivery is offered for pickle-only orders
   const hasFruit = items.some((item) => item.kind === "fruit")
@@ -1596,7 +1593,7 @@ function Checkout({
     : !isPhoneValid
       ? "Please enter a valid 10-digit mobile number"
       : asima
-        ? "Please enter your Asima room number"
+        ? "Asima rooms go 001–010, 101–110 … 501–510. Please enter yours and choose a block"
         : "Please enter your 3-digit Kalam room number and choose A or B"
 
   return (
@@ -1711,36 +1708,25 @@ function Checkout({
                   <span className="radio">{asima && !asimaPickup && <span />}</span>
                 </button>
               )}
-              {fulfilment === "delivery" &&
-                (asima ? (
-                  <div className="form-grid delivery-fields">
-                    <Field
-                      label="Room number in Asima"
-                      placeholder="e.g. 214"
-                      maxLength={20}
-                      value={details.room}
-                      onChange={(v) => set("room", v)}
-                    />
-                  </div>
-                ) : (
-                  <div className="form-grid delivery-fields">
-                    <Field
-                      label="Room number in Kalam"
-                      placeholder="e.g. 214"
-                      inputMode="numeric"
-                      maxLength={3}
-                      value={room.digits}
-                      onChange={(v) => set("room", v.replace(/\D/g, "").slice(0, 3) + room.side)}
-                    />
-                    <Field
-                      label="A or B"
-                      placeholder="Choose A or B"
-                      options={["A", "B"]}
-                      value={room.side}
-                      onChange={(v) => set("room", room.digits + v)}
-                    />
-                  </div>
-                ))}
+              {fulfilment === "delivery" && (
+                <div className="form-grid delivery-fields">
+                  <Field
+                    label={`Room number in ${details.hostel}`}
+                    placeholder={asima ? "e.g. 104" : "e.g. 214"}
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={room.digits}
+                    onChange={(v) => set("room", v.replace(/\D/g, "").slice(0, 3) + room.side)}
+                  />
+                  <Field
+                    label={asima ? "Block" : "A or B"}
+                    placeholder={asima ? "Choose your block" : "Choose A or B"}
+                    options={asima ? ["A", "B", "C", "D"] : ["A", "B"]}
+                    value={room.side}
+                    onChange={(v) => set("room", room.digits + v)}
+                  />
+                </div>
+              )}
             </section>
             {!isComplete && (details.name || details.phone) && (
               <div className="validation-hint mobile-validation-hint">{missing}</div>

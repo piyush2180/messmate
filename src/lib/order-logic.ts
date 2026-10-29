@@ -65,18 +65,18 @@ export const HOSTEL_SLOTS: Record<string, string[]> = {
 // Asima runs an hour longer on Saturday and Sunday mornings
 export const ASIMA_WEEKEND = ["8:30–10:30 AM"]
 export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND, ...HOSTEL_SLOTS.Kalam]
-// Kalam rooms are a 3-digit number plus side A or B, saved together like "214A"
+// Rooms are a 3-digit number plus a letter, saved together like "214A". Kalam: side A or B.
 export const KALAM_ROOM = /^\d{3}[AB]$/
-// Asima room numbers can be anything for now, as long as one is given
-export const ASIMA_ROOM = /\S/
-export function splitKalamRoom(room: string): { digits: string; side: string } {
+// Asima: blocks A–D, 10 rooms a floor; the first digit is the floor (001–010, 101–110 … 501–510)
+export const ASIMA_ROOM = /^[0-5](0[1-9]|10)[A-D]$/
+export function splitRoom(room: string): { digits: string; side: string } {
   const raw = String(room || "").toUpperCase()
   const digits = raw.replace(/\D/g, "")
   // An older saved room with more digits can't be trusted as a 3-digit one, so it's asked for again
-  return { digits: digits.length <= 3 ? digits : "", side: /[AB]$/.test(raw) ? raw.slice(-1) : "" }
+  return { digits: digits.length <= 3 ? digits : "", side: /[A-D]$/.test(raw) ? raw.slice(-1) : "" }
 }
-export const normalizeKalamRoom = (room: string) => {
-  const { digits, side } = splitKalamRoom(room)
+export const normalizeRoom = (room: string) => {
+  const { digits, side } = splitRoom(room)
   return digits + side
 }
 
