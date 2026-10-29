@@ -32,6 +32,8 @@ import {
   fruitBowlCartItem,
   repriceForReorder,
   PREORDER_TAG,
+  MAX_LEFT_OUT,
+  toggleLeftOut,
   type CartItem,
 } from "../src/lib/inventory.ts"
 
@@ -803,6 +805,7 @@ test("Fruit bowl - six fruits, and leaving one out tops up the others", () => {
   const reply = getFaqResponse("which fruits are in the bowl")
   assert.match(reply, /6 fresh-cut fruits/)
   assert.match(reply, /add more of the others/)
+  assert.match(reply, /up to 2 fruits/)
   assert.doesNotMatch(reply, /grapes|pineapple/i)
 })
 
@@ -836,4 +839,14 @@ test("Kalam room - 3 digits plus A or B, saved together like 214A", () => {
   assert.deepEqual(splitKalamRoom("214a"), { digits: "214", side: "A" })
   assert.equal(normalizeKalamRoom("214"), "214") // typed number, side still to pick
   assert.equal(normalizeKalamRoom("1203"), "") // an older 4-digit saved room is asked for again
+})
+
+test("Fruit bowl - at most 2 fruits can be left out; tapping a left-out fruit adds it back", () => {
+  assert.equal(MAX_LEFT_OUT, 2)
+  let out = toggleLeftOut([], "Banana")
+  out = toggleLeftOut(out, "Papaya")
+  assert.deepEqual(out, ["Banana", "Papaya"])
+  assert.deepEqual(toggleLeftOut(out, "Guava"), ["Banana", "Papaya"]) // a third is refused
+  out = toggleLeftOut(out, "Banana") // add one back...
+  assert.deepEqual(toggleLeftOut(out, "Guava"), ["Papaya", "Guava"]) // ...then another can go
 })

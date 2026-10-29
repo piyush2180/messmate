@@ -5,6 +5,7 @@ import {
   DEFAULT_MENU_ITEMS,
   FRUIT_BOWL_NAME,
   FRUIT_BOWL_PRICE,
+  MAX_LEFT_OUT,
   POOTHAREKULU_PACK,
   POOTHAREKULU_PRICE,
   PREORDER_TAG,
@@ -15,6 +16,7 @@ import {
   pickleCartItem,
   pickleProducts,
   repriceForReorder,
+  toggleLeftOut,
   type CartItem,
 } from "./lib/inventory"
 import phonepeQrUrl from "./assets/phonepe-qr.png"
@@ -1099,12 +1101,8 @@ function FruitBuilder({
   const bowlSoldOut = Boolean(soldOutItems?.has(FRUIT_BOWL_NAME))
   const canAdd = includedCount > 0 && !bowlSoldOut
 
-  const toggle = (name: string) =>
-    setLeftOut((current) =>
-      current.includes(name)
-        ? current.filter((n) => n !== name)
-        : [...current, name],
-    )
+  const toggle = (name: string) => setLeftOut((current) => toggleLeftOut(current, name))
+  const limitReached = leftOut.length >= MAX_LEFT_OUT
 
   const handleAdd = () => {
     if (canAdd) add(fruitBowlCartItem(skipped))
@@ -1132,7 +1130,7 @@ function FruitBuilder({
                   <br />
                   <em>₹{FRUIT_BOWL_PRICE}, every time.</em>
                 </h1>
-                <p>{fruits.length} fruits in every bowl. Tap any fruit you'd rather skip.</p>
+                <p>{fruits.length} fruits in every bowl. Tap up to {MAX_LEFT_OUT} you'd rather skip.</p>
               </div>
               <div className="bowl-thumb">
                 <img src={fruitImage} alt="Happy Tummy Co. fresh fruit bowl" />
@@ -1148,6 +1146,8 @@ function FruitBuilder({
               {fruits.map((fruit) => {
                 const isSoldOut = isFruitSoldOut(fruit.name)
                 const included = !skipped.includes(fruit.name)
+                // Two already left out: the rest stay in (tap a left-out one to swap)
+                const locked = included && !isSoldOut && limitReached
 
                 return (
                   <button
@@ -1155,6 +1155,7 @@ function FruitBuilder({
                     className={`fruit-card ${isSoldOut ? "sold-out" : ""} ${included ? "selected" : "left-out"}`}
                     key={fruit.name}
                     aria-pressed={included}
+                    aria-disabled={locked || undefined}
                     disabled={isSoldOut}
                     onClick={() => toggle(fruit.name)}
                   >
@@ -1170,9 +1171,11 @@ function FruitBuilder({
                       <small className={isSoldOut ? "sold-out-text" : ""}>
                         {isSoldOut
                           ? "Sold out today"
-                          : included
-                            ? "In your bowl · tap to leave out"
-                            : "Left out · tap to add back"}
+                          : locked
+                            ? "In your bowl"
+                            : included
+                              ? "In your bowl · tap to leave out"
+                              : "Left out · tap to add back"}
                       </small>
                     </div>
                     <span className="fruit-check" aria-hidden="true">
@@ -1182,9 +1185,16 @@ function FruitBuilder({
                 )
               })}
             </div>
+            {limitReached && (
+              <p className="leave-out-limit" role="status">
+                You can leave out up to {MAX_LEFT_OUT} fruits. Tap a left-out fruit to add it back and pick a different one.
+              </p>
+            )}
             <div className="builder-note builder-topup-note">
               <Icon name="check" size={18} />
-              <span>Don't want a fruit? Leave it out and we'll add more of the other fruits, so your bowl stays just as full.</span>
+              <span>
+                Don't want a fruit? Leave out up to {MAX_LEFT_OUT} and we'll add more of the others, so your bowl stays just as full.
+              </span>
             </div>
           </div>
           <div className="builder-right-col">
@@ -2999,7 +3009,7 @@ const FAQ_ITEMS = [
     label: "Fruit bowl price & fruits",
     question: "How does the fruit bowl work?",
     answer:
-      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits: ${fruits.map((f) => f.name.toLowerCase()).join(", ")}, cut fresh right before your slot. Don't want a fruit? Tap it to leave it out and we'll add more of the others.`,
+      `Every bowl is a fixed ₹${FRUIT_BOWL_PRICE} with ${fruits.length} fresh-cut fruits: ${fruits.map((f) => f.name.toLowerCase()).join(", ")}, cut fresh right before your slot. Don't want a fruit? Leave out up to ${MAX_LEFT_OUT} and we'll add more of the others.`,
   },
   {
     id: "pickle",

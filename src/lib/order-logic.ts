@@ -1,4 +1,4 @@
-import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, POOTHAREKULU_PACK, POOTHAREKULU_PRICE, packOptions, pickleProducts } from "./inventory.ts"
+import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, POOTHAREKULU_PACK, POOTHAREKULU_PRICE, packOptions, pickleProducts } from "./inventory.ts"
 
 export type SupportMsg = {
   id: string
@@ -249,7 +249,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("bowl") ||
     q.includes("portion")
   ) {
-    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits: ${BOWL_FRUITS}. Leave out any fruit you don't want and we'll add more of the others.`
+    return `Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE} with ${BOWL_FRUIT_COUNT} fresh-cut fruits: ${BOWL_FRUITS}. Leave out up to ${MAX_LEFT_OUT} fruits you don't want and we'll add more of the others.`
   }
   if (
     q.includes("pickle") ||

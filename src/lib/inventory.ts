@@ -82,6 +82,14 @@ export type PackOption = (typeof packOptions)[number]
 
 export const FRUIT_BOWL_NAME = "Fresh Fruit Bowl"
 export const FRUIT_BOWL_PRICE = 49
+// Students may leave out at most this many fruits (sold-out fruits don't count towards it)
+export const MAX_LEFT_OUT = 2
+
+/** A tap leaves a fruit out, or adds it back; a third fruit can't be left out. */
+export function toggleLeftOut(current: string[], name: string): string[] {
+  if (current.includes(name)) return current.filter((n) => n !== name)
+  return current.length >= MAX_LEFT_OUT ? current : [...current, name]
+}
 
 // Sweets & Snacks: shown as Coming soon, not orderable yet
 export const POOTHAREKULU_PACK = "5 pcs"
