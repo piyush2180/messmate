@@ -2447,3 +2447,6 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 @media (min-width: 1024px) {
   .category-list > .category-card.sweet { width: 100%; max-width: calc(50% - 16px); justify-self: center; }
 }
+/* Asima's pickup hours, shown like a slot card but nothing to pick */
+.pickup-hours { display: flex; align-items: center; gap: 10px; border: 1px solid var(--olive); background: #fcfdf9; border-radius: 16px; padding: 12px 14px; font-size: 11px; }
+.pickup-hours strong { display: block; font-weight: 700; line-height: 1.6; }

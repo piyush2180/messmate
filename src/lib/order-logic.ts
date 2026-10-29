@@ -46,21 +46,22 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
 // Room delivery fee in ₹ (campus pickup is free). The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
 
-// Pickup and delivery times depend on the hostel: Asima in the morning, Kalam in the evening
+// Pickup and delivery times depend on the hostel: Asima in the morning, Kalam in the evening.
+// Kalam students pick a half-hour slot; Asima has one pickup window per morning (nothing to pick).
 export const HOSTEL_SLOTS: Record<string, string[]> = {
   Kalam: ["6:00–6:30 PM", "6:30–7:00 PM"],
-  Asima: ["8:30–9:00 AM", "9:00–9:30 AM"],
+  Asima: ["8:30–9:30 AM"],
 }
 // Asima runs an hour longer on Saturday and Sunday mornings
-export const ASIMA_WEEKEND_EXTRA = ["9:30–10:00 AM", "10:00–10:30 AM"]
-export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND_EXTRA, ...HOSTEL_SLOTS.Kalam]
+export const ASIMA_WEEKEND = ["8:30–10:30 AM"]
+export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND, ...HOSTEL_SLOTS.Kalam]
 // Kalam gets room delivery only, Asima collects near its mess only
 export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
 export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup near the mess ${HOSTEL_HOURS.Asima}`
 
 /**
  * The slots a hostel offers for its next service. Asima's next morning is today until that
- * morning's window closes (9:30, or 10:30 at weekends), then tomorrow; weekend mornings get the extra hour.
+ * morning's window closes (9:30, or 10:30 at weekends), then tomorrow; weekend mornings get the longer window.
  */
 export function slotsForHostel(hostel: string, now: Date = new Date()): string[] {
   if (hostel === "Kalam") return HOSTEL_SLOTS.Kalam
@@ -68,7 +69,7 @@ export function slotsForHostel(hostel: string, now: Date = new Date()): string[]
   const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6
   const morning = new Date(now)
   if (now.getTime() >= new Date(now).setHours(isWeekend(now) ? 10 : 9, 30, 0, 0)) morning.setDate(morning.getDate() + 1)
-  return isWeekend(morning) ? [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND_EXTRA] : HOSTEL_SLOTS.Asima
+  return isWeekend(morning) ? ASIMA_WEEKEND : HOSTEL_SLOTS.Asima
 }
 
 /**

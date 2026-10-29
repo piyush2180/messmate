@@ -25,8 +25,10 @@ import fruitImage from "./assets/fruit-bowl.webp"
 import pootharekuluImage from "./assets/pootharekulu.webp"
 import {
   ALL_SLOTS,
+  ASIMA_WEEKEND,
   DELIVERY_FEE,
   HOSTEL_HOURS,
+  HOSTEL_SLOTS,
   SERVICE_HOURS,
   slotsForHostel,
   calculateOrderTotals,
@@ -1739,7 +1741,7 @@ function Fulfilment({
           </h1>
           <p>
             {fulfilment === "pickup"
-              ? "Collect it near the Asima mess. Pick a time that works for you."
+              ? "Collect it near the Asima mess during pickup hours."
               : "Fresh food, straight to your room in Kalam. Pick a time that suits you."}
           </p>
         </section>
@@ -1769,7 +1771,17 @@ function Fulfilment({
                 <div className="availability">
                   <span></span>Pickup available every day
                 </div>
-                {slotPicker("Choose a pickup time")}
+                {/* Asima has one pickup window per morning, so the hours are shown, not picked */}
+                <div className="time-section">
+                  <h2>Pickup time</h2>
+                  <div className="pickup-hours">
+                    <Icon name="clock" size={18} />
+                    <div>
+                      <strong>Weekdays {HOSTEL_SLOTS.Asima[0]}</strong>
+                      <strong>Weekends {ASIMA_WEEKEND[0]}</strong>
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               <>
