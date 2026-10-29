@@ -1593,7 +1593,7 @@ function Checkout({
     : !isPhoneValid
       ? "Please enter a valid 10-digit mobile number"
       : asima
-        ? "Asima rooms go 001–010, 101–110 … 501–510. Please enter yours and choose a block"
+        ? "Please enter your Asima room number and choose a block"
         : "Please enter your 3-digit Kalam room number and choose A or B"
 
   return (
