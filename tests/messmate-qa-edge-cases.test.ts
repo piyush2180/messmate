@@ -8,7 +8,7 @@ import {
   getPickupPin,
   canCancelOrder,
   getFaqResponse,
-  HOSTEL_SLOTS,
+  slotsForHostel,
   ALL_SLOTS,
   getSmallTalkReply,
   FAQ_FALLBACK,
@@ -802,8 +802,17 @@ test("Fruit bowl - six fruits, and leaving one out tops up the others", () => {
   assert.doesNotMatch(reply, /grapes|pineapple/i)
 })
 
-test("Slots - Asima in the morning, Kalam in the evening", () => {
-  assert.deepEqual(HOSTEL_SLOTS.Asima, ["8:30–9:00 AM", "9:00–9:30 AM"])
-  assert.deepEqual(HOSTEL_SLOTS.Kalam, ["6:00–6:30 PM", "6:30–7:00 PM"])
-  assert.equal(ALL_SLOTS.length, 4)
+test("Slots - Asima mornings (an hour longer at weekends), Kalam evenings, picked by the morning the order is for", () => {
+  const weekday = ["8:30–9:00 AM", "9:00–9:30 AM"]
+  const weekend = [...weekday, "9:30–10:00 AM", "10:00–10:30 AM"]
+  const at = (s: string) => new Date(s) // local time, like the student's phone
+  assert.deepEqual(slotsForHostel("Asima", at("2026-10-28T20:00:00")), weekday) // Wed night -> Thu morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-10-30T21:00:00")), weekend) // Fri night -> Sat morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-10-31T10:00:00")), weekend) // Sat 10:00, before 10:30 -> this morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-11-01T22:00:00")), weekday) // Sun night -> Mon morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-11-02T09:00:00")), weekday) // Mon 9:00, before 9:30 -> this morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-11-02T09:45:00")), weekday) // Mon 9:45 -> Tue morning
+  assert.deepEqual(slotsForHostel("Kalam", at("2026-10-31T10:00:00")), ["6:00–6:30 PM", "6:30–7:00 PM"])
+  assert.equal(ALL_SLOTS.length, 6)
+  assert.ok(slotsForHostel("Asima", at("2026-10-31T10:00:00")).every((s) => ALL_SLOTS.includes(s)))
 })

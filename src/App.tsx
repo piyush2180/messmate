@@ -20,8 +20,8 @@ import logoUrl from "./assets/happy-tummy-logo.webp"
 import {
   ALL_SLOTS,
   DELIVERY_FEE,
-  HOSTEL_SLOTS,
   SERVICE_HOURS,
+  slotsForHostel,
   calculateOrderTotals,
   cleanPhoneInput,
   FAQ_FALLBACK,
@@ -130,7 +130,7 @@ const PICKUP_POINTS = [
 ]
 // The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
 const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
-  HOSTEL_SLOTS[fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? "")] ?? ALL_SLOTS
+  slotsForHostel(fulfilment === "delivery" ? hostel : (PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? ""))
 
 // Support messages are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = `${BRAND} Support Team`

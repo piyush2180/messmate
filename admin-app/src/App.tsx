@@ -135,8 +135,8 @@ function mergeSupportMessages(
 
 // Money staff type in by hand, by table
 const ENTRY_LABEL = { counter_sales: "counter sale", expenses: "expense" } as const
-// Pickup / delivery slots the store offers: Asima mornings, Kalam evenings (keep in step with src/lib/order-logic.ts)
-const SLOT_OPTIONS = ["8:30–9:00 AM", "9:00–9:30 AM", "6:00–6:30 PM", "6:30–7:00 PM"]
+// Pickup / delivery slots the store offers: Asima mornings (two more at weekends), Kalam evenings (keep in step with src/lib/order-logic.ts)
+const SLOT_OPTIONS = ["8:30–9:00 AM", "9:00–9:30 AM", "9:30–10:00 AM", "10:00–10:30 AM", "6:00–6:30 PM", "6:30–7:00 PM"]
 
 // Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {

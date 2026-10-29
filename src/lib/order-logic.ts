@@ -51,8 +51,23 @@ export const HOSTEL_SLOTS: Record<string, string[]> = {
   Kalam: ["6:00–6:30 PM", "6:30–7:00 PM"],
   Asima: ["8:30–9:00 AM", "9:00–9:30 AM"],
 }
-export const ALL_SLOTS = Object.values(HOSTEL_SLOTS).flat()
-export const SERVICE_HOURS = "Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM"
+// Asima runs an hour longer on Saturday and Sunday mornings
+export const ASIMA_WEEKEND_EXTRA = ["9:30–10:00 AM", "10:00–10:30 AM"]
+export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND_EXTRA, ...HOSTEL_SLOTS.Kalam]
+export const SERVICE_HOURS = "Kalam 6:00–7:00 PM, Asima 8:30–9:30 AM (weekends till 10:30 AM)"
+
+/**
+ * The slots a hostel offers for its next service. Asima's next morning is today until that
+ * morning's window closes (9:30, or 10:30 at weekends), then tomorrow; weekend mornings get the extra hour.
+ */
+export function slotsForHostel(hostel: string, now: Date = new Date()): string[] {
+  if (hostel === "Kalam") return HOSTEL_SLOTS.Kalam
+  if (hostel !== "Asima") return ALL_SLOTS
+  const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6
+  const morning = new Date(now)
+  if (now.getTime() >= new Date(now).setHours(isWeekend(now) ? 10 : 9, 30, 0, 0)) morning.setDate(morning.getDate() + 1)
+  return isWeekend(morning) ? [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND_EXTRA] : HOSTEL_SLOTS.Asima
+}
 
 /**
  * Calculates subtotal, delivery fee, and final total for an order.
