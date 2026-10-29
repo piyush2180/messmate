@@ -5,6 +5,8 @@ import {
   DEFAULT_MENU_ITEMS,
   FRUIT_BOWL_NAME,
   FRUIT_BOWL_PRICE,
+  POOTHAREKULU_PACK,
+  POOTHAREKULU_PRICE,
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
@@ -17,6 +19,10 @@ import {
 } from "./lib/inventory"
 import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
+// Our own fruit bowl in its Happy Tummy Co. packaging
+import fruitImage from "./assets/fruit-bowl.webp"
+// Our own illustration of Pootharekulu rolls (no credit needed) until the real photo is in
+import pootharekuluImage from "./assets/pootharekulu.svg"
 import {
   ALL_SLOTS,
   DELIVERY_FEE,
@@ -47,6 +53,7 @@ type Screen =
   | "payment"
   | "confirmation"
   | "orders"
+  | "sweets"
 
 type CustomerDetails = {
   name: string
@@ -111,10 +118,6 @@ type IconName =
 // Our supplier's (Food On Farm Pickles) mango pickle photo.
 const pickleImage =
   "https://cdn.shopify.com/s/files/1/0722/3872/7323/files/mango-pickle-scaled_f383ec5b-be63-4988-81c1-f2f381d76f8e.webp?width=1000"
-
-// A real bowl of cut fruit; free to use under the Unsplash License.
-// Unsplash photo of a cut-fruit platter (papaya, pomegranate, guava, orange, banana, apple and a little pineapple)
-const fruitImage = "https://images.unsplash.com/photo-1641642400143-6be68f1a0918?auto=format&fit=crop&w=800&h=800&q=80"
 
 const BRAND = "Happy Tummy Co."
 
@@ -609,6 +612,12 @@ function BottomBar({ children }: { children: ReactNode }) {
   )
 }
 
+const CATEGORY_LOOK = {
+  pickle: { number: "01", eyebrow: "Mess meal upgrade", alt: "Homemade pickle in a bowl" },
+  fruit: { number: "02", eyebrow: "Made fresh for you", alt: "Happy Tummy Co. fresh fruit bowl" },
+  sweet: { number: "03", eyebrow: "Something sweet", alt: "Pootharekulu rolls" },
+}
+
 function CategoryCard({
   type,
   title,
@@ -620,7 +629,7 @@ function CategoryCard({
   onClick,
   soon = false,
 }: {
-  type: "pickle" | "fruit"
+  type: keyof typeof CATEGORY_LOOK
   title: string
   punchline: string
   line: string
@@ -630,26 +639,16 @@ function CategoryCard({
   onClick: () => void
   soon?: boolean
 }) {
+  const look = CATEGORY_LOOK[type]
   return (
     <article className={`category-card ${type}`} onClick={onClick} style={{ cursor: "pointer" }}>
       <div className="category-image">
-        <img
-          src={image}
-          alt={
-            type === "pickle"
-              ? "Homemade pickle in a bowl"
-              : "Fresh mixed fruit bowl"
-          }
-        />
-        <span className="category-number">
-          {type === "pickle" ? "01" : "02"}
-        </span>
+        <img src={image} alt={look.alt} />
+        <span className="category-number">{look.number}</span>
         {soon && <span className="arriving-soon-chip">Arriving soon</span>}
       </div>
       <div className="category-content">
-        <div className="eyebrow">
-          {type === "pickle" ? "Mess meal upgrade" : "Made fresh for you"}
-        </div>
+        <div className="eyebrow">{look.eyebrow}</div>
         <h2>{title}</h2>
         <p className="punchline">{punchline}</p>
         <p className="muted">{line}</p>
@@ -778,6 +777,17 @@ function Home({
             cta="Order a bowl"
             onClick={() => go("fruit-builder")}
           />
+          <CategoryCard
+            type="sweet"
+            title="Sweets & Snacks"
+            punchline="A sweet finish to mess dinner."
+            line="Starting with Pootharekulu: paper-thin, layered and melt-in-the-mouth."
+            image={pootharekuluImage}
+            labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} · ₹${POOTHAREKULU_PRICE}`]}
+            cta="Coming soon"
+            onClick={() => go("sweets")}
+            soon
+          />
         </section>
         <section className="coming-soon">
           <span>
@@ -796,6 +806,55 @@ function Home({
           onClick={() => go("cart")}
         />
       )}
+    </>
+  )
+}
+
+// Sweets & Snacks: only Pootharekulu for now, shown as Arriving soon (price and ordering come later)
+function SweetsPage({ go, cartCount }: { go: (screen: Screen) => void; cartCount: number }) {
+  return (
+    <>
+      <Header
+        title="Sweets & Snacks"
+        onBack={() => go("home")}
+        cartCount={cartCount}
+        onCart={() => go("cart")}
+        onOrders={() => go("orders")}
+        go={go}
+        activeScreen="sweets"
+      />
+      <main className="screen-content pickles-page">
+        <section className="screen-intro pickle-intro">
+          <div className="eyebrow">New on the menu soon</div>
+          <h1>
+            Sweets &
+            <br />
+            <em>snacks.</em>
+          </h1>
+          <p>Traditional sweets for after mess dinner, starting with Pootharekulu.</p>
+        </section>
+        <div className="product-grid">
+          <article className="product-card sweet-card">
+            <div className="product-image-wrap">
+              <img src={pootharekuluImage} alt="Pootharekulu rolls" />
+              <span className="arriving-soon-chip">Arriving soon</span>
+            </div>
+            <div className="product-info">
+              <h3>Pootharekulu</h3>
+              <p>Paper-thin layered rolls that melt in your mouth.</p>
+              <div className="product-bottom">
+                <div>
+                  <small>{POOTHAREKULU_PACK} pack</small>
+                  <strong>₹{POOTHAREKULU_PRICE}</strong>
+                </div>
+                <button type="button" className="coming-soon-btn" disabled>
+                  Coming soon
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </main>
     </>
   )
 }
@@ -1071,7 +1130,7 @@ function FruitBuilder({
                 <p>{fruits.length} fruits in every bowl. Tap any fruit you'd rather skip.</p>
               </div>
               <div className="bowl-thumb">
-                <img src={fruitImage} alt="Fresh mixed fruit bowl" />
+                <img src={fruitImage} alt="Happy Tummy Co. fresh fruit bowl" />
               </div>
             </section>
             <div className="builder-note">
@@ -3711,7 +3770,7 @@ function SupportChatWidget({
   )
 }
 
-const SCREENS: Screen[] = ["home", "pickles", "pickle-detail", "fruit-builder", "cart", "checkout", "fulfilment", "payment", "confirmation", "orders"]
+const SCREENS: Screen[] = ["home", "pickles", "pickle-detail", "fruit-builder", "cart", "checkout", "fulfilment", "payment", "confirmation", "orders", "sweets"]
 // Steps that only make sense with something in the cart
 const NEEDS_CART: Screen[] = ["cart", "checkout", "fulfilment", "payment"]
 const SESSION_KEY = "ht_session"
@@ -4378,6 +4437,7 @@ export default function App() {
             preorder={picklesSoon}
           />
         )}
+        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} />}
         {screen === "fruit-builder" && (
           <FruitBuilder
             go={go}

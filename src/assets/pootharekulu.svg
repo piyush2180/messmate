@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 960 640" role="img" aria-label="Pootharekulu rolls on a plate">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="80%">
+      <stop offset="0" stop-color="#fcf3e2"/>
+      <stop offset="0.6" stop-color="#f3dfbc"/>
+      <stop offset="1" stop-color="#e6c590"/>
+    </radialGradient>
+    <radialGradient id="plate" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.78" stop-color="#faf6f0"/>
+      <stop offset="1" stop-color="#e7ddcf"/>
+    </radialGradient>
+    <linearGradient id="roll" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbedd0"/>
+      <stop offset="0.42" stop-color="#ecc47c"/>
+      <stop offset="1" stop-color="#c88a39"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.8"/>
+      <stop offset="0.32" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="face" cx="45%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#f3d39a"/>
+      <stop offset="1" stop-color="#fdf3df"/>
+    </radialGradient>
+    <filter id="plateShadow" x="-20%" y="-20%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#8a5a1c" flood-opacity="0.22"/>
+    </filter>
+    <filter id="rollShadow" x="-10%" y="-40%" width="120%" height="200%">
+      <feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#7a4812" flood-opacity="0.3"/>
+    </filter>
+    <!-- Paper-thin layers, pistachio bits and sugar on one roll (500 x 92) -->
+    <symbol id="layers" viewBox="0 0 500 92">
+      <path d="M40 20 H462 M28 36 H474 M26 54 H476 M36 71 H466" stroke="#fff7e6" stroke-opacity="0.55" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <path d="M60 28 C140 24 220 31 300 27 S420 30 452 26" stroke="#d29a48" stroke-opacity="0.35" stroke-width="2" fill="none"/>
+      <path d="M52 63 C150 60 240 66 330 62 S430 65 458 61" stroke="#d29a48" stroke-opacity="0.3" stroke-width="2" fill="none"/>
+      <g fill="#86b84f">
+        <ellipse cx="96" cy="30" rx="9" ry="5.5" transform="rotate(24 96 30)"/>
+        <ellipse cx="168" cy="52" rx="8" ry="5" transform="rotate(-18 168 52)"/>
+        <ellipse cx="236" cy="26" rx="9" ry="5.5" transform="rotate(12 236 26)"/>
+        <ellipse cx="302" cy="58" rx="8.5" ry="5" transform="rotate(30 302 58)"/>
+        <ellipse cx="372" cy="34" rx="9" ry="5.5" transform="rotate(-26 372 34)"/>
+        <ellipse cx="430" cy="60" rx="7.5" ry="4.5" transform="rotate(16 430 60)"/>
+      </g>
+      <g fill="#b9d98a">
+        <ellipse cx="128" cy="62" rx="5" ry="3" transform="rotate(10 128 62)"/>
+        <ellipse cx="270" cy="44" rx="5" ry="3" transform="rotate(-20 270 44)"/>
+        <ellipse cx="404" cy="22" rx="5" ry="3" transform="rotate(25 404 22)"/>
+      </g>
+      <g fill="#f4e3c4">
+        <ellipse cx="204" cy="40" rx="10" ry="4" transform="rotate(-8 204 40)"/>
+        <ellipse cx="338" cy="20" rx="9" ry="3.5" transform="rotate(14 338 20)"/>
+        <ellipse cx="140" cy="20" rx="8" ry="3.5" transform="rotate(-12 140 20)"/>
+      </g>
+      <g fill="#fffdf6">
+        <circle cx="74" cy="48" r="2.6"/><circle cx="118" cy="40" r="2.2"/><circle cx="152" cy="30" r="2"/>
+        <circle cx="190" cy="64" r="2.4"/><circle cx="222" cy="50" r="2"/><circle cx="256" cy="66" r="2.6"/>
+        <circle cx="288" cy="34" r="2.2"/><circle cx="322" cy="46" r="2"/><circle cx="356" cy="64" r="2.4"/>
+        <circle cx="392" cy="48" r="2.2"/><circle cx="420" cy="38" r="2"/><circle cx="446" cy="50" r="2.4"/>
+      </g>
+    </symbol>
+  </defs>
+
+  <rect width="960" height="640" fill="url(#bg)"/>
+  <circle cx="118" cy="104" r="78" fill="#ffffff" opacity="0.28"/>
+  <circle cx="852" cy="530" r="104" fill="#ffffff" opacity="0.2"/>
+  <circle cx="830" cy="112" r="44" fill="#f2c26c" opacity="0.28"/>
+  <circle cx="150" cy="560" r="36" fill="#f2c26c" opacity="0.22"/>
+
+  <ellipse cx="480" cy="356" rx="398" ry="222" fill="url(#plate)" filter="url(#plateShadow)"/>
+  <ellipse cx="480" cy="356" rx="334" ry="176" fill="none" stroke="#eee4d6" stroke-width="3"/>
+
+  <!-- Back roll -->
+  <g filter="url(#rollShadow)" transform="translate(236 176) rotate(-7 250 46)">
+    <rect width="500" height="92" rx="46" fill="url(#roll)"/>
+    <use xlink:href="#layers" href="#layers" width="500" height="92"/>
+    <rect width="500" height="92" rx="46" fill="url(#sheen)"/>
+  </g>
+  <!-- Middle roll -->
+  <g filter="url(#rollShadow)" transform="translate(214 284) rotate(-4 250 46)">
+    <rect width="500" height="92" rx="46" fill="url(#roll)"/>
+    <use xlink:href="#layers" href="#layers" width="500" height="92" transform="translate(500 0) scale(-1 1)"/>
+    <rect width="500" height="92" rx="46" fill="url(#sheen)"/>
+  </g>
+  <!-- Front roll, cut open at the left to show the layers -->
+  <g filter="url(#rollShadow)" transform="translate(250 392) rotate(-2 250 46)">
+    <rect width="500" height="92" rx="46" fill="url(#roll)"/>
+    <use xlink:href="#layers" href="#layers" width="500" height="92"/>
+    <rect width="500" height="92" rx="46" fill="url(#sheen)"/>
+    <ellipse cx="34" cy="46" rx="30" ry="45" fill="url(#face)" stroke="#e2b469" stroke-width="2"/>
+    <g fill="none" stroke="#d49a45" stroke-linecap="round">
+      <ellipse cx="35" cy="46" rx="22" ry="35" stroke-width="2.4" stroke-opacity="0.7"/>
+      <ellipse cx="36" cy="47" rx="15" ry="25" stroke-width="2.2" stroke-opacity="0.65"/>
+      <ellipse cx="37" cy="47" rx="8" ry="14" stroke-width="2" stroke-opacity="0.6"/>
+    </g>
+    <circle cx="38" cy="48" r="3.4" fill="#86b84f"/>
+  </g>
+
+  <!-- Crumbs on the plate -->
+  <g fill="#86b84f" opacity="0.9">
+    <ellipse cx="206" cy="470" rx="7" ry="4" transform="rotate(20 206 470)"/>
+    <ellipse cx="772" cy="300" rx="6" ry="3.5" transform="rotate(-30 772 300)"/>
+    <ellipse cx="720" cy="480" rx="6" ry="3.5" transform="rotate(12 720 480)"/>
+  </g>
+  <g fill="#fffdf6">
+    <circle cx="226" cy="452" r="2.6"/><circle cx="754" cy="318" r="2.4"/><circle cx="742" cy="468" r="2.2"/><circle cx="198" cy="300" r="2.4"/>
+  </g>
+</svg>

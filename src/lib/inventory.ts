@@ -83,6 +83,10 @@ export type PackOption = (typeof packOptions)[number]
 export const FRUIT_BOWL_NAME = "Fresh Fruit Bowl"
 export const FRUIT_BOWL_PRICE = 49
 
+// Sweets & Snacks: shown as Coming soon, not orderable yet
+export const POOTHAREKULU_PACK = "5 pcs"
+export const POOTHAREKULU_PRICE = 150
+
 export function pickleCartItem(product: PickleProduct, pack: PackOption): CartItem {
   return {
     id: `pickle-${product.name}-${pack.label}`,

@@ -816,3 +816,9 @@ test("Slots - Asima mornings (an hour longer at weekends), Kalam evenings, picke
   assert.equal(ALL_SLOTS.length, 6)
   assert.ok(slotsForHostel("Asima", at("2026-10-31T10:00:00")).every((s) => ALL_SLOTS.includes(s)))
 })
+
+test("FAQ Bot - Sweets & Snacks says Pootharekulu is coming soon, with its price", () => {
+  assert.match(getFaqResponse("do you have pootharekulu?"), /coming soon/i)
+  assert.match(getFaqResponse("price of sweets?"), /Pootharekulu: 5 pcs for ₹150/)
+  assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
+})
