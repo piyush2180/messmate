@@ -2440,3 +2440,10 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* The lone Pootharekulu card takes the full row on phones, capped in width on bigger screens */
 .product-grid > .sweet-card { grid-column: 1 / -1; width: 100%; max-width: 420px; }
 .product-bottom .coming-soon-btn { white-space: nowrap; }
+/* Where the cards sit two across, the third sits centred at the same width, so its photo isn't stretched */
+@media (min-width: 768px) and (max-width: 1023px) and (min-height: 600px) {
+  .category-list > .category-card.sweet { width: 100%; max-width: calc(50% - 10px); justify-self: center; }
+}
+@media (min-width: 1024px) {
+  .category-list > .category-card.sweet { width: 100%; max-width: calc(50% - 16px); justify-self: center; }
+}

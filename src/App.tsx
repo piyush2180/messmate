@@ -21,8 +21,8 @@ import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
 // Our own fruit bowl in its Happy Tummy Co. packaging
 import fruitImage from "./assets/fruit-bowl.webp"
-// Our own illustration of Pootharekulu rolls (no credit needed) until the real photo is in
-import pootharekuluImage from "./assets/pootharekulu.svg"
+// Pootharekulu photo the owner supplied
+import pootharekuluImage from "./assets/pootharekulu.webp"
 import {
   ALL_SLOTS,
   DELIVERY_FEE,
