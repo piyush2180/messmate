@@ -32,6 +32,7 @@ import {
   fruitBowlCartItem,
   repriceForReorder,
   PREORDER_TAG,
+  hasPreorderLine,
   MAX_LEFT_OUT,
   toggleLeftOut,
   type CartItem,
@@ -779,14 +780,14 @@ test("Support merge - the same text sent twice is two messages once both are sav
   assert.equal(mergeSupportMessages([row("msg-123")], [row("uuid-3")]).length, 1)
 })
 
-test("FAQ Bot - while pickles are on Preorder, pickle questions say they're arriving soon and can be preordered", () => {
+test("FAQ Bot - while pickles are on Preorder, pickle questions give the arrival date and say they can be preordered", () => {
   const reply = getFaqResponse("do you have pickles?", true)
-  assert.match(reply, /arriving soon/i)
+  assert.match(reply, /arrive on 5 Nov/)
   assert.match(reply, /preorder/i)
-  assert.match(getFaqResponse("when will mango achar be back?", true), /arriving soon/i) // not the delivery-times answer
+  assert.match(getFaqResponse("when will mango achar be back?", true), /5 Nov/) // not the delivery-times answer
   const price = getFaqResponse("how much does it cost?", true)
   assert.match(price, /₹40 each/)
-  assert.match(price, /on preorder/)
+  assert.match(price, /on preorder for 5 Nov/)
   assert.match(price, /fixed ₹49/)
   // Back on sale: the usual answers
   assert.match(getFaqResponse("do you have pickles?"), /Mango Pickle/)
@@ -849,4 +850,10 @@ test("Fruit bowl - at most 2 fruits can be left out; tapping a left-out fruit ad
   assert.deepEqual(toggleLeftOut(out, "Guava"), ["Banana", "Papaya"]) // a third is refused
   out = toggleLeftOut(out, "Banana") // add one back...
   assert.deepEqual(toggleLeftOut(out, "Guava"), ["Papaya", "Guava"]) // ...then another can go
+})
+
+test("Preorder - an order's preorder pickle lines are recognised, so Track Orders can show the arrival date", () => {
+  assert.equal(hasPreorderLine([{ detail: `50g${PREORDER_TAG}` }, { detail: "All fruits" }]), true)
+  assert.equal(hasPreorderLine([{ detail: "50g" }, { detail: "Without Papaya" }]), false)
+  assert.equal(hasPreorderLine(null), false) // a bad row from the database doesn't crash the page
 })

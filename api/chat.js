@@ -93,7 +93,8 @@ export async function POST(request) {
     system += "\n- Right now the store is CLOSED and ordering is paused. If asked about ordering now, say we're unavailable at the moment and to check back later."
   }
   if (body?.picklesSoon === true) {
-    system += "\n- Right now the homemade pickles are ARRIVING SOON and on preorder: students can preorder them on the Pickles page, and they're brought over as soon as they arrive."
+    // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
+    system += "\n- Right now the homemade pickles are on PREORDER: they arrive on 5 Nov. Students can preorder them now on the Pickles page; preordered pickles are delivered (Kalam) or ready to collect (Asima) on 5 Nov."
   }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()

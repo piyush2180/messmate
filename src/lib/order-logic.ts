@@ -1,4 +1,4 @@
-import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, POOTHAREKULU_PACK, POOTHAREKULU_PRICE, packOptions, pickleProducts } from "./inventory.ts"
+import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, PICKLES_ARRIVAL, POOTHAREKULU_PACK, POOTHAREKULU_PRICE, packOptions, pickleProducts } from "./inventory.ts"
 
 export type SupportMsg = {
   id: string
@@ -197,7 +197,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     if (!ratingTalk) {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
-      const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? ", on preorder while they're arriving soon" : ""}.`
+      const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder for ${PICKLES_ARRIVAL}` : ""}.`
       return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Kalam room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
     }
   }
@@ -205,7 +205,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
   }
   if (picklesSoon && /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)) {
-    return "Our homemade pickles are arriving soon! You can preorder them now on the Pickles page, and we'll bring them to you as soon as they arrive."
+    return `Our homemade pickles arrive on ${PICKLES_ARRIVAL}! Preorder them now on the Pickles page and they'll be with you on ${PICKLES_ARRIVAL}.`
   }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
     return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared before every delivery slot!"

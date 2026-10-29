@@ -8,10 +8,12 @@ import {
   MAX_LEFT_OUT,
   POOTHAREKULU_PACK,
   POOTHAREKULU_PRICE,
+  PICKLES_ARRIVAL,
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
   getPickupPin,
+  hasPreorderLine,
   packOptions,
   pickleCartItem,
   pickleProducts,
@@ -167,7 +169,7 @@ const sized = (url: string, width: number) => url.replace(/width=\d+/, `width=${
 
 // A pickle line's text while pickles are on Preorder (the placed order gets PREORDER_TAG instead)
 const preorderDetail = (item: CartItem, preorder: boolean) =>
-  preorder && item.kind === "pickle" ? `${item.detail} · Preorder, arriving soon` : item.detail
+  preorder && item.kind === "pickle" ? `${item.detail} · Preorder, delivered on ${PICKLES_ARRIVAL}` : item.detail
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
@@ -634,7 +636,7 @@ function CategoryCard({
   labels,
   cta,
   onClick,
-  soon = false,
+  soon,
 }: {
   type: keyof typeof CATEGORY_LOOK
   title: string
@@ -644,7 +646,7 @@ function CategoryCard({
   labels: string[]
   cta: string
   onClick: () => void
-  soon?: boolean
+  soon?: string
 }) {
   const look = CATEGORY_LOOK[type]
   return (
@@ -652,7 +654,7 @@ function CategoryCard({
       <div className="category-image">
         <img src={image} alt={look.alt} />
         <span className="category-number">{look.number}</span>
-        {soon && <span className="arriving-soon-chip">Arriving soon</span>}
+        {soon && <span className="arriving-soon-chip">{soon}</span>}
       </div>
       <div className="category-content">
         <div className="eyebrow">{look.eyebrow}</div>
@@ -772,7 +774,7 @@ function Home({
             labels={["Homemade", "South Indian", "Small-batch"]}
             cta={picklesSoon ? "Preorder pickles" : "Explore pickles"}
             onClick={() => go("pickles")}
-            soon={picklesSoon}
+            soon={picklesSoon ? `Arriving ${PICKLES_ARRIVAL}` : undefined}
           />
           <CategoryCard
             type="fruit"
@@ -793,7 +795,7 @@ function Home({
             labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} · ₹${POOTHAREKULU_PRICE}`]}
             cta="Coming soon"
             onClick={() => go("sweets")}
-            soon
+            soon="Arriving soon"
           />
         </section>
         <section className="coming-soon">
@@ -914,7 +916,7 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
-                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving soon</span>}
+                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving {PICKLES_ARRIVAL}</span>}
                 </div>
                 <div className="product-info">
                   <div className="product-meta-row">
@@ -1003,7 +1005,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
-            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Arriving soon</span>}
+            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Arriving {PICKLES_ARRIVAL}</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
@@ -1055,7 +1057,7 @@ function PickleDetail({
                   className="desktop-pack-tag"
                   style={isSoldOut ? { color: "#d90429", background: "#fee2e2" } : {}}
                 >
-                  {isSoldOut ? "Temporarily Sold Out" : preorder ? "Arriving soon · preorder now" : "In stock today"}
+                  {isSoldOut ? "Temporarily Sold Out" : preorder ? `Arriving ${PICKLES_ARRIVAL} · preorder now` : "In stock today"}
                 </div>
               </div>
               <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
@@ -2299,6 +2301,14 @@ function Confirmation({
               </span>
             </div>
           </div>
+          {hasPreorderLine(items) && (
+            <div className="preorder-date-note">
+              <Icon name="clock" size={16} />
+              <span>
+                Your pickles will be {fulfilment === "pickup" ? "ready to collect" : "delivered"} on <strong>{PICKLES_ARRIVAL}</strong>.
+              </span>
+            </div>
+          )}
         </section>
         {/* Asima collects near the mess with the PIN, so it doesn't need the tracking hint */}
         {fulfilment !== "pickup" && (
@@ -2487,11 +2497,13 @@ function OrdersPage({
   phone,
   cartCount,
   onReorder,
+  picklesSoon = false,
 }: {
   go: (screen: Screen) => void
   phone: string
   cartCount: number
   onReorder: (items: CartItem[]) => void
+  picklesSoon?: boolean
 }) {
   const [searchInput, setSearchInput] = useState(() => {
     return phone || safeStorage.getItem("messmate_phone", "") || ""
@@ -2882,6 +2894,15 @@ function OrdersPage({
                           <strong>₹{item.price * item.quantity}</strong>
                         </div>
                       ))}
+                    {picklesSoon && hasPreorderLine(order.items) && !["delivered", "cancelled", "no_show"].includes(order.status) && (
+                      <div className="preorder-date-note">
+                        <Icon name="clock" size={16} />
+                        <span>
+                          Pickles in this order will be {order.fulfilment === "pickup" ? "ready to collect" : "delivered"} on{" "}
+                          <strong>{PICKLES_ARRIVAL}</strong>.
+                        </span>
+                      </div>
+                    )}
                     <div className="totals">
                       <div>
                         <span>Subtotal</span>
@@ -4535,6 +4556,7 @@ export default function App() {
             phone={details.phone}
             cartCount={cartCount}
             onReorder={handleReorder}
+            picklesSoon={picklesSoon}
           />
         )}
         {cartCount > 0 &&

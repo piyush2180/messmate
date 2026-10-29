@@ -2457,3 +2457,6 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* Fruit bowl: the note once 2 fruits are left out; the fruits still in can't be tapped out */
 .leave-out-limit { margin: 12px 2px 0; font-size: 11.5px; font-weight: 700; color: var(--terracotta-dark); }
 .fruit-card[aria-disabled="true"] { cursor: default; }
+/* Preorder pickles: when they arrive (confirmation and Track Orders) */
+.preorder-date-note { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #fbeee9; color: var(--terracotta-dark); font-size: 12px; font-weight: 600; }
+.preorder-date-note strong { font-weight: 800; }
