@@ -360,6 +360,7 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
   assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) from Room 104 or 210/)
+  assert.match(reply1, /Asima pickle orders don't have a set time yet/) // the morning window is for fruit bowls
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")

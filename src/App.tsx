@@ -153,13 +153,9 @@ const savedRoom = (hostel: string) => {
   const room = safeStorage.getItem(roomKey(hostel), "") || ""
   return hostel === "Asima" ? room.slice(0, 20) : normalizeKalamRoom(room)
 }
-// The times on offer follow the hostel: Kalam's evening slots or Asima's pickup window; Asima room delivery has no set time yet
-const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
-  fulfilment === "pickup"
-    ? slotsForHostel(PICKUP_POINTS.find((p) => p.name === pickupPoint)?.hostel ?? "")
-    : hostel === "Asima"
-      ? []
-      : slotsForHostel(hostel)
+// The times on offer: Kalam's evening slots, or Asima's morning window for fruit bowls; Asima pickle orders have no set time yet
+const slotsFor = (hostel: string, items: CartItem[]) =>
+  hostel !== "Asima" ? slotsForHostel(hostel) : items.some((item) => item.kind === "fruit") ? slotsForHostel("Asima") : []
 
 // Support messages are stored under this name. Older names stay recognised so past chats still read as support.
 const SUPPORT_NAME = `${BRAND} Support Team`
@@ -1683,10 +1679,15 @@ function Checkout({
                 </span>
                 <span>
                   <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
-                  <small>
-                    {hasFruit ? `Orders with a fruit bowl are collected from ${ASIMA_PICKUP}.` : `Collect it from ${ASIMA_PICKUP}.`}
-                  </small>
-                  <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                  {/* The morning window is for fruit bowls; pickle orders have no set time yet */}
+                  {hasFruit ? (
+                    <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                  ) : (
+                    <>
+                      <small>Collect it from {ASIMA_PICKUP}.</small>
+                      <em>FREE</em>
+                    </>
+                  )}
                 </span>
                 <span className="radio">{asimaPickup && <span />}</span>
               </button>
@@ -1789,6 +1790,7 @@ function Fulfilment({
   fulfilment,
   details,
   slot,
+  slots,
   setSlot,
   pickupPoint,
 }: {
@@ -1796,11 +1798,10 @@ function Fulfilment({
   fulfilment: "pickup" | "delivery"
   details: CustomerDetails
   slot: string
+  slots: string[]
   setSlot: (value: string) => void
   pickupPoint: string
 }) {
-  const slots = slotsFor(fulfilment, details.hostel, pickupPoint)
-
   const slotPicker = (heading: string) => (
     <div className="time-section">
       <h2>{heading}</h2>
@@ -1842,7 +1843,7 @@ function Fulfilment({
           </h1>
           <p>
             {fulfilment === "pickup"
-              ? `Collect it from ${ASIMA_PICKUP} in Asima during pickup hours.`
+              ? `Collect it from ${ASIMA_PICKUP} in Asima${slots.length ? " during pickup hours" : ""}.`
               : `Fresh food, straight to your room in ${details.hostel}.${slots.length ? " Pick a time that suits you." : ""}`}
           </p>
         </section>
@@ -1869,17 +1870,19 @@ function Fulfilment({
                     </div>
                   </div>
                 </div>
-                {/* Asima has one pickup window per morning, so the hours are shown, not picked */}
-                <div className="time-section">
-                  <h2>Pickup time</h2>
-                  <div className="pickup-hours">
-                    <Icon name="clock" size={18} />
-                    <div>
-                      <strong>Weekdays {HOSTEL_SLOTS.Asima[0]}</strong>
-                      <strong>Weekends {ASIMA_WEEKEND[0]}</strong>
+                {/* Asima has one fruit bowl pickup window per morning, so the hours are shown, not picked; pickle orders have none yet */}
+                {slots.length > 0 && (
+                  <div className="time-section">
+                    <h2>Pickup time</h2>
+                    <div className="pickup-hours">
+                      <Icon name="clock" size={18} />
+                      <div>
+                        <strong>Weekdays {HOSTEL_SLOTS.Asima[0]}</strong>
+                        <strong>Weekends {ASIMA_WEEKEND[0]}</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
               <>
@@ -1905,11 +1908,13 @@ function Fulfilment({
               <h3>Fulfilment Schedule</h3>
               <div className="selected-delivery-preview">
                 <strong>
-                  {fulfilment === "pickup"
-                    ? `Pickup Window: ${slot}`
-                    : slot
-                      ? `Room Delivery: ${slot}`
-                      : "Room Delivery"}
+                  {!slot
+                    ? fulfilment === "pickup"
+                      ? `Pickup from ${ASIMA_PICKUP}`
+                      : "Room Delivery"
+                    : fulfilment === "pickup"
+                      ? `Pickup Window: ${slot}`
+                      : `Room Delivery: ${slot}`}
                 </strong>
                 <p>Contact: {details.name} ({details.phone})</p>
               </div>
@@ -2954,7 +2959,11 @@ function OrdersPage({
                               marginTop: "2px",
                             }}
                           >
-                            {order.slot && `Slot: ${order.slot} · `}Contact: {order.customer_name} (
+                            {/* The morning window is for fruit bowls, so older Asima pickle orders don't show it */}
+                            {order.slot &&
+                              (order.hostel === "Kalam" || order.items?.some((item) => item.kind === "fruit")) &&
+                              `Slot: ${order.slot} · `}
+                            Contact: {order.customer_name} (
                             {order.customer_phone?.replace(/\D/g, "").slice(-10) || order.customer_phone})
                           </div>
                         </div>
@@ -3093,7 +3102,7 @@ const FAQ_ITEMS = [
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      `Times depend on your hostel: ${SERVICE_HOURS}. Asima pickup is free, and room delivery is ₹${DELIVERY_FEE}.`,
+      `Times depend on your hostel: ${SERVICE_HOURS} (that's for fruit bowls; Asima pickle orders don't have a set time yet). Asima pickup is free, and room delivery is ₹${DELIVERY_FEE}.`,
   },
   {
     id: "pickup",
@@ -4047,7 +4056,7 @@ export default function App() {
         if (!error) applyStoreStatus(data)
       })
   // The chosen time, or the hostel's first slot when it belongs to the other hostel
-  const slotOptions = slotsFor(fulfilment, details.hostel, pickupPoint)
+  const slotOptions = slotsFor(details.hostel, cart)
   const orderSlot = slotOptions.includes(slot) ? slot : (slotOptions[0] ?? "")
   useEffect(() => {
     const client = supabase
@@ -4627,6 +4636,7 @@ export default function App() {
             fulfilment={fulfilment}
             details={details}
             slot={orderSlot}
+            slots={slotOptions}
             setSlot={setSlot}
             pickupPoint={pickupPoint}
           />

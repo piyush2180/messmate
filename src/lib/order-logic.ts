@@ -241,7 +241,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return `Times depend on your hostel: ${SERVICE_HOURS}. Room delivery is ₹${DELIVERY_FEE}, and Asima pickup is free!`
+    return `Times depend on your hostel: ${SERVICE_HOURS} (that's for fruit bowls; Asima pickle orders don't have a set time yet). Room delivery is ₹${DELIVERY_FEE}, and Asima pickup is free!`
   }
   if (
     q.includes("pickup point") ||
