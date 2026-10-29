@@ -128,8 +128,7 @@ const BRAND = "Happy Tummy Co."
 const CONTACT_PHONE = "+91 83091 22630"
 const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 
-// Our only hostels; the pickup counters are inside them.
-// Kalam gets room delivery only; Asima collects near its mess only
+// Our only hostels: Kalam gets room delivery only; Asima collects near its mess only
 const DELIVERY_HOSTEL = "Kalam"
 const PICKUP_POINTS = [{ name: "Near Asima Mess", hostel: "Asima" }]
 // The times on offer follow the hostel: the delivery hostel, or the one the pickup counter is in
@@ -1921,7 +1920,11 @@ function Payment({
         <section className="screen-intro compact">
           <div className="eyebrow">Step 3 of 3</div>
           <h1>Complete your payment</h1>
-          <p>Scan & pay via merchant PhonePe QR or pay at counter.</p>
+          <p>
+            {fulfilment === "delivery"
+              ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
+              : "Scan & pay via PhonePe QR, or pay at the counter."}
+          </p>
         </section>
         <div className="payment-layout">
           <div className="payment-left-col">
@@ -2945,7 +2948,7 @@ const FAQ_ITEMS = [
     label: "Delivery & pickup slots",
     question: "When are delivery and pickup timings?",
     answer:
-      `Pickup and room delivery times depend on your hostel: ${SERVICE_HOURS}. Pickup at Kalam or Asima is free, and room delivery is ₹${DELIVERY_FEE}.`,
+      `Times depend on your hostel: ${SERVICE_HOURS}. Asima pickup is free, and Kalam room delivery is ₹${DELIVERY_FEE}.`,
   },
   {
     id: "pickup",

@@ -185,7 +185,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
       const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? ", on preorder while they're arriving soon" : ""}.`
-      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Room delivery is ₹${DELIVERY_FEE}; campus pickup is free.`
+      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. Kalam room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
     }
   }
   if (ratingTalk) {
@@ -215,7 +215,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("when") ||
     q.includes("slot")
   ) {
-    return `Pickup and room delivery times depend on your hostel: ${SERVICE_HOURS}. Room delivery is ₹${DELIVERY_FEE}, and campus pickup is free!`
+    return `Times depend on your hostel: ${SERVICE_HOURS}. Kalam room delivery is ₹${DELIVERY_FEE}, and Asima pickup is free!`
   }
   if (
     q.includes("pickup point") ||

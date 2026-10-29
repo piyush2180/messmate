@@ -42,7 +42,7 @@
 
 ## 🚀 Overview
 
-**Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, and evening dinner deliveries directly to their hostel blocks or pickup gates.
+**Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, with room delivery in Kalam and pickup near the Asima mess.
 
 The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live kitchen sound alerts, live item availability toggling, and two-way in-app support chat without page reloads.
 
@@ -158,19 +158,15 @@ Happy Tummy Co. Monorepo
   - Each item displays a visual spice meter (1 to 3 chillies), diet tags (Vegetarian, Vegan, Gluten-Free), and detailed shelf-life guidance.
   - Every pickle comes in a single **50g** pack: ₹40 (₹70 for chicken).
 - **Fixed-Price Fruit Bowl**:
-  - One ₹60 bowl with 8 fresh-cut fruits (Apple, Banana, Papaya, Pomegranate, Orange, Guava, Grapes, Pineapple).
-  - Students tap any fruit to leave it out; sold-out fruits are left out automatically. The price stays ₹60.
-  - Shows the 8:00–9:30 PM delivery/pickup window.
+  - One ₹49 bowl with 6 fresh-cut fruits (Apple, Banana, Papaya, Pomegranate, Orange, Guava).
+  - Students tap any fruit to leave it out (we add more of the others); sold-out fruits are left out automatically. The price stays ₹49.
+  - Shows each hostel's times: Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM (weekends till 10:30 AM).
 - **Slide-Out Cart Drawer**:
   - Quantity increment/decrement controls with automatic zero-item removal guards.
   - Subtotal calculation shielded against floating-point precision errors.
-- **Flexible Campus Fulfillment**:
-  - **Campus Pickup (₹0 Free)**: Choose from predefined campus hubs:
-    - *Kalam Room-341* (APJ Abdul Kalam Block)
-    - *Asima - 110* (ground floor)
-  - **Room Delivery (₹5 Runner Fee)**: Direct-to-door delivery with hostel and room number inputs (room number is digits only).
-- **Scheduled Evening Delivery Slots**:
-  - Pre-order for dinner windows: *8:00–8:30 PM*, *8:30–9:00 PM*, or *9:00–9:30 PM*.
+- **Fulfilment by hostel**:
+  - **Kalam: Room Delivery (₹5 runner fee)**, to the student's room (room number is digits only), in a *6:00–6:30 PM* or *6:30–7:00 PM* slot.
+  - **Asima: Pickup near the Asima mess (free)**, 8:30–9:30 AM on weekdays and 8:30–10:30 AM at weekends (one window, nothing to pick).
 - **UPI & Cash Settlement**:
   - 1-tap mobile UPI intent link (`upi://pay`) to launch payment apps directly (PhonePe, Google Pay, Paytm).
   - 1-click UPI ID copy.
@@ -277,7 +273,7 @@ export function calculateOrderTotals(items: Array<{ price: number; quantity: num
 ```
 
 ### Fixed Fruit Bowl Price
-Every bowl costs a flat ₹60 (`FRUIT_BOWL_PRICE` in `src/lib/inventory.ts`). Leaving fruits out doesn't change the price; each distinct set of left-out fruits becomes its own cart line so the kitchen sees exactly what goes in.
+Every bowl costs a flat ₹49 (`FRUIT_BOWL_PRICE` in `src/lib/inventory.ts`). Leaving fruits out doesn't change the price; each distinct set of left-out fruits becomes its own cart line so the kitchen sees exactly what goes in.
 
 ### UPI UTR Reference Validation
 Validates that customer-provided UPI transaction references match official NPCI / bank standards:
@@ -440,7 +436,7 @@ npm run test:live
 1. **Phone Normalization & Validation (6 Tests)**: Handles clean digits, strips `+91`/`91`, leading zeros, dashes, brackets, malicious script injections, and rejects malformed inputs.
 2. **Deterministic Pickup PIN Algorithm (6 Tests)**: Preserves explicit codes, calculates 4-digit PINs deterministically, tests zero/negative/undefined order numbers, and fuzzes 1,000 random order numbers.
 3. **Order Subtotals & Delivery Fees (4 Tests)**: Empty cart handling, ₹0 campus pickup, ₹5 room delivery, and negative quantity protections.
-4. **Menu Pricing & Reorder (2 Tests)**: ₹40/50g pickles (₹70 chicken), fixed ₹60 fruit bowl, separate cart lines per pickle, and reorders re-priced at today's menu.
+4. **Menu Pricing & Reorder (2 Tests)**: ₹40/50g pickles (₹70 chicken), fixed ₹49 fruit bowl, separate cart lines per pickle, and reorders re-priced at today's menu.
 5. **Order Cancellation Policy (1 Test)**: Restricts cancellation strictly to placed orders (before the kitchen starts).
 6. **Support Message Deduplication & Sorting (4 Tests)**: Exact ID deduplication, optimistic-to-server merging, chronological ascending order sorting, and rapid double-click filtering.
 7. **Automated FAQ Intelligence Bot (10 Tests)**: Tests the bot the support chat really uses: delivery timing, pickup spots, menu prices, whole-word matching, shelf life, order tracking, refunds, and fallback routing.
