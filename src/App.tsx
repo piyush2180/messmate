@@ -1850,9 +1850,12 @@ function Payment({
   // Same calculation handlePay uses, so the amount shown is the amount saved.
   const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
-  const [method, setMethodState] = useState<"upi" | "counter">(() =>
+  const [chosenMethod, setMethodState] = useState<"upi" | "counter">(() =>
     safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
   )
+  // Asima fruit orders are paid in person when collected near the mess, never online
+  const payAtPickupOnly = fulfilment === "pickup" && items.some((item) => item.kind === "fruit")
+  const method = payAtPickupOnly ? "counter" : chosenMethod
   const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
   const setMethod = (m: "upi" | "counter") => {
     setMethodState(m)
@@ -1921,30 +1924,36 @@ function Payment({
           <div className="eyebrow">Step 3 of 3</div>
           <h1>Complete your payment</h1>
           <p>
-            {fulfilment === "delivery"
-              ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
-              : "Scan & pay via PhonePe QR, or pay at the counter."}
+            {payAtPickupOnly
+              ? "Pay when you collect your order near the Asima mess."
+              : fulfilment === "delivery"
+                ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
+                : "Scan & pay via PhonePe QR, or pay at the counter."}
           </p>
         </section>
         <div className="payment-layout">
           <div className="payment-left-col">
             <section className="payment-methods">
-              <h2>Select payment method</h2>
-              <button
-                type="button"
-                className={method === "upi" ? "selected" : ""}
-                aria-pressed={method === "upi"}
-                onClick={() => setMethod("upi")}
-              >
-                <span className="upi-mark phonepe-pill">
-                  <span className="pe-symbol">पे</span>
-                </span>
-                <span>
-                  <strong>Pay via PhonePe / UPI QR</strong>
-                  <small>GPay, PhonePe, Paytm, CRED & more</small>
-                </span>
-                <span className="radio">{method === "upi" && <span />}</span>
-              </button>
+              <h2>{payAtPickupOnly ? "Payment" : "Select payment method"}</h2>
+              {payAtPickupOnly ? (
+                <p className="pay-at-pickup-note">Fruit bowls for Asima are paid at pickup near the mess, by cash or scan.</p>
+              ) : (
+                <button
+                  type="button"
+                  className={method === "upi" ? "selected" : ""}
+                  aria-pressed={method === "upi"}
+                  onClick={() => setMethod("upi")}
+                >
+                  <span className="upi-mark phonepe-pill">
+                    <span className="pe-symbol">पे</span>
+                  </span>
+                  <span>
+                    <strong>Pay via PhonePe / UPI QR</strong>
+                    <small>GPay, PhonePe, Paytm, CRED & more</small>
+                  </span>
+                  <span className="radio">{method === "upi" && <span />}</span>
+                </button>
+              )}
               <button
                 type="button"
                 className={method === "counter" ? "selected" : ""}

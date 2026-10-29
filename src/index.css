@@ -2450,3 +2450,5 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* Asima's pickup hours, shown like a slot card but nothing to pick */
 .pickup-hours { display: flex; align-items: center; gap: 10px; border: 1px solid var(--olive); background: #fcfdf9; border-radius: 16px; padding: 12px 14px; font-size: 11px; }
 .pickup-hours strong { display: block; font-weight: 700; line-height: 1.6; }
+/* Asima fruit orders: no online payment, just this note above the pay-at-pickup option */
+.pay-at-pickup-note { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
