@@ -45,12 +45,16 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
 
 // Room delivery fee in ₹ (Kalam, and Asima pickle-only orders); pickup is free. The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
-// Asima orders with a fruit bowl are collected from one of these rooms
+// Asima orders are collected from one of these rooms
 export const ASIMA_PICKUP = "Room 104 or 210"
 
-/** Kalam always gets room delivery. At Asima an order with a fruit bowl is collected from ASIMA_PICKUP; pickle-only orders go to the room. */
-export const fulfilmentFor = (hostel: string, items: Array<{ kind?: string }>): "pickup" | "delivery" =>
-  hostel === "Asima" && items.some((item) => item.kind === "fruit") ? "pickup" : "delivery"
+/** Kalam always gets room delivery. Asima orders are collected from ASIMA_PICKUP, unless a pickle-only order asks for room delivery. */
+export const fulfilmentFor = (
+  hostel: string,
+  items: Array<{ kind?: string }>,
+  asimaRoomDelivery = false,
+): "pickup" | "delivery" =>
+  hostel !== "Asima" || (asimaRoomDelivery && !items.some((item) => item.kind === "fruit")) ? "delivery" : "pickup"
 
 // Pickup and delivery times depend on the hostel: Asima in the morning, Kalam in the evening.
 // Kalam students pick a half-hour slot; Asima has one pickup window per morning (nothing to pick).
@@ -251,7 +255,7 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
     q.includes("asima") ||
     (q.includes("pickup") && !q.includes("pin"))
   ) {
-    return `At Asima, orders with a fruit bowl are picked up from ${ASIMA_PICKUP} (free) and pickle-only orders come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`
+    return `At Asima, orders are picked up from ${ASIMA_PICKUP} (free), or pickle-only orders can come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`
   }
   if (
     q.includes("fruit") ||

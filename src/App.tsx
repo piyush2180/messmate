@@ -143,10 +143,16 @@ const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 // The Asima team handles Asima orders; their numbers show on Asima order confirmations
 const ASIMA_CONTACTS = ["+91 82527 48806", "+91 99081 81705"]
 
-// Our only hostels. Kalam gets room delivery; at Asima, orders with a fruit bowl are collected from
-// Room 104 or 210 and pickle-only orders go to the room (see fulfilmentFor)
+// Our only hostels. Kalam gets room delivery; Asima orders are collected from Room 104 or 210,
+// and pickle-only orders can come to the room instead (see fulfilmentFor)
 const ASIMA_PICKUP_POINT = `Asima, ${ASIMA_PICKUP}`
 const PICKUP_POINTS = [{ name: ASIMA_PICKUP_POINT, hostel: "Asima" }]
+// Each hostel remembers its own room, so a saved Kalam room never fills in the Asima box
+const roomKey = (hostel: string) => (hostel === "Asima" ? "messmate_room_asima" : "messmate_room")
+const savedRoom = (hostel: string) => {
+  const room = safeStorage.getItem(roomKey(hostel), "") || ""
+  return hostel === "Asima" ? room.slice(0, 20) : normalizeKalamRoom(room)
+}
 // The times on offer follow the hostel: Kalam's evening slots or Asima's pickup window; Asima room delivery has no set time yet
 const slotsFor = (fulfilment: "pickup" | "delivery", hostel: string, pickupPoint: string) =>
   fulfilment === "pickup"
@@ -1549,6 +1555,7 @@ function Checkout({
   fulfilment,
   pickupPoint,
   items,
+  setAsimaDelivery,
 }: {
   go: (screen: Screen) => void
   details: CustomerDetails
@@ -1556,15 +1563,21 @@ function Checkout({
   fulfilment: "pickup" | "delivery"
   pickupPoint: string
   items: CartItem[]
+  setAsimaDelivery: (value: boolean) => void
 }) {
   const set = (key: keyof CustomerDetails, value: string) => {
     setDetails({ ...details, [key]: value })
     try {
       if (key === "name") localStorage.setItem("messmate_customer_name", value)
       if (key === "phone" && isValidIndianPhone(value)) localStorage.setItem("messmate_phone", value)
-      if (key === "hostel") localStorage.setItem("messmate_hostel", value)
-      if (key === "room") localStorage.setItem("messmate_room", value)
+      if (key === "room") localStorage.setItem(roomKey(details.hostel), value)
     } catch {}
+  }
+  // Switching hostel brings back that hostel's own saved room
+  const choose = (hostel: string, roomDelivery = false) => {
+    setDetails({ ...details, hostel, room: hostel === details.hostel ? details.room : savedRoom(hostel) })
+    safeStorage.setItem("messmate_hostel", hostel)
+    setAsimaDelivery(roomDelivery)
   }
 
   const cleanPhone = details.phone.replace(/\D/g, "")
@@ -1572,7 +1585,9 @@ function Checkout({
   // The room only matters for room delivery: Kalam is 3 digits + A or B, Asima anything for now
   const room = splitKalamRoom(details.room)
   const asima = details.hostel === "Asima"
-  const asimaPickup = fulfilmentFor("Asima", items) === "pickup"
+  // Fruit bowls at Asima are only ever picked up, so room delivery is offered for pickle-only orders
+  const hasFruit = items.some((item) => item.kind === "fruit")
+  const asimaPickup = asima && fulfilment === "pickup"
   const isComplete = Boolean(
     details.name.trim() &&
     isPhoneValid &&
@@ -1646,7 +1661,7 @@ function Checkout({
               <button
                 className={`fulfilment-card ${!asima ? "selected" : ""}`}
                 aria-pressed={!asima}
-                onClick={() => set("hostel", "Kalam")}
+                onClick={() => choose("Kalam")}
               >
                 <span className="fulfilment-icon">
                   <Icon name="bag" />
@@ -1659,28 +1674,39 @@ function Checkout({
                 <span className="radio">{!asima && <span />}</span>
               </button>
               <button
-                className={`fulfilment-card ${asima ? "selected" : ""}`}
-                aria-pressed={asima}
-                onClick={() => set("hostel", "Asima")}
+                className={`fulfilment-card ${asimaPickup ? "selected" : ""}`}
+                aria-pressed={asimaPickup}
+                onClick={() => choose("Asima")}
               >
                 <span className="fulfilment-icon">
-                  <Icon name={asimaPickup ? "location" : "bag"} />
+                  <Icon name="location" />
                 </span>
-                {asimaPickup ? (
-                  <span>
-                    <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
-                    <small>Orders with a fruit bowl are collected from {ASIMA_PICKUP}.</small>
-                    <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                <span>
+                  <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
+                  <small>
+                    {hasFruit ? `Orders with a fruit bowl are collected from ${ASIMA_PICKUP}.` : `Collect it from ${ASIMA_PICKUP}.`}
+                  </small>
+                  <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                </span>
+                <span className="radio">{asimaPickup && <span />}</span>
+              </button>
+              {!hasFruit && (
+                <button
+                  className={`fulfilment-card ${asima && !asimaPickup ? "selected" : ""}`}
+                  aria-pressed={asima && !asimaPickup}
+                  onClick={() => choose("Asima", true)}
+                >
+                  <span className="fulfilment-icon">
+                    <Icon name="bag" />
                   </span>
-                ) : (
                   <span>
                     <strong>Asima · Room delivery</strong>
                     <small>Right to your room in Asima.</small>
                     <em>+₹{DELIVERY_FEE}</em>
                   </span>
-                )}
-                <span className="radio">{asima && <span />}</span>
-              </button>
+                  <span className="radio">{asima && !asimaPickup && <span />}</span>
+                </button>
+              )}
               {fulfilment === "delivery" &&
                 (asima ? (
                   <div className="form-grid delivery-fields">
@@ -2361,7 +2387,8 @@ function Confirmation({
             <div className="preorder-date-note">
               <Icon name="clock" size={16} />
               <span>
-                Your pickles will be delivered on <strong>{PICKLES_ARRIVAL}</strong>.
+                Your pickles will be {fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
+                <strong>{PICKLES_ARRIVAL}</strong>.
               </span>
             </div>
           )}
@@ -2955,7 +2982,7 @@ function OrdersPage({
                       <div className="preorder-date-note">
                         <Icon name="clock" size={16} />
                         <span>
-                          Pickles in this order will be delivered on{" "}
+                          Pickles in this order will be {order.fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
                           <strong>{PICKLES_ARRIVAL}</strong>.
                         </span>
                       </div>
@@ -3073,7 +3100,7 @@ const FAQ_ITEMS = [
     label: "Where is pickup point?",
     question: "Where is the pickup point located?",
     answer:
-      `At Asima, orders with a fruit bowl are picked up from ${ASIMA_PICKUP} (free) and pickle-only orders come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose your hostel at checkout!`,
+      `At Asima, orders are picked up from ${ASIMA_PICKUP} (free), or pickle-only orders can come to your room (₹${DELIVERY_FEE}). Kalam orders come straight to your room (₹${DELIVERY_FEE}). Choose at checkout!`,
   },
   {
     id: "sold_out",
@@ -3882,6 +3909,7 @@ type SavedSession = {
   cart: CartItem[]
   selectedProduct: string
   hostel: string
+  asimaDelivery?: boolean
   fulfilment?: "pickup" | "delivery"
   pickupPoint: string
   slot: string
@@ -3901,6 +3929,7 @@ function restoreSession() {
     selectedProduct: pickleProducts.find((p) => p.name === fresh.selectedProduct)?.name ?? pickleProducts[0].name,
     // Sessions saved before Asima had room delivery only kept fulfilment, and delivery meant Kalam
     hostel: fresh.hostel === "Kalam" || fresh.fulfilment === "delivery" ? "Kalam" : "Asima",
+    asimaDelivery: fresh.asimaDelivery === true,
     pickupPoint: PICKUP_POINTS.find((p) => p.name === fresh.pickupPoint)?.name ?? PICKUP_POINTS[0].name,
     // An old or unknown slot becomes the hostel's first slot (see orderSlot)
     slot: fresh.slot && ALL_SLOTS.includes(fresh.slot) ? fresh.slot : "",
@@ -3915,26 +3944,33 @@ export default function App() {
 
   const [cart, setCart] = useState<CartItem[]>(restored.cart)
 
-  const [details, setDetails] = useState<CustomerDetails>(() => {
-    const savedRoom = safeStorage.getItem("messmate_room", "") || ""
-    return {
-      name: safeStorage.getItem("messmate_customer_name", "") || "",
-      phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
-      hostel: restored.hostel,
-      // Kalam rooms are 3 digits + A or B; Asima rooms can be anything for now
-      room: restored.hostel === "Asima" ? savedRoom.slice(0, 20) : normalizeKalamRoom(savedRoom),
-    }
-  })
+  const [details, setDetails] = useState<CustomerDetails>(() => ({
+    name: safeStorage.getItem("messmate_customer_name", "") || "",
+    phone: normalizePhone(safeStorage.getItem("messmate_phone", "")),
+    hostel: restored.hostel,
+    room: savedRoom(restored.hostel),
+  }))
 
-  const fulfilment = fulfilmentFor(details.hostel, cart)
+  // An Asima student's pick between pickup and room delivery (fruit bowl orders are always picked up)
+  const [asimaDelivery, setAsimaDelivery] = useState(restored.asimaDelivery)
+  const fulfilment = fulfilmentFor(details.hostel, cart, asimaDelivery)
   // One pickup spot (Room 104 or 210 in Asima), kept in state so saved sessions and orders carry its name
   const [pickupPoint] = useState(restored.pickupPoint)
 
   const [slot, setSlot] = useState(restored.slot)
 
   useEffect(() => {
-    safeStorage.setJson(SESSION_KEY, { screen, cart, selectedProduct, hostel: details.hostel, pickupPoint, slot, savedAt: Date.now() })
-  }, [screen, cart, selectedProduct, details.hostel, pickupPoint, slot])
+    safeStorage.setJson(SESSION_KEY, {
+      screen,
+      cart,
+      selectedProduct,
+      hostel: details.hostel,
+      asimaDelivery,
+      pickupPoint,
+      slot,
+      savedAt: Date.now(),
+    })
+  }, [screen, cart, selectedProduct, details.hostel, asimaDelivery, pickupPoint, slot])
 
   // The phone's Back button steps back through the screens instead of leaving the site.
   // nav mirrors the browser history (one screen per step) so the on-screen back arrows can use it too.
@@ -4416,7 +4452,7 @@ export default function App() {
             safeStorage.setItem("messmate_hostel", details.hostel.trim())
           }
           if (details.room) {
-            safeStorage.setItem("messmate_room", details.room.trim())
+            safeStorage.setItem(roomKey(details.hostel), details.room.trim())
           }
           // Clear cart so subsequent orders start fresh
           safeStorage.removeItem("ht_pay_method")
@@ -4582,6 +4618,7 @@ export default function App() {
             fulfilment={fulfilment}
             pickupPoint={pickupPoint}
             items={cart}
+            setAsimaDelivery={setAsimaDelivery}
           />
         )}
         {screen === "fulfilment" && (

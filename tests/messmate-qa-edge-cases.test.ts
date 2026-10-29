@@ -369,7 +369,7 @@ test("FAQ Bot - resolves delivery and timing queries", () => {
 test("FAQ Bot - resolves pickup location queries: Asima fruit orders are collected from Room 104 or 210, pickle-only orders and Kalam get room delivery", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
   assert.match(reply, /picked up from Room 104 or 210/)
-  assert.match(reply, /pickle-only orders come to your room \(₹5\)/)
+  assert.match(reply, /pickle-only orders can come to your room \(₹5\)/)
   assert.match(reply, /Kalam orders come straight to your room/)
   assert.doesNotMatch(reply, /mess/) // pickup moved away from the mess
   assert.doesNotMatch(reply, /Room-341|Asima - 110/) // the old pickup counters are gone
@@ -854,13 +854,14 @@ test("Asima room numbers can be anything for now, just not blank", () => {
   assert.equal(ASIMA_ROOM.test("   "), false)
 })
 
-test("Fulfilment - Kalam is always room delivery; at Asima a fruit bowl order is picked up and a pickle-only order is delivered", () => {
+test("Fulfilment - Kalam is always room delivery; Asima picks up, and only pickle-only orders can choose room delivery", () => {
   const pickle = { kind: "pickle" }
   const fruit = { kind: "fruit" }
   assert.equal(fulfilmentFor("Kalam", [pickle, fruit]), "delivery")
-  assert.equal(fulfilmentFor("Asima", [pickle]), "delivery")
-  assert.equal(fulfilmentFor("Asima", [fruit]), "pickup")
-  assert.equal(fulfilmentFor("Asima", [pickle, fruit]), "pickup") // one trip to Room 104 or 210 covers both
+  assert.equal(fulfilmentFor("Asima", [pickle]), "pickup") // free pickup unless room delivery is chosen
+  assert.equal(fulfilmentFor("Asima", [pickle], true), "delivery")
+  assert.equal(fulfilmentFor("Asima", [fruit], true), "pickup") // no fruit delivery at Asima
+  assert.equal(fulfilmentFor("Asima", [pickle, fruit], true), "pickup") // one trip to Room 104 or 210 covers both
 })
 
 test("Fruit bowl - at most 2 fruits can be left out; tapping a left-out fruit adds it back", () => {
