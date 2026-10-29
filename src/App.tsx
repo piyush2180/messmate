@@ -130,6 +130,8 @@ const BRAND = "Happy Tummy Co."
 // Call/WhatsApp number; shown only on the order confirmation and in the support chat header.
 const CONTACT_PHONE = "+91 83091 22630"
 const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
+// The team at the Asima mess handles pickups there; their numbers show on Asima order confirmations
+const ASIMA_CONTACTS = ["+91 82527 48806", "+91 99081 81705"]
 
 // Our only hostels: Kalam gets room delivery only; Asima collects near its mess only
 const DELIVERY_HOSTEL = "Kalam"
@@ -2295,22 +2297,27 @@ function Confirmation({
             <strong>{details.phone.replace(/\D/g, "").slice(-10)}</strong>.
           </span>
         </div>
-        <div className="contact-card">
-          <span>
-            <small>Questions about your order?</small>
-            <strong>{CONTACT_PHONE}</strong>
-          </span>
-          <a
-            href={`https://wa.me/${contactDigits}?text=${encodeURIComponent(`Hi ${BRAND}, I have a question about order #${orderNumber}.`)}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Icon name="whatsapp" size={15} /> WhatsApp
-          </a>
-          <a href={`tel:+${contactDigits}`}>
-            <Icon name="phone" size={15} /> Call
-          </a>
-        </div>
+        {(fulfilment === "pickup" ? ASIMA_CONTACTS : [CONTACT_PHONE]).map((phone, i) => {
+          const digits = phone.replace(/\D/g, "")
+          return (
+            <div className="contact-card" key={phone}>
+              <span>
+                <small>{i === 0 ? "Questions about your order?" : "Or contact"}</small>
+                <strong>{phone}</strong>
+              </span>
+              <a
+                href={`https://wa.me/${digits}?text=${encodeURIComponent(`Hi ${BRAND}, I have a question about order #${orderNumber}.`)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Icon name="whatsapp" size={15} /> WhatsApp
+              </a>
+              <a href={`tel:+${digits}`}>
+                <Icon name="phone" size={15} /> Call
+              </a>
+            </div>
+          )
+        })}
         <div className="confirm-actions">
           <PrimaryButton onClick={() => go("home")}>Back to home</PrimaryButton>
           <button className="secondary-button" onClick={() => go("orders")}>
