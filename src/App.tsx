@@ -3418,7 +3418,7 @@ function SupportChatWidget({
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
-    const answer = getFaqResponse(query, picklesSoon)
+    const answer = getFaqResponse(query, picklesSoon, storeOpen)
     const known = answer !== FAQ_FALLBACK
     const botId = `faq-b-${Date.now() + 1}`
 
@@ -4486,16 +4486,18 @@ export default function App() {
               <div>
                 {activeReadyOrder.fulfilment === "delivery" ? (
                   <>
-                    <strong>Order #{activeReadyOrder.order_number} is ready and heading to your room!</strong>
+                    <strong>Order #{activeReadyOrder.order_number} is on its way to your room!</strong>
                     <p>
-                      To <u>{activeReadyOrder.hostel}, Room {activeReadyOrder.room}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
+                      Arriving at <u>{activeReadyOrder.hostel}, Room {activeReadyOrder.room}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
                     </p>
                   </>
                 ) : (
                   <>
                     <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
+                    {/* Fruit bowls near the mess, pickle orders (older ones too) at Room 104 or 210 */}
                     <p>
-                      At <u>{activeReadyOrder.hostel || "your pickup point"}</u> · PIN: <b>{getPickupPin(activeReadyOrder)}</b>
+                      {pickupPointFor(activeReadyOrder.items) === MESS_PICKUP ? <u>{MESS_PICKUP}</u> : <>At <u>{ASIMA_PICKUP}</u></>} · PIN:{" "}
+                      <b>{getPickupPin(activeReadyOrder)}</b>
                     </p>
                   </>
                 )}

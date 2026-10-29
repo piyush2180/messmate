@@ -174,8 +174,9 @@ const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUI
  * Instant answers in the support chat. Checked in order: the first matching topic wins,
  * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
  * picklesSoon: the admin has pickles on Preorder ("Arriving soon"); students can still order them.
+ * storeOpen: the admin's Open / Closed switch.
  */
-export function getFaqResponse(query: string, picklesSoon = false): string {
+export function getFaqResponse(query: string, picklesSoon = false, storeOpen = true): string {
   const q = (query || "").toLowerCase().trim()
   // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
   const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
@@ -188,6 +189,12 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
   }
   if (/\b(late|delay|delayed|not (come|came|arrived|received)|hasn'?t (come|arrived)|still waiting)\b/.test(q)) {
     return `Sorry for the wait! You can see live progress in 'Track Orders', or tap 'Talk to our Support Team' below and the ${SUPPORT_TEAM} will check right away.`
+  }
+  // Follows the admin's Open / Closed switch
+  if (/\b(open|closed|khula|khuli)\b/.test(q) && /\b(store|shop|you|now|today|still|abhi|aaj)\b/.test(q)) {
+    return storeOpen
+      ? "Yes, we're open and taking orders right now!"
+      : "We're closed right now, so ordering is paused. Please check back later!"
   }
   if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
     return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"
@@ -217,7 +224,17 @@ export function getFaqResponse(query: string, picklesSoon = false): string {
   if (ratingTalk) {
     return "After your order is marked Delivered, you can leave a 1 to 5 star rating and feedback note directly in 'Track Orders'!"
   }
-  if (picklesSoon && /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)) {
+  const aboutPickles = /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)
+  if (aboutPickles && /\b(fruits?|bowls?)\b/.test(q)) {
+    return picklesSoon
+      ? `Pickles are on preorder and arrive on ${PICKLES_ARRIVAL}, while fruit bowls go out sooner, so please order them separately: one order for the fruit bowl and one for the pickles.`
+      : "Yes! Add both to your cart. In Kalam they come to your room together; in Asima an order with a fruit bowl is all picked up near the Asima mess."
+  }
+  if (aboutPickles && /\b(deliver|delivery|delivered|room|pickup|pick up|collect|asima|kalam)\b/.test(q)) {
+    const how = `In Asima, pickle orders are picked up free from ${ASIMA_PICKUP} or delivered to your room for ₹${DELIVERY_FEE}; in Kalam they come to your room (₹${DELIVERY_FEE}). Choose at checkout!`
+    return picklesSoon ? `Pickles arrive on ${PICKLES_ARRIVAL}. ${how}` : how
+  }
+  if (picklesSoon && aboutPickles) {
     return `Our homemade pickles arrive on ${PICKLES_ARRIVAL}, so preorder them now on the Pickles page and we'll deliver them then!`
   }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {

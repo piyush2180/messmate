@@ -137,6 +137,12 @@ function mergeSupportMessages(
 const ENTRY_LABEL = { counter_sales: "counter sale", expenses: "expense" } as const
 // Pickup / delivery slots the store offers: Asima's morning window (longer at weekends), Kalam's evening slots (keep in step with src/lib/order-logic.ts)
 const SLOT_OPTIONS = ["8:30–9:30 AM", "8:30–10:30 AM", "6:00–6:30 PM", "6:30–7:00 PM"]
+// Asima pickle-only pickups (older ones saved as "Near Asima Mess" too) are collected from Room 104 or 210 and have
+// no set time yet; fruit bowl pickups keep their spot and morning slot (keep in step with the store's pickupPointFor)
+const isPicklePickup = (order: OrderRecord) =>
+  order.fulfilment === "pickup" && !(Array.isArray(order.items) && order.items.some((item) => item?.kind === "fruit"))
+const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Room 104 or 210" : order.hostel || "Campus pickup")
+const orderSlot = (order: OrderRecord) => (isPicklePickup(order) ? "" : order.slot || "")
 
 // Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {
@@ -849,7 +855,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     return orders.filter((order) => {
       if (statusFilter !== "all" && order.status !== statusFilter) return false
       if (fulfilmentFilter !== "all" && order.fulfilment !== fulfilmentFilter) return false
-      if (slotFilter !== "all" && order.slot !== slotFilter) return false
+      if (slotFilter !== "all" && orderSlot(order) !== slotFilter) return false
 
       const q = search.trim().toLowerCase()
       if (q) {
@@ -861,7 +867,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         // "+91 98765 43210" or "98765-43210" still finds the stored 10 digits
         const phoneQuery = /^[\d\s+()-]+$/.test(q) ? get10DigitPhone(q.replace(/^\+91/, "")) : ""
         const matchPhone = phoneQuery !== "" && get10DigitPhone(order.customer_phone).includes(phoneQuery)
-        const matchHostel = (order.hostel || "").toLowerCase().includes(q)
+        const matchHostel = (order.fulfilment === "pickup" ? pickupSpot(order) : order.hostel || "").toLowerCase().includes(q)
         const matchRoom = (order.room || "").toLowerCase().includes(q)
         return matchNum || matchPin || matchName || matchPhone || matchHostel || matchRoom
       }
@@ -1884,7 +1890,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <span>Slots Volume · {periodLabel}</span>
               </div>
               {SLOT_OPTIONS.map((slotName) => {
-                const count = chartOrders.filter((o) => o.slot === slotName).length
+                const count = chartOrders.filter((o) => orderSlot(o) === slotName).length
                 const pct = (count / Math.max(chartOrders.length, 1)) * 100
                 return (
                   <div key={slotName} className="analytics-bar-row">
@@ -2017,8 +2023,8 @@ function OrderCard({
           <span className="order-time-text">
             {formatWhen(order.created_at)}
           </span>
-          {/* Asima room delivery has no set time yet, so those orders have no slot */}
-          {order.slot && <span className="order-slot-pill">{order.slot}</span>}
+          {/* Asima pickle orders have no set time yet, so they show no slot */}
+          {orderSlot(order) && <span className="order-slot-pill">{orderSlot(order)}</span>}
         </div>
       </div>
 
@@ -2041,7 +2047,7 @@ function OrderCard({
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                   <circle cx="12" cy="10" r="3" />
                 </svg>
-                {order.hostel || "Campus pickup"}
+                {pickupSpot(order)}
               </span>
             )}
           </span>

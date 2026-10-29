@@ -890,3 +890,21 @@ test("Preorder - fruit bowls and preordered pickles can't share an order, since 
   assert.equal(mixesPreorder([{ kind: "pickle" }, { kind: "pickle" }], true), false)
   assert.equal(mixesPreorder([{ kind: "fruit" }], true), false)
 })
+
+test("FAQ Bot - 'is the store open?' follows the admin's Open / Closed switch", () => {
+  assert.match(getFaqResponse("is the store open?"), /we're open/)
+  assert.match(getFaqResponse("are you open now?", false, false), /closed right now/)
+  assert.match(getFaqResponse("shop khula hai abhi?", false, false), /closed right now/)
+})
+
+test("FAQ Bot - fruit and pickles together: separate orders while pickles are on preorder", () => {
+  assert.match(getFaqResponse("can I order fruit and pickle together?", true), /order them separately/)
+  assert.match(getFaqResponse("can I order fruit and pickle together?"), /Add both to your cart/)
+})
+
+test("FAQ Bot - Asima pickle delivery questions give the pickup and room delivery options", () => {
+  const reply = getFaqResponse("can I get pickles delivered to my room in asima?", true)
+  assert.match(reply, /arrive on 5–6 Nov/)
+  assert.match(reply, /picked up free from Room 104 or 210 or delivered to your room for ₹5/)
+  assert.match(getFaqResponse("when will mango achar be back?", true), /preorder them now/) // plain pickle questions keep the preorder answer
+})
