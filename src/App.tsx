@@ -3987,7 +3987,7 @@ function ResumeNotice() {
           </li>
           <li>
             <strong>Asima</strong>
-            <span>Closed tomorrow</span>
+            <span>Opening from Sunday</span>
           </li>
         </ul>
         <PrimaryButton onClick={close}>Got it</PrimaryButton>
