@@ -3936,19 +3936,11 @@ function restoreSession() {
   }
 }
 
-// Back-in-service notice: shown once per visit until Asima reopens, with day words that stay true on each day
-const KALAM_BACK = new Date(2026, 9, 31) // Sat 31 Oct 2026
-const ASIMA_BACK = new Date(2026, 10, 1) // Sun 1 Nov 2026
+// Back-in-service notice, shown once per visit
 const RESUME_NOTICE_KEY = "ht_resume_notice"
-const daysAway = (day: Date) => Math.round((day.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
-const dayWord = (day: Date) => {
-  const days = daysAway(day)
-  return days <= 0 ? "today" : days === 1 ? "tomorrow" : `on ${day.toLocaleDateString("en-IN", { weekday: "long" })}`
-}
 
 function ResumeNotice() {
   const [open, setOpen] = useState(() => {
-    if (daysAway(ASIMA_BACK) < 0) return false
     try {
       return sessionStorage.getItem(RESUME_NOTICE_KEY) !== "seen"
     } catch {
@@ -3985,17 +3977,17 @@ function ResumeNotice() {
         </button>
         <h2 id="resume-notice-title">Hey everyone! 👋</h2>
         <p>
-          We're happy to announce that our services will resume from {dayWord(KALAM_BACK)}! Thank you for your patience
-          and support. We look forward to serving you again! ❤️
+          We're happy to announce that our services will resume from tomorrow! Thank you for your patience and support.
+          We look forward to serving you again! ❤️
         </p>
         <ul className="notice-hostels">
           <li>
             <strong>Kalam</strong>
-            <span>{daysAway(KALAM_BACK) < 0 ? "Room delivery is back" : `Room delivery from ${dayWord(KALAM_BACK)}`}</span>
+            <span>Opening tomorrow</span>
           </li>
           <li>
             <strong>Asima</strong>
-            <span>We reopen {dayWord(ASIMA_BACK)}</span>
+            <span>Closed tomorrow</span>
           </li>
         </ul>
         <PrimaryButton onClick={close}>Got it</PrimaryButton>
