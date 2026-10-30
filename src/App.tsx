@@ -3983,7 +3983,7 @@ function ResumeNotice() {
         <ul className="notice-hostels">
           <li>
             <strong>Kalam</strong>
-            <span>Opening tomorrow</span>
+            <span>Find us near the mess area on Saturday</span>
           </li>
           <li>
             <strong>Asima</strong>
