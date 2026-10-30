@@ -3996,8 +3996,8 @@ function ResumeNotice() {
         </button>
         <h2 id="resume-notice-title">Hey everyone! 👋</h2>
         <p>
-          We're happy to announce that our services will resume from tomorrow! Thank you for your patience and support.
-          We look forward to serving you again! ❤️
+          We're happy to announce that we're back! Thank you for your patience and support. We look forward to serving you
+          again! ❤️
         </p>
         <ul className="notice-hostels">
           <li>
