@@ -2458,3 +2458,16 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* Preorder pickles: when they arrive (confirmation and Track Orders) */
 .preorder-date-note { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #fbeee9; color: var(--terracotta-dark); font-size: 12px; font-weight: 600; }
 .preorder-date-note strong { font-weight: 800; white-space: nowrap; }
+
+/* Back-in-service notice shown when the site opens */
+.notice-backdrop { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; padding: 20px; background: rgba(37,37,37,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: notice-fade .2s ease-out; }
+.notice-card { position: relative; width: 100%; max-width: 380px; padding: 30px 22px 22px; border-radius: var(--radius); background: var(--cream); box-shadow: 0 24px 64px rgba(0,0,0,.22); text-align: center; }
+.notice-card h2 { margin: 0 0 10px; font-family: "DM Serif Display", serif; font-weight: 400; font-size: 28px; color: var(--charcoal); }
+.notice-card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.notice-hostels { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; text-align: left; }
+.notice-hostels li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-radius: var(--radius-sm); background: var(--white); border: 1px solid var(--line); font-size: 13px; color: var(--charcoal); }
+.notice-hostels strong { color: var(--olive-dark); }
+.notice-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--olive-pale); color: var(--olive-dark); cursor: pointer; }
+.notice-card .primary-button { width: 100%; }
+@keyframes notice-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .notice-backdrop { animation: none; } }

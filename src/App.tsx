@@ -3936,6 +3936,74 @@ function restoreSession() {
   }
 }
 
+// Back-in-service notice: shown once per visit until Asima reopens, with day words that stay true on each day
+const KALAM_BACK = new Date(2026, 9, 31) // Sat 31 Oct 2026
+const ASIMA_BACK = new Date(2026, 10, 1) // Sun 1 Nov 2026
+const RESUME_NOTICE_KEY = "ht_resume_notice"
+const daysAway = (day: Date) => Math.round((day.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
+const dayWord = (day: Date) => {
+  const days = daysAway(day)
+  return days <= 0 ? "today" : days === 1 ? "tomorrow" : `on ${day.toLocaleDateString("en-IN", { weekday: "long" })}`
+}
+
+function ResumeNotice() {
+  const [open, setOpen] = useState(() => {
+    if (daysAway(ASIMA_BACK) < 0) return false
+    try {
+      return sessionStorage.getItem(RESUME_NOTICE_KEY) !== "seen"
+    } catch {
+      return true
+    }
+  })
+  const close = () => {
+    setOpen(false)
+    try {
+      sessionStorage.setItem(RESUME_NOTICE_KEY, "seen")
+    } catch {}
+  }
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open])
+  if (!open) return null
+
+  return (
+    <div className="notice-backdrop" onClick={close}>
+      <div
+        className="notice-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resume-notice-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="notice-close" onClick={close} aria-label="Close">
+          <Icon name="close" size={16} />
+        </button>
+        <h2 id="resume-notice-title">Hey everyone! 👋</h2>
+        <p>
+          We're happy to announce that our services will resume from {dayWord(KALAM_BACK)}! Thank you for your patience
+          and support. We look forward to serving you again! ❤️
+        </p>
+        <ul className="notice-hostels">
+          <li>
+            <strong>Kalam</strong>
+            <span>{daysAway(KALAM_BACK) < 0 ? "Room delivery is back" : `Room delivery from ${dayWord(KALAM_BACK)}`}</span>
+          </li>
+          <li>
+            <strong>Asima</strong>
+            <span>We reopen {dayWord(ASIMA_BACK)}</span>
+          </li>
+        </ul>
+        <PrimaryButton onClick={close}>Got it</PrimaryButton>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [restored] = useState(restoreSession)
   const [screen, setScreen] = useState<Screen>(restored.screen)
@@ -4476,6 +4544,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
+        <ResumeNotice />
         {/* Live Floating Alert Banner for Ready Orders */}
         {activeReadyOrder && (
           <div className="ready-order-alert-banner">
