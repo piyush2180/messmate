@@ -24,37 +24,6 @@ const rebrand = (text: string) => text.replace(/MessMate Support Team/g, SUPPORT
 // "1 order" / "2 orders"
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-// One shared audio context. Browsers keep it muted until someone taps the page once after loading.
-let audioCtx: AudioContext | null = null
-function getAudio(): AudioContext | null {
-  if (!audioCtx) {
-    const Ctor = window.AudioContext || (window as any).webkitAudioContext
-    if (Ctor) audioCtx = new Ctor()
-  }
-  return audioCtx
-}
-
-// Rising two-note ding for a new order; one softer note for a new chat message
-function playChime(kind: "order" | "message" = "order") {
-  const ctx = getAudio()
-  if (!ctx || ctx.state !== "running") return
-  try {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = "sine"
-    osc.frequency.setValueAtTime(kind === "order" ? 587.33 : 880, ctx.currentTime) // D5 / A5
-    if (kind === "order") osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15)
-    gain.gain.setValueAtTime(kind === "order" ? 0.2 : 0.12, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.6)
-  } catch (err) {
-    console.warn("Chime failed:", err)
-  }
-}
-
 // "Today, 05:03 PM" / "Yesterday, …" / "6 Oct, …" so older orders and chats don't look like today's.
 function formatWhen(iso: string): string {
   const d = new Date(iso)
@@ -253,34 +222,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
     return []
   })
-  const supportRef = useRef(supportMessages)
-  useEffect(() => {
-    supportRef.current = supportMessages
-  }, [supportMessages])
-  // True when a message isn't on screen yet (each one arrives by broadcast and again from the database)
-  const isNewMessage = (m: SupportMessage) =>
-    typeof m?.message === "string" && !supportRef.current.some((s) => s.id === m.id || isSameMessage(s, m))
-
-  // Sound needs one tap after every page load; any tap or key press turns it on
-  const [soundOn, setSoundOn] = useState(false)
-  useEffect(() => {
-    const ctx = getAudio()
-    if (!ctx) return
-    const sync = () => setSoundOn(ctx.state === "running")
-    const unlock = () => {
-      if (ctx.state !== "running") ctx.resume().then(sync).catch(() => {})
-    }
-    sync()
-    ctx.addEventListener("statechange", sync)
-    window.addEventListener("pointerdown", unlock)
-    window.addEventListener("keydown", unlock)
-    return () => {
-      ctx.removeEventListener("statechange", sync)
-      window.removeEventListener("pointerdown", unlock)
-      window.removeEventListener("keydown", unlock)
-    }
-  }, [])
-
   // Connection state for the "connection lost" notice
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine))
   const [liveOk, setLiveOk] = useState(true)
@@ -411,7 +352,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           if (payload.eventType === "INSERT") {
             const newOrder = payload.new as OrderRecord
             setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)])
-            playChime("order")
           } else if (payload.eventType === "UPDATE") {
             const updated = payload.new as OrderRecord
             setOrders((prev) =>
@@ -474,13 +414,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         { event: "INSERT", schema: "public", table: "support_messages" },
         (payload) => {
           const newMsg = payload.new as SupportMessage
-          const fresh = isNewMessage(newMsg)
           setSupportMessages((prev) => {
             const next = mergeSupportMessages(prev, [newMsg])
             saveAdminSupportToLocal(next)
             return next
           })
-          if (fresh && newMsg.sender === "customer") playChime("message")
         }
       )
       .subscribe((status) => {
@@ -1151,15 +1089,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
           )
-        )}
-        {!soundOn && (
-          <button
-            type="button"
-            className="admin-banner sound"
-            onClick={() => getAudio()?.resume().then(() => playChime("order")).catch(() => {})}
-          >
-            🔔 Tap here to turn on the new-order sound
-          </button>
         )}
         {(!isOnline || !liveOk) && (
           <div className="admin-banner offline" role="status">

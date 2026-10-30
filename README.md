@@ -44,7 +44,7 @@
 
 **Happy Tummy Co.** (formerly MessMate) solves campus dining friction by providing university hostel students with quick access to authentic, homemade South Indian pickles, fixed-price fresh fruit bowls, with room delivery in Kalam and Asima, fruit bowl pickup near the Asima mess, and pickle pickup from Room 104 or 210 in Asima.
 
-The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live kitchen sound alerts, live item availability toggling, and two-way in-app support chat without page reloads.
+The system connects students with kitchen staff through **Supabase Realtime WebSockets**, delivering instant order status transitions, live item availability toggling, and two-way in-app support chat without page reloads.
 
 ---
 
@@ -88,10 +88,7 @@ Everything powering Happy Tummy Co. has been carefully chosen for performance, z
   - Listens to PostgreSQL `INSERT` and `UPDATE` change data capture (CDC) events via `supabase_realtime` publication channels.
   - Pushes status changes to students and incoming orders to the kitchen instantly without polling.
 
-### Audio & Browser Native APIs
-- **Web Audio API (`AudioContext`, `OscillatorNode`, `GainNode`)**:
-  - Generates synthetic melodic chimes directly through the browser sound engine.
-  - Requires **zero external MP3/audio files**, guaranteeing zero network bandwidth usage and instant offline-ready acoustic alerts for new orders and incoming chat messages.
+### Browser Native APIs
 - **Mobile UPI Intent Linking (`upi://pay`)**:
   - Native deep-linking schema allowing 1-tap mobile handoff directly into PhonePe, Google Pay, Paytm, or BHIM.
 - **Clipboard API (`navigator.clipboard.writeText`)**:
@@ -196,8 +193,6 @@ Happy Tummy Co. Monorepo
 - **Kanban Kitchen Dispatch Board**:
   - High-visibility columns: *Placed (New)*, *Preparing*, *Ready for Pickup*, *Delivered*, and *Cancelled*.
   - Displays customer phone number, room/pickup location, fulfillment type, item breakdown, and total price.
-- **Web Audio Soundbox Alerts**:
-  - Integrated audio chime plays immediately upon receiving a new order or a student support message.
 - **UPI Soundbox Verification**:
   - Kitchen staff inspects the student's entered 12-digit UTR against their physical UPI soundbox or banking app and toggles *Verify Payment* to confirm settlement.
 - **Real-Time Stock Inventory Management**:

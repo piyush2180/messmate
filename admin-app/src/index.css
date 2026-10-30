@@ -207,27 +207,6 @@ button, input, select, textarea {
   50% { opacity: 0.6; transform: scale(1.25); }
 }
 
-.sound-toggle-btn {
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.sound-toggle-btn.active {
-  background: #eef6ec;
-  border-color: #badbb0;
-  color: var(--olive);
-}
-
 /* Main Container */
 .admin-main {
   max-width: 1440px;
@@ -1769,7 +1748,7 @@ button, input, select, textarea {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Top-of-board notices: sound is off, or the connection dropped */
+/* Top-of-board notice when the connection drops */
 .admin-banner {
   display: block;
   width: 100%;
@@ -1782,7 +1761,6 @@ button, input, select, textarea {
   font-weight: 700;
   text-align: left;
 }
-.admin-banner.sound { background: var(--amber-soft); border-color: var(--amber); color: var(--text); cursor: pointer; }
 .admin-banner.offline { background: var(--red-soft); border-color: var(--red); color: var(--red); }
 .status-dot.cancelled, .status-dot.no_show { background: #9ca3af; }
 
