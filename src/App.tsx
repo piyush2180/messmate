@@ -34,6 +34,9 @@ import {
   ASIMA_WEEKEND,
   DELIVERY_FEE,
   fulfilmentFor,
+  hostelsOpen,
+  isHostelOpen,
+  type HostelOpen,
   HOSTEL_HOURS,
   HOSTEL_SLOTS,
   KALAM_ROOM,
@@ -1551,6 +1554,7 @@ function Checkout({
   pickupPoint,
   items,
   setAsimaDelivery,
+  hostelOpen,
 }: {
   go: (screen: Screen) => void
   details: CustomerDetails
@@ -1559,6 +1563,7 @@ function Checkout({
   pickupPoint: string
   items: CartItem[]
   setAsimaDelivery: (value: boolean) => void
+  hostelOpen: HostelOpen
 }) {
   const set = (key: keyof CustomerDetails, value: string) => {
     setDetails({ ...details, [key]: value })
@@ -1583,12 +1588,17 @@ function Checkout({
   // Fruit bowls at Asima are only ever picked up, so room delivery is offered for pickle-only orders
   const hasFruit = items.some((item) => item.kind === "fruit")
   const asimaPickup = asima && fulfilment === "pickup"
+  // The admin can close one hostel while the other keeps taking orders
+  const closed = !isHostelOpen(hostelOpen, details.hostel)
   const isComplete = Boolean(
+    !closed &&
     details.name.trim() &&
     isPhoneValid &&
     (fulfilment === "pickup" || (asima ? ASIMA_ROOM : KALAM_ROOM).test(details.room))
   )
-  const missing = !details.name.trim()
+  const missing = closed
+    ? `${details.hostel} is closed right now. Please check back later.`
+    : !details.name.trim()
     ? "Please enter your name to continue"
     : !isPhoneValid
       ? "Please enter a valid 10-digit mobile number"
@@ -1654,8 +1664,9 @@ function Checkout({
                 </div>
               </div>
               <button
-                className={`fulfilment-card ${!asima ? "selected" : ""}`}
+                className={`fulfilment-card ${!asima ? "selected" : ""} ${hostelOpen.Kalam ? "" : "closed"}`}
                 aria-pressed={!asima}
+                disabled={!hostelOpen.Kalam}
                 onClick={() => choose("Kalam")}
               >
                 <span className="fulfilment-icon">
@@ -1664,13 +1675,14 @@ function Checkout({
                 <span>
                   <strong>Kalam · Room delivery</strong>
                   <small>Right to your room in Kalam.</small>
-                  <em>+₹{DELIVERY_FEE} · {HOSTEL_HOURS.Kalam}</em>
+                  <em>{hostelOpen.Kalam ? `+₹${DELIVERY_FEE} · ${HOSTEL_HOURS.Kalam}` : "Closed right now"}</em>
                 </span>
                 <span className="radio">{!asima && <span />}</span>
               </button>
               <button
-                className={`fulfilment-card ${asimaPickup ? "selected" : ""}`}
+                className={`fulfilment-card ${asimaPickup ? "selected" : ""} ${hostelOpen.Asima ? "" : "closed"}`}
                 aria-pressed={asimaPickup}
+                disabled={!hostelOpen.Asima}
                 onClick={() => choose("Asima")}
               >
                 <span className="fulfilment-icon">
@@ -1680,21 +1692,22 @@ function Checkout({
                 {hasFruit ? (
                   <span>
                     <strong>Asima · {MESS_PICKUP}</strong>
-                    <em>FREE · {HOSTEL_HOURS.Asima}</em>
+                    <em>{hostelOpen.Asima ? `FREE · ${HOSTEL_HOURS.Asima}` : "Closed right now"}</em>
                   </span>
                 ) : (
                   <span>
                     <strong>Asima · Pickup from {ASIMA_PICKUP}</strong>
                     <small>Collect it from {ASIMA_PICKUP}.</small>
-                    <em>FREE</em>
+                    <em>{hostelOpen.Asima ? "FREE" : "Closed right now"}</em>
                   </span>
                 )}
                 <span className="radio">{asimaPickup && <span />}</span>
               </button>
               {!hasFruit && (
                 <button
-                  className={`fulfilment-card ${asima && !asimaPickup ? "selected" : ""}`}
+                  className={`fulfilment-card ${asima && !asimaPickup ? "selected" : ""} ${hostelOpen.Asima ? "" : "closed"}`}
                   aria-pressed={asima && !asimaPickup}
+                  disabled={!hostelOpen.Asima}
                   onClick={() => choose("Asima", true)}
                 >
                   <span className="fulfilment-icon">
@@ -1703,7 +1716,7 @@ function Checkout({
                   <span>
                     <strong>Asima · Room delivery</strong>
                     <small>Right to your room in Asima.</small>
-                    <em>+₹{DELIVERY_FEE}</em>
+                    <em>{hostelOpen.Asima ? `+₹${DELIVERY_FEE}` : "Closed right now"}</em>
                   </span>
                   <span className="radio">{asima && !asimaPickup && <span />}</span>
                 </button>
@@ -1728,7 +1741,7 @@ function Checkout({
                 </div>
               )}
             </section>
-            {!isComplete && (details.name || details.phone) && (
+            {!isComplete && (closed || details.name || details.phone) && (
               <div className="validation-hint mobile-validation-hint">{missing}</div>
             )}
           </div>
@@ -3133,7 +3146,7 @@ const FAQ_ITEMS = [
 async function askAi(
   message: string,
   history: Array<{ sender: "user" | "bot"; text: string }>,
-  storeOpen: boolean,
+  hostelOpen: HostelOpen,
   picklesSoon: boolean,
 ): Promise<string | null> {
   const controller = new AbortController()
@@ -3146,7 +3159,9 @@ async function askAi(
         message,
         history: history.slice(-6).map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.text })),
         visitorId: safeStorage.getItem("ht_visitor_id", "") || undefined,
-        storeOpen,
+        storeOpen: hostelOpen.Kalam || hostelOpen.Asima,
+        kalamOpen: hostelOpen.Kalam,
+        asimaOpen: hostelOpen.Asima,
         picklesSoon,
       }),
       signal: controller.signal,
@@ -3164,14 +3179,16 @@ async function askAi(
 function SupportChatWidget({
   customerPhone = "",
   customerName = "",
-  storeOpen = true,
+  hostelOpen = { Kalam: true, Asima: true },
   picklesSoon = false,
 }: {
   customerPhone?: string
   customerName?: string
-  storeOpen?: boolean
+  hostelOpen?: HostelOpen
   picklesSoon?: boolean
 }) {
+  // The chat shows "away" only when both hostels are closed
+  const storeOpen = hostelOpen.Kalam || hostelOpen.Asima
   // 1. Initial saved messages from localStorage
   const savedCleanPhone = (customerPhone || safeStorage.getItem("messmate_phone", "") || "")
     .replace(/\D/g, "")
@@ -3418,7 +3435,7 @@ function SupportChatWidget({
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
-    const answer = getFaqResponse(query, picklesSoon, storeOpen)
+    const answer = getFaqResponse(query, picklesSoon, hostelOpen)
     const known = answer !== FAQ_FALLBACK
     const botId = `faq-b-${Date.now() + 1}`
 
@@ -3430,7 +3447,7 @@ function SupportChatWidget({
     if (known) return
     // No instant answer (a greeting, small talk…): the AI helper replies; if it can't, a built-in
     // small-talk reply, and otherwise a pointer to the team
-    const reply = (await askAi(query, faqHistory, storeOpen, picklesSoon)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
+    const reply = (await askAi(query, faqHistory, hostelOpen, picklesSoon)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
     setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply, showEscalate: true } : m)))
   }
 
@@ -3903,6 +3920,8 @@ function SupportChatWidget({
 const SCREENS: Screen[] = ["home", "pickles", "pickle-detail", "fruit-builder", "cart", "checkout", "fulfilment", "payment", "confirmation", "orders", "sweets"]
 // Steps that only make sense with something in the cart
 const NEEDS_CART: Screen[] = ["cart", "checkout", "fulfilment", "payment"]
+type StoreStatusRow = { is_open?: unknown; kalam_open?: unknown; asima_open?: unknown; pickles_coming_soon?: unknown }
+
 const SESSION_KEY = "ht_session"
 const SESSION_MAX_AGE = 6 * 60 * 60 * 1000 // an old cart from yesterday shouldn't come back
 
@@ -4087,12 +4106,13 @@ export default function App() {
     safeStorage.setJson("ht_dismissed_ready", [...dismissedReadyIds])
     safeStorage.setJson("ht_dismissed_cancelled", [...dismissedCancelledIds])
   }, [dismissedReadyIds, dismissedCancelledIds])
-  // Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
-  const [storeOpen, setStoreOpen] = useState(true)
+  // Each hostel's Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
+  const [hostelOpen, setHostelOpen] = useState<HostelOpen>({ Kalam: true, Asima: true })
+  const storeOpen = hostelOpen.Kalam || hostelOpen.Asima
   // The admin's Preorder switch for pickles ("Arriving soon"); plain add-to-cart if it can't be read
   const [picklesSoon, setPicklesSoon] = useState(false)
-  const applyStoreStatus = (row: { is_open?: unknown; pickles_coming_soon?: unknown } | null) => {
-    if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+  const applyStoreStatus = (row: StoreStatusRow | null) => {
+    if (row) setHostelOpen(hostelsOpen(row))
     if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
   }
   const refreshStoreStatus = () =>
@@ -4114,7 +4134,7 @@ export default function App() {
     const channel = client
       .channel("store_status_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
-        applyStoreStatus(payload.new as { is_open?: unknown; pickles_coming_soon?: unknown })
+        applyStoreStatus(payload.new as StoreStatusRow)
       })
       .subscribe()
     return () => {
@@ -4398,9 +4418,10 @@ export default function App() {
         supabase.from("store_status").select("*").eq("id", 1).maybeSingle(),
         supabase.from("menu_inventory").select("id, name, is_available"),
       ])
-      if (status?.is_open === false) {
-        setStoreOpen(false)
-        alert(`${CLOSED_MESSAGE}, so your order wasn't placed. If you already paid, please message us in Support.`)
+      const freshOpen = hostelsOpen(status)
+      if (!isHostelOpen(freshOpen, details.hostel)) {
+        setHostelOpen(freshOpen)
+        alert(`${details.hostel} is closed right now, so your order wasn't placed. If you already paid, please message us in Support.`)
         return
       }
       if (stock) {
@@ -4684,6 +4705,7 @@ export default function App() {
             pickupPoint={pickupPoint}
             items={cart}
             setAsimaDelivery={setAsimaDelivery}
+            hostelOpen={hostelOpen}
           />
         )}
         {screen === "fulfilment" && (
@@ -4705,7 +4727,7 @@ export default function App() {
             onPay={handlePay}
             isSubmitting={isSubmitting}
             soldOutItems={soldOutItems}
-            storeOpen={storeOpen}
+            storeOpen={isHostelOpen(hostelOpen, details.hostel)}
             preorder={picklesSoon}
           />
         )}
@@ -4754,7 +4776,7 @@ export default function App() {
         <SupportChatWidget
           customerPhone={details.phone}
           customerName={details.name}
-          storeOpen={storeOpen}
+          hostelOpen={hostelOpen}
           picklesSoon={picklesSoon}
         />
       </div>

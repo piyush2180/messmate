@@ -48,6 +48,17 @@ export const DELIVERY_FEE = 5
 // Asima pickle-only orders are collected from one of these rooms (fruit bowls near the Asima mess)
 export const ASIMA_PICKUP = "Room 104 or 210"
 
+export type HostelOpen = { Kalam: boolean; Asima: boolean }
+/** Each hostel's Open / Closed switch. Before their SQL is run the store-wide switch stands in, and no row means open. */
+export const hostelsOpen = (row: { is_open?: unknown; kalam_open?: unknown; asima_open?: unknown } | null | undefined): HostelOpen => {
+  const open = row?.is_open !== false
+  return {
+    Kalam: typeof row?.kalam_open === "boolean" ? row.kalam_open : open,
+    Asima: typeof row?.asima_open === "boolean" ? row.asima_open : open,
+  }
+}
+export const isHostelOpen = (open: HostelOpen, hostel: string) => (hostel === "Asima" ? open.Asima : open.Kalam)
+
 /** Kalam always gets room delivery. Asima orders are picked up (fruit bowls near the mess, pickles from ASIMA_PICKUP), unless a pickle-only order asks for room delivery. */
 export const fulfilmentFor = (
   hostel: string,
@@ -174,9 +185,9 @@ const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUI
  * Instant answers in the support chat. Checked in order: the first matching topic wins,
  * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
  * picklesSoon: the admin has pickles on Preorder ("Arriving soon"); students can still order them.
- * storeOpen: the admin's Open / Closed switch.
+ * open: the admin's Open / Closed switches, for both hostels or each one.
  */
-export function getFaqResponse(query: string, picklesSoon = false, storeOpen = true): string {
+export function getFaqResponse(query: string, picklesSoon = false, open: boolean | HostelOpen = true): string {
   const q = (query || "").toLowerCase().trim()
   // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
   const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
@@ -190,11 +201,13 @@ export function getFaqResponse(query: string, picklesSoon = false, storeOpen = t
   if (/\b(late|delay|delayed|not (come|came|arrived|received)|hasn'?t (come|arrived)|still waiting)\b/.test(q)) {
     return `Sorry for the wait! You can see live progress in 'Track Orders', or tap 'Talk to our Support Team' below and the ${SUPPORT_TEAM} will check right away.`
   }
-  // Follows the admin's Open / Closed switch
+  // Follows the admin's Open / Closed switches
   if (/\b(open|closed|khula|khuli)\b/.test(q) && /\b(store|shop|you|now|today|still|abhi|aaj)\b/.test(q)) {
-    return storeOpen
-      ? "Yes, we're open and taking orders right now!"
-      : "We're closed right now, so ordering is paused. Please check back later!"
+    const { Kalam, Asima } = typeof open === "boolean" ? { Kalam: open, Asima: open } : open
+    if (Kalam && Asima) return "Yes, we're open and taking orders right now!"
+    if (!Kalam && !Asima) return "We're closed right now, so ordering is paused. Please check back later!"
+    const [on, off] = Kalam ? ["Kalam", "Asima"] : ["Asima", "Kalam"]
+    return `${on} is open and taking orders, but ${off} is closed right now. Please check back later!`
   }
   if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
     return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"

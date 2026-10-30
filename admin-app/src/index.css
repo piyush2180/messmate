@@ -1966,3 +1966,7 @@ button, input, select, textarea {
 /* Pickles Preorder switch in Menu & Stock */
 .store-status-bar.soon { background: var(--amber-soft); border-color: var(--amber); color: #92400e; }
 .store-status-bar.soon .store-status-dot { background: var(--amber); }
+/* Kalam and Asima switches side by side on wide screens */
+.store-status-row { display: grid; gap: 8px; margin: 0 0 14px; }
+.store-status-row .store-status-bar { margin: 0; }
+@media (min-width: 900px) { .store-status-row { grid-template-columns: 1fr 1fr; } .store-status-row .store-status-bar.missing { grid-column: 1 / -1; } }

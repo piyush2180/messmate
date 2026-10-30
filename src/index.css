@@ -2471,3 +2471,6 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 .notice-card .primary-button { width: 100%; }
 @keyframes notice-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .notice-backdrop { animation: none; } }
+/* A hostel the admin has closed can't be picked at checkout */
+.fulfilment-card.closed { opacity: .55; cursor: not-allowed; }
+.fulfilment-card.closed em { color: var(--terracotta-dark); }

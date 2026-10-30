@@ -12,6 +12,8 @@ import {
   ALL_SLOTS,
   ASIMA_ROOM,
   fulfilmentFor,
+  hostelsOpen,
+  isHostelOpen,
   KALAM_ROOM,
   normalizeRoom,
   splitRoom,
@@ -907,4 +909,18 @@ test("FAQ Bot - Asima pickle delivery questions give the pickup and room deliver
   assert.match(reply, /arrive on 5–6 Nov/)
   assert.match(reply, /picked up free from Room 104 or 210 or delivered to your room for ₹5/)
   assert.match(getFaqResponse("when will mango achar be back?", true), /preorder them now/) // plain pickle questions keep the preorder answer
+})
+
+test("Hostel switches - each hostel opens and closes on its own; before their SQL the store-wide switch stands in", () => {
+  assert.deepEqual(hostelsOpen({ is_open: true, kalam_open: true, asima_open: false }), { Kalam: true, Asima: false })
+  assert.deepEqual(hostelsOpen({ is_open: false }), { Kalam: false, Asima: false }) // columns not added yet
+  assert.deepEqual(hostelsOpen(null), { Kalam: true, Asima: true }) // can't read it: stay open
+  assert.equal(isHostelOpen({ Kalam: true, Asima: false }, "Asima"), false)
+  assert.equal(isHostelOpen({ Kalam: true, Asima: false }, "Kalam"), true)
+})
+
+test("FAQ Bot - 'is the store open?' says which hostel is closed when only one is", () => {
+  assert.match(getFaqResponse("is the store open?", false, { Kalam: true, Asima: false }), /Kalam is open and taking orders, but Asima is closed right now/)
+  assert.match(getFaqResponse("are you open now?", false, { Kalam: false, Asima: true }), /Asima is open and taking orders, but Kalam is closed right now/)
+  assert.match(getFaqResponse("is the store open?", false, { Kalam: false, Asima: false }), /closed right now, so ordering is paused/)
 })

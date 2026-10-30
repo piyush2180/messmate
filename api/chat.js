@@ -92,6 +92,11 @@ export async function POST(request) {
   let system = SYSTEM_PROMPT
   if (body?.storeOpen === false) {
     system += "\n- Right now the store is CLOSED and ordering is paused. If asked about ordering now, say we're unavailable at the moment and to check back later."
+  } else {
+    // The admin can close one hostel while the other keeps taking orders
+    for (const [hostel, open] of [["Kalam", body?.kalamOpen], ["Asima", body?.asimaOpen]]) {
+      if (open === false) system += `\n- Right now ${hostel} is CLOSED and ${hostel} orders are paused; the other hostel is open. If asked about ordering for ${hostel}, say it's unavailable at the moment and to check back later.`
+    }
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts

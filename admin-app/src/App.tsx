@@ -144,6 +144,18 @@ const isPicklePickup = (order: OrderRecord) =>
 const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Room 104 or 210" : order.hostel || "Campus pickup")
 const orderSlot = (order: OrderRecord) => (isPicklePickup(order) ? "" : order.slot || "")
 
+type Hostel = "Kalam" | "Asima"
+const HOSTELS: Hostel[] = ["Kalam", "Asima"]
+type StoreStatusRow = { is_open?: unknown; kalam_open?: unknown; asima_open?: unknown; pickles_coming_soon?: unknown }
+// Each hostel's switch; before its SQL is run (or with no row yet) the store-wide switch stands in for both
+const hostelsOpen = (row: StoreStatusRow | null): Record<Hostel, boolean> => {
+  const open = row?.is_open !== false
+  return {
+    Kalam: typeof row?.kalam_open === "boolean" ? row.kalam_open : open,
+    Asima: typeof row?.asima_open === "boolean" ? row.asima_open : open,
+  }
+}
+
 // Staff log in before the dashboard loads anything; the database only lets the staff account make changes
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -274,8 +286,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [liveOk, setLiveOk] = useState(true)
 
   // Open / Closed switch the student store follows (null until loaded)
-  const [storeOpen, setStoreOpen] = useState<boolean | null>(null)
+  // Each hostel's own Open / Closed switch
+  const [hostelOpen, setHostelOpen] = useState<Record<Hostel, boolean> | null>(null)
   const [storeStatusMissing, setStoreStatusMissing] = useState(false)
+  // A row without kalam_open means the hostel switches' SQL hasn't been run yet
+  const [hostelSwitchesMissing, setHostelSwitchesMissing] = useState(false)
   // Pickles Preorder switch ("Arriving soon" in the store); null until loaded, or while its SQL hasn't been run
   const [picklesSoon, setPicklesSoon] = useState<boolean | null>(null)
 
@@ -519,7 +534,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           return
         }
         setStoreStatusMissing(false)
-        setStoreOpen(data ? Boolean(data.is_open) : true)
+        setHostelOpen(hostelsOpen(data))
+        setHostelSwitchesMissing(Boolean(data) && typeof data.kalam_open !== "boolean")
         // No row yet means pickles are on sale; a row without the column means its SQL hasn't been run
         setPicklesSoon(!data ? false : typeof data.pickles_coming_soon === "boolean" ? data.pickles_coming_soon : null)
       })
@@ -540,21 +556,26 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-  const handleToggleStore = async () => {
-    if (!supabase || storeOpen === null) return
-    const next = !storeOpen
-    if (!next && !confirm("Close the store? Students won't be able to place orders, and the chat will say \"Unavailable at the moment\".")) return
-    setStoreOpen(next)
-    const { error } = await supabase
-      .from("store_status")
-      .upsert({ id: 1, is_open: next, updated_at: new Date().toISOString() })
+  const handleToggleHostel = async (hostel: Hostel) => {
+    if (!supabase || hostelOpen === null) return
+    const before = hostelOpen
+    const next = { ...before, [hostel]: !before[hostel] }
+    if (!next[hostel] && !confirm(`Close ${hostel}? ${hostel} students won't be able to place orders until you open it again.`)) return
+    setHostelOpen(next)
+    const { error } = await supabase.from("store_status").upsert({
+      id: 1,
+      [hostel === "Kalam" ? "kalam_open" : "asima_open"]: next[hostel],
+      // The store-wide switch stays as "either hostel is open"
+      is_open: next.Kalam || next.Asima,
+      updated_at: new Date().toISOString(),
+    })
     if (error) {
-      console.error("Store status not saved:", error.message)
-      setStoreOpen(!next)
+      console.error("Hostel switch not saved:", error.message)
+      setHostelOpen(before)
       alert(
-        error.code === "PGRST205" || error.code === "42P01"
-          ? "The Open / Closed switch needs the latest SQL in Supabase. Please run it first."
-          : "Couldn't change the store status. Please check the connection and try again."
+        ["PGRST204", "PGRST205", "42703", "42P01"].includes(error.code)
+          ? "The Kalam / Asima switches need the latest SQL in Supabase. Please run it first."
+          : "Couldn't change the switch. Please check the connection and try again."
       )
     }
   }
@@ -566,8 +587,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     const storeChannel = supabase
       ?.channel("admin_store_status")
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
-        const row = payload.new as { is_open?: boolean; pickles_coming_soon?: boolean }
-        if (typeof row?.is_open === "boolean") setStoreOpen(row.is_open)
+        const row = payload.new as StoreStatusRow
+        if (row) setHostelOpen(hostelsOpen(row))
         if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
       })
       .subscribe()
@@ -1107,15 +1128,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {storeStatusMissing ? (
           <div className="store-status-bar missing">Run the store_status SQL in Supabase to use the Open / Closed switch.</div>
         ) : (
-          storeOpen !== null && (
-            <div className={`store-status-bar ${storeOpen ? "open" : "closed"}`}>
-              <span>
-                <span className="store-status-dot" />
-                {storeOpen ? "Store is open" : "Store is closed: students can't order right now"}
-              </span>
-              <button type="button" className="action-btn-small" onClick={handleToggleStore}>
-                {storeOpen ? "Close store" : "Open store"}
-              </button>
+          hostelOpen !== null && (
+            <div className="store-status-row">
+              {hostelSwitchesMissing && (
+                <div className="store-status-bar missing">Run the latest SQL in Supabase to use the Kalam / Asima switches.</div>
+              )}
+              {HOSTELS.map((hostel) => (
+                <div key={hostel} className={`store-status-bar ${hostelOpen[hostel] ? "open" : "closed"}`}>
+                  <span>
+                    <span className="store-status-dot" />
+                    {hostelOpen[hostel] ? `${hostel} is open` : `${hostel} is closed: students there can't order`}
+                  </span>
+                  <button
+                    type="button"
+                    className="action-btn-small"
+                    disabled={hostelSwitchesMissing}
+                    onClick={() => handleToggleHostel(hostel)}
+                  >
+                    {hostelOpen[hostel] ? `Close ${hostel}` : `Open ${hostel}`}
+                  </button>
+                </div>
+              ))}
             </div>
           )
         )}
@@ -1381,7 +1414,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </div>
 
             {picklesSoon === null ? (
-              storeOpen !== null && (
+              hostelOpen !== null && (
                 <div className="store-status-bar missing">Run the pickles SQL in Supabase to use the Preorder switch.</div>
               )
             ) : (

@@ -335,18 +335,25 @@ revoke all on public.counter_sales from anon;
 grant select, insert, delete on public.counter_sales to authenticated;
 
 -- ============================================================================
--- 8. Store Open / Closed (admin switch; the student store reads it live)
--- One row. Closed: checkout pauses and the chat says "Unavailable at the moment".
+-- 8. Store Open / Closed (admin switches; the student store reads them live)
+-- One row. kalam_open / asima_open: each hostel's own switch; a closed hostel's checkout pauses.
+-- is_open: kept as "either hostel is open"; with both closed the chat says "Unavailable at the moment".
 -- pickles_coming_soon: the store shows pickles as "Coming soon" and they can't be ordered (admin Menu & Stock).
 -- ============================================================================
 create table if not exists public.store_status (
   id int primary key default 1 check (id = 1),
   is_open boolean not null default true,
+  kalam_open boolean not null default true,
+  asima_open boolean not null default true,
   pickles_coming_soon boolean not null default false,
   updated_at timestamptz not null default now()
 );
 alter table public.store_status add column if not exists pickles_coming_soon boolean not null default false;
 insert into public.store_status (id) values (1) on conflict (id) do nothing;
+-- The hostel switches start as the old store-wide switch (only while both are still at their default)
+alter table public.store_status add column if not exists kalam_open boolean not null default true;
+alter table public.store_status add column if not exists asima_open boolean not null default true;
+update public.store_status set kalam_open = is_open, asima_open = is_open where id = 1 and kalam_open and asima_open;
 
 alter table public.store_status enable row level security;
 
