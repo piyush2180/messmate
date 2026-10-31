@@ -870,8 +870,8 @@ function Home({
           <CategoryCard
             type="sweet"
             title="Sweets & Snacks"
-            punchline="A sweet finish to mess dinner."
-            line={`Starting with ${POOTHAREKULU_NAME}: paper-thin, layered and melt-in-the-mouth.`}
+            punchline={POOTHAREKULU_NAME}
+            line="Paper-thin, layered and melt-in-the-mouth."
             image={pootharekuluImage}
             video={pootharekuluVideo}
             labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} pack`]}
@@ -4143,6 +4143,13 @@ function ResumeNotice() {
             <strong>Asima</strong>
             <span>
               Available at the counter near the mess: {HOSTEL_SLOTS.Asima[0]} on weekdays, {ASIMA_WEEKEND[0]} on weekends
+            </span>
+          </li>
+          <li>
+            <strong>Preorder</strong>
+            <span>
+              Homemade pickles (arriving around {PICKLES_ARRIVAL_SHORT}) and {POOTHAREKULU_NAME} (arriving{" "}
+              {SWEETS_ARRIVAL}) can both be preordered now
             </span>
           </li>
         </ul>
