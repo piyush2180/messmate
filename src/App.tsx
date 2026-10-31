@@ -29,8 +29,9 @@ import {
 } from "./lib/inventory"
 import phonepeQrUrl from "./assets/phonepe-qr.png"
 import logoUrl from "./assets/happy-tummy-logo.webp"
-// Pootharekulu photo the owner supplied
+// Pootharekulu photo and making-of clip (vertical 360×640) the owner supplied
 import pootharekuluImage from "./assets/pootharekulu.webp"
+import pootharekuluVideo from "./assets/pootharekulu-making.mp4"
 import {
   ALL_SLOTS,
   ASIMA_PICKUP,
@@ -136,6 +137,7 @@ type IconName =
   | "key"
   | "bell"
   | "zap"
+  | "play"
   | "whatsapp"
 
 // Our supplier's (Food On Farm Pickles) mango pickle photo.
@@ -417,6 +419,8 @@ function Icon({
     zap: (
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     ),
+
+    play: <polygon points="6 3 20 12 6 21 6 3" fill="currentColor" />,
 
     // WhatsApp glyph (Simple Icons, CC0): a filled shape, unlike the stroked icons above.
     whatsapp: (
@@ -854,6 +858,42 @@ function Home({
   )
 }
 
+// How Pootharekulu is made: opens over the page in a frame the clip's own shape, and only loads once tapped
+function MakingVideo({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
+
+  return (
+    <div className="notice-backdrop" onClick={onClose}>
+      <div
+        className="video-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="How Pootharekulu is made"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Started from the tap, so it plays with sound; if a browser still blocks it, the controls are there */}
+        <video
+          ref={(el) => {
+            el?.play().catch(() => {})
+          }}
+          src={pootharekuluVideo}
+          controls
+          playsInline
+        />
+        <button type="button" className="notice-close" onClick={onClose} aria-label="Close video">
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Sweets & Snacks: only Pootharekulu for now, on preorder until it arrives
 function SweetsPage({
   go,
@@ -864,6 +904,7 @@ function SweetsPage({
   cartCount: number
   add: (item: CartItem) => void
 }) {
+  const [showVideo, setShowVideo] = useState(false)
   return (
     <>
       <Header
@@ -887,10 +928,13 @@ function SweetsPage({
         </section>
         <div className="product-grid">
           <article className="product-card sweet-card">
-            <div className="product-image-wrap">
+            <button type="button" className="product-image-wrap watch-making" onClick={() => setShowVideo(true)}>
               <img src={pootharekuluImage} alt="Pootharekulu rolls" />
               <span className="arriving-soon-chip">Arriving {SWEETS_ARRIVAL}</span>
-            </div>
+              <span className="watch-badge">
+                <Icon name="play" size={12} /> Watch how it's made
+              </span>
+            </button>
             <div className="product-info">
               <h3>Pootharekulu</h3>
               <p>Paper-thin layered rolls that melt in your mouth.</p>
@@ -907,6 +951,7 @@ function SweetsPage({
           </article>
         </div>
       </main>
+      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} />}
     </>
   )
 }
