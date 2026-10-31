@@ -674,15 +674,14 @@ const CATEGORY_LOOK = {
   sweet: { number: "03", eyebrow: "Something sweet", alt: "Pootharekulu rolls" },
 }
 
-// A card's clip plays silently on a loop over its photo, with a corner button to pause it. Phones set to reduce
-// motion get the photo until they press play.
+// A card's clip stays a photo (and downloads nothing) until its corner button is pressed; then it plays silently on a
+// loop over the photo, and the same button pauses it
 function CardVideo({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null)
-  const [paused, setPaused] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)
+  const [paused, setPaused] = useState(true)
   useEffect(() => {
     const video = ref.current
     if (!video) return
-    video.muted = true // on the element itself: iOS only autoplays muted video
     if (paused) video.pause()
     else video.play().catch(() => setPaused(true))
   }, [paused])
