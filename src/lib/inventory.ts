@@ -101,7 +101,7 @@ export const POOTHAREKULU_PACKS = [
 ]
 export type PootharekuluPack = (typeof POOTHAREKULU_PACKS)[number]
 export const SWEETS_ARRIVAL = "3–4 Nov"
-/** Each pack size is its own cart line. */
+/** Pootharekulu is one pack per order, so an order has exactly 1, 2 or 5 pieces. */
 export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
   id: `sweet-pootharekulu-${pack.pieces}`,
   name: POOTHAREKULU_NAME,
@@ -110,8 +110,10 @@ export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
   quantity: 1,
   kind: "sweet",
 })
-/** The most of one cart line someone can order, so no one places a fake huge order: 20 of a Pootharekulu pack, 10 of anything else. */
-export const maxQuantity = (item: Pick<CartItem, "kind">) => (item?.kind === "sweet" ? 20 : 10)
+/** The most of one cart line someone can order, so no one places a fake huge order: one Pootharekulu pack, 10 of anything else. */
+export const maxQuantity = (item: Pick<CartItem, "kind">) => (item?.kind === "sweet" ? 1 : 10)
+/** Puts a Pootharekulu pack in the cart in place of any other one (one pack per order). */
+export const withPootharekuluPack = (cart: CartItem[], pack: CartItem) => [...cart.filter((line) => line.kind !== "sweet"), pack]
 
 // Orders placed before Pootharekulu had a price have ₹0 lines: they show "Price soon" (paid in person on arrival)
 export const PRICE_SOON = "Price soon"
@@ -173,7 +175,7 @@ export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: 
   new Set(items.map((item) => (item.kind === "sweet" ? "sweet" : item.kind === "pickle" && picklesPreorder ? "pickle" : "now"))).size > 1
 
 export function repriceForReorder(items: CartItem[]): CartItem[] {
-  return items.flatMap((item) => {
+  const lines = items.flatMap((item) => {
     const quantity = Math.min(Math.max(1, Math.floor(Number(item?.quantity)) || 1), maxQuantity(item))
     if (item?.kind === "fruit") {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
@@ -189,6 +191,9 @@ export function repriceForReorder(items: CartItem[]): CartItem[] {
     const pack = packOptions.find((p) => p.label === String(item?.detail ?? "").replace(PREORDER_TAG, ""))
     return product && pack ? [{ ...pickleCartItem(product, pack), quantity }] : []
   })
+  // One Pootharekulu pack per order: keep the first
+  const firstSweet = lines.findIndex((line) => line.kind === "sweet")
+  return lines.filter((line, i) => line.kind !== "sweet" || i === firstSweet)
 }
 
 export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [

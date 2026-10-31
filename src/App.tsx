@@ -21,6 +21,7 @@ import {
   bowlLeftOut,
   fruitBowlCartItem,
   maxQuantity,
+  withPootharekuluPack,
   getPickupPin,
   mixesPreorder,
   packOptions,
@@ -1526,15 +1527,19 @@ function Cart({
                         <p className="cart-sold-out">{soldOutNote(item, soldOutItems)}</p>
                       )}
                       <div className="cart-controls">
-                        <Quantity
-                          value={item.quantity}
-                          onChange={(quantity) =>
-                            updateQuantity(item.id, quantity)
-                          }
-                          small
-                          label={`${item.name}, ${item.detail}`}
-                          max={maxQuantity(item)}
-                        />
+                        {item.kind === "sweet" ? (
+                          <small className="cart-pack-note">One pack per order</small>
+                        ) : (
+                          <Quantity
+                            value={item.quantity}
+                            onChange={(quantity) =>
+                              updateQuantity(item.id, quantity)
+                            }
+                            small
+                            label={`${item.name}, ${item.detail}`}
+                            max={maxQuantity(item)}
+                          />
+                        )}
                         <strong>{linePrice(item)}</strong>
                       </div>
                     </div>
@@ -4508,6 +4513,8 @@ export default function App() {
 
   const add = (item: CartItem) => {
     setCart((current) => {
+      // One Pootharekulu pack per order (1, 2 or 5 pieces): a newly chosen pack replaces the one in the cart
+      if (item.kind === "sweet") return withPootharekuluPack(current, item)
       const exists = current.find((entry) => entry.id === item.id)
 
       return exists
@@ -4545,10 +4552,11 @@ export default function App() {
     if (current.length === 0) return
     // Like "Buy it again" in most shops: add to the cart instead of replacing what's there
     setCart((existing) => {
-      const merged = [...existing]
+      let merged = [...existing]
       for (const item of current) {
         const i = merged.findIndex((m) => m.id === item.id)
-        if (i === -1) merged.push(item)
+        if (item.kind === "sweet") merged = withPootharekuluPack(merged, item)
+        else if (i === -1) merged.push(item)
         else merged[i] = { ...merged[i], quantity: Math.min(merged[i].quantity + item.quantity, maxQuantity(item)) }
       }
       return merged

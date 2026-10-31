@@ -42,6 +42,7 @@ import {
   pootharekuluCartItem,
   POOTHAREKULU_PACKS,
   maxQuantity,
+  withPootharekuluPack,
   hasUnpricedItem,
   linePrice,
   PRICE_SOON,
@@ -844,7 +845,7 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
 test("FAQ Bot - Sweets & Snacks gives Pootharekulu's ₹35-a-piece packs and its 3–4 Nov preorder", () => {
   assert.match(
     getFaqResponse("do you have pootharekulu?"),
-    /^Premium Atreyapuram Pootharekhulu is ₹35 a piece: 1 pc ₹35, 2 pcs ₹70, 5 pcs ₹175\. It's on preorder and arrives on 3–4 Nov/,
+    /^Premium Atreyapuram Pootharekhulu is ₹35 a piece: 1 pc ₹35, 2 pcs ₹70, 5 pcs ₹175 \(one pack per order\)\. It's on preorder and arrives on 3–4 Nov/,
   )
   assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
   assert.match(getFaqResponse("price of sweets?"), /₹35 a piece/)
@@ -879,22 +880,27 @@ test("Pootharekulu - is always its own order, and a past one reorders as a fresh
   assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true)
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], false), true) // pickles in stock go out sooner
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles arrive on another day
-  // A ₹0 line from before the rename and the price, and a second pack size: both come back at today's prices
+  // A ₹0 line from before the rename and the price (3 of them) and a second pack size: it comes back as one pack
+  // at today's price, since an order only ever has 1, 2 or 5 pieces
   const past: CartItem[] = [
     { id: "sweet-pootharekulu", name: "Pootharekulu", detail: "5 pcs · Preorder", price: 0, quantity: 3, kind: "sweet" },
     { id: "sweet-pootharekulu-2", name: "Premium Atreyapuram Pootharekhulu", detail: "2 pcs · Preorder", price: 70, quantity: 2, kind: "sweet" },
   ]
   assert.deepEqual(
     repriceForReorder(past).map((i) => [i.id, i.detail, i.price, i.quantity]),
-    [
-      ["sweet-pootharekulu-5", "5 pcs", 175, 3],
-      ["sweet-pootharekulu-2", "2 pcs", 70, 2],
-    ],
+    [["sweet-pootharekulu-5", "5 pcs", 175, 1]],
   )
+  // Choosing another pack swaps it, leaving the rest of the cart alone
+  const bowl = fruitBowlCartItem([])
+  const swapped = withPootharekuluPack(
+    [pootharekuluCartItem(POOTHAREKULU_PACKS[0]), bowl],
+    pootharekuluCartItem(POOTHAREKULU_PACKS[2]),
+  )
+  assert.deepEqual(swapped.map((i) => i.id), [bowl.id, "sweet-pootharekulu-5"])
 })
 
-test("Order limits - at most 20 of a Pootharekulu pack and 10 of anything else, even from an old order or saved cart", () => {
-  assert.equal(maxQuantity(pootharekuluCartItem(POOTHAREKULU_PACKS[0])), 20)
+test("Order limits - one Pootharekulu pack and at most 10 of anything else, even from an old order or saved cart", () => {
+  assert.equal(maxQuantity(pootharekuluCartItem(POOTHAREKULU_PACKS[0])), 1)
   assert.equal(maxQuantity(fruitBowlCartItem([])), 10)
   assert.equal(maxQuantity(pickleCartItem(pickleProducts[0], packOptions[0])), 10)
   const huge: CartItem[] = [
@@ -903,7 +909,7 @@ test("Order limits - at most 20 of a Pootharekulu pack and 10 of anything else, 
     { ...pickleCartItem(pickleProducts[0], packOptions[0]), quantity: 99 },
     { ...fruitBowlCartItem(["Papaya"]), quantity: 3 },
   ]
-  assert.deepEqual(repriceForReorder(huge).map((i) => i.quantity), [20, 10, 10, 3])
+  assert.deepEqual(repriceForReorder(huge).map((i) => i.quantity), [1, 10, 10, 3])
   assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Premium Atreyapuram Pootharekhulu", when: "3–4 Nov" })
   assert.equal(preorderWait([{ kind: "pickle", detail: "50g · Preorder" }])?.what, "pickles")
 })
