@@ -171,6 +171,7 @@ Happy Tummy Co. Monorepo
   - 1-click UPI ID copy.
   - 12-digit bank UTR reference input with pattern validation.
   - Option to choose *Pay at Counter* (cash or counter scan upon pickup).
+  - Pickle and Pootharekhulu orders, and Asima fruit pickups, have no UPI option: they are paid in person, at pickup or to the runner on room delivery.
 - **Deterministic 4-Digit Pickup PIN**:
   - Generates a secure 4-digit verification code for counter collection.
 - **Real-Time Order Tracking**:

@@ -217,7 +217,7 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
     return "After paying via PhonePe QR, submit your 12-digit UTR number. The kitchen staff verifies it on their merchant soundbox and marks it 'Verified'!"
   }
   if (aboutPaying) {
-    return "You can pay online with PhonePe/UPI (scan the QR, then enter the 12-digit UTR), or pay in person: at pickup, or to the runner on room delivery."
+    return "You pay in person, by cash or scan: at pickup, or to the runner on room delivery. Only Kalam fruit bowl orders can also be paid online, with PhonePe/UPI (scan the QR, then enter the 12-digit UTR)."
   }
   if (q.includes("reorder") || word("again") || q.includes("repeat") || q.includes("previous")) {
     return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"

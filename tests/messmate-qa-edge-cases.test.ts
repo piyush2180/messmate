@@ -767,6 +767,7 @@ test("FAQ Bot - common student questions get the right instant answer", () => {
   assert.match(getFaqResponse("what is the rate"), price)
   assert.match(getFaqResponse("chicken pickle kitne ka hai"), /₹70/)
   assert.match(getFaqResponse("cash on delivery?"), /runner on room delivery/)
+  assert.match(getFaqResponse("can I pay online for pickles?"), /Only Kalam fruit bowl orders can also be paid online/)
   assert.match(getFaqResponse("upi payment failed but money deducted"), /Support Team/)
   assert.match(getFaqResponse("refund"), /sort it out/)
   assert.match(getFaqResponse("my order is late"), /Track Orders/)

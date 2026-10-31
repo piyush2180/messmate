@@ -2109,9 +2109,10 @@ function Payment({
   const [chosenMethod, setMethodState] = useState<"upi" | "counter">(() =>
     safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
   )
-  // Paid in person, never online: Asima fruit orders when collected near the mess, preordered Pootharekulu when it arrives
+  // Paid in person, never online: pickles and Pootharekulu when the student gets them, Asima fruit orders when collected near the mess
   const sweet = items.some((item) => item.kind === "sweet")
-  const payInPersonOnly = sweet || (fulfilment === "pickup" && items.some((item) => item.kind === "fruit"))
+  const fruitPickup = fulfilment === "pickup" && items.some((item) => item.kind === "fruit")
+  const payInPersonOnly = sweet || fruitPickup || items.some((item) => item.kind === "pickle")
   const method = payInPersonOnly ? "counter" : chosenMethod
   const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
   const setMethod = (m: "upi" | "counter") => {
@@ -2183,8 +2184,12 @@ function Payment({
           <p>
             {sweet
               ? `Pay when your ${POOTHAREKULU_NAME} arrives.`
-              : payInPersonOnly
+              : fruitPickup
               ? "Pay when you collect your order near the Asima mess."
+              : payInPersonOnly
+              ? fulfilment === "delivery"
+                ? "Pay when your order reaches your room."
+                : "Pay when you collect your order."
               : fulfilment === "delivery"
                 ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
                 : "Scan & pay via PhonePe QR, or pay at the counter."}
@@ -2198,7 +2203,9 @@ function Payment({
                 <p className="pay-at-pickup-note">
                   {sweet
                     ? `${POOTHAREKULU_NAME} preorders are paid when they arrive, by cash or scan.`
-                    : "Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan."}
+                    : fruitPickup
+                    ? "Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan."
+                    : "Pickle orders are paid when you get them, by cash or scan."}
                 </p>
               ) : (
                 <button
