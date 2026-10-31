@@ -4007,7 +4007,9 @@ function ResumeNotice() {
           </li>
           <li>
             <strong>Asima</strong>
-            <span>Available 9–11 AM at the counter near the mess</span>
+            <span>
+              Available at the counter near the mess: {HOSTEL_SLOTS.Asima[0]} on weekdays, {ASIMA_WEEKEND[0]} on weekends
+            </span>
           </li>
         </ul>
         <PrimaryButton onClick={close}>Got it</PrimaryButton>
