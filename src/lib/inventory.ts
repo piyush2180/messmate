@@ -91,21 +91,27 @@ export function toggleLeftOut(current: string[], name: string): string[] {
   return current.length >= MAX_LEFT_OUT ? current : [...current, name]
 }
 
-// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL
+// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL, priced per piece in packs of 1, 2 or 5
 export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
-export const POOTHAREKULU_PACK = "5 pcs"
+export const POOTHAREKULU_PIECE_PRICE = 35
+export const POOTHAREKULU_PACKS = [
+  { label: "1 pc", pieces: 1 },
+  { label: "2 pcs", pieces: 2 },
+  { label: "5 pcs", pieces: 5 },
+]
+export type PootharekuluPack = (typeof POOTHAREKULU_PACKS)[number]
 export const SWEETS_ARRIVAL = "3–4 Nov"
-// Its price isn't set yet, so it goes in the cart at ₹0
-export const pootharekuluCartItem = (): CartItem => ({
-  id: "sweet-pootharekulu",
+/** Each pack size is its own cart line. */
+export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
+  id: `sweet-pootharekulu-${pack.pieces}`,
   name: POOTHAREKULU_NAME,
-  detail: POOTHAREKULU_PACK,
-  price: 0,
+  detail: pack.label,
+  price: POOTHAREKULU_PIECE_PRICE * pack.pieces,
   quantity: 1,
   kind: "sweet",
 })
 
-// A ₹0 line has no price yet: it shows "Price soon" and is paid in person when it arrives
+// Orders placed before Pootharekulu had a price have ₹0 lines: they show "Price soon" (paid in person on arrival)
 export const PRICE_SOON = "Price soon"
 export const hasUnpricedItem = (items: Array<{ price?: unknown }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => !Number(item?.price))
@@ -170,8 +176,12 @@ export function repriceForReorder(items: CartItem[]): CartItem[] {
     if (item?.kind === "fruit") {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
     }
-    // Pootharekulu is the only sweet, so a past line (even one under its old name) reorders as today's
-    if (item?.kind === "sweet") return [{ ...pootharekuluCartItem(), quantity }]
+    // Pootharekulu is the only sweet: a past line (even one under its old name or from before it had a price)
+    // comes back as today's pack of the same size, at today's price
+    if (item?.kind === "sweet") {
+      const pack = POOTHAREKULU_PACKS.find((p) => p.label === String(item.detail ?? "").replace(PREORDER_TAG, ""))
+      return pack ? [{ ...pootharekuluCartItem(pack), quantity }] : []
+    }
     const product = pickleProducts.find((p) => p.name === item?.name)
     // A past preorder line reorders as a plain pack; whether it's a preorder is decided again at checkout
     const pack = packOptions.find((p) => p.label === String(item?.detail ?? "").replace(PREORDER_TAG, ""))

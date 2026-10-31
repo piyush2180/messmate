@@ -7,7 +7,8 @@ import {
   FRUIT_BOWL_PRICE,
   MAX_LEFT_OUT,
   POOTHAREKULU_NAME,
-  POOTHAREKULU_PACK,
+  POOTHAREKULU_PACKS,
+  POOTHAREKULU_PIECE_PRICE,
   PRICE_SOON,
   SWEETS_ARRIVAL,
   hasUnpricedItem,
@@ -874,7 +875,7 @@ function Home({
             line="Paper-thin, layered and melt-in-the-mouth."
             image={pootharekuluImage}
             video={pootharekuluVideo}
-            labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} pack`]}
+            labels={["Traditional", `₹${POOTHAREKULU_PIECE_PRICE} a piece`, "1, 2 or 5 pcs"]}
             cta="Preorder now"
             onClick={() => go("sweets")}
             soon={`Arriving ${SWEETS_ARRIVAL}`}
@@ -952,6 +953,7 @@ function SweetsPage({
   add: (item: CartItem) => void
 }) {
   const [showVideo, setShowVideo] = useState(false)
+  const [pack, setPack] = useState(POOTHAREKULU_PACKS[0])
   return (
     <>
       <Header
@@ -985,12 +987,27 @@ function SweetsPage({
             <div className="product-info">
               <h3>{POOTHAREKULU_NAME}</h3>
               <p>Paper-thin layered rolls that melt in your mouth.</p>
+              <div className="option-list sweet-packs" role="radiogroup" aria-label="Pack size">
+                {POOTHAREKULU_PACKS.map((option) => (
+                  <button
+                    key={option.pieces}
+                    type="button"
+                    role="radio"
+                    aria-checked={option === pack}
+                    className={`pack-option${option === pack ? " selected" : ""}`}
+                    onClick={() => setPack(option)}
+                  >
+                    <strong>{option.label}</strong>
+                    <small>₹{POOTHAREKULU_PIECE_PRICE * option.pieces}</small>
+                  </button>
+                ))}
+              </div>
               <div className="product-bottom">
                 <div>
-                  <small>{POOTHAREKULU_PACK} pack</small>
-                  <strong>{PRICE_SOON}</strong>
+                  <small>{pack.label} pack</small>
+                  <strong>₹{POOTHAREKULU_PIECE_PRICE * pack.pieces}</strong>
                 </div>
-                <button type="button" className="preorder-btn" onClick={() => add(pootharekuluCartItem())}>
+                <button type="button" className="preorder-btn" onClick={() => add(pootharekuluCartItem(pack))}>
                   Preorder
                 </button>
               </div>
@@ -998,7 +1015,7 @@ function SweetsPage({
           </article>
         </div>
       </main>
-      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={() => add(pootharekuluCartItem())} />}
+      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={() => add(pootharekuluCartItem(pack))} />}
     </>
   )
 }
@@ -1461,7 +1478,6 @@ function Cart({
     (sum, item) => sum + item.price * item.quantity,
     0,
   )
-  const subtotalLabel = hasUnpricedItem(items) ? PRICE_SOON : `₹${subtotal}`
 
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -1553,7 +1569,7 @@ function Cart({
               <div className="price-card">
                 <div>
                   <span>Subtotal</span>
-                  <strong>{subtotalLabel}</strong>
+                  <strong>₹{subtotal}</strong>
                 </div>
                 <div>
                   <span>Delivery</span>
@@ -1561,7 +1577,7 @@ function Cart({
                 </div>
                 <div className="price-total">
                   <span>Total</span>
-                  <strong>{subtotalLabel}</strong>
+                  <strong>₹{subtotal}</strong>
                 </div>
                 <div className="desktop-cart-cta">
                   <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
@@ -1591,7 +1607,7 @@ function Cart({
         <BottomBar>
           <div className="dock-price">
             <small>Total</small>
-            <strong>{subtotalLabel}</strong>
+            <strong>₹{subtotal}</strong>
           </div>
           <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
             {ctaLabel}
@@ -2084,13 +2100,10 @@ function Payment({
   const [chosenMethod, setMethodState] = useState<"upi" | "counter">(() =>
     safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
   )
-  // Asima fruit orders are paid in person when collected near the mess, never online, and Pootharekulu (no price yet)
-  // when it arrives
-  const unpriced = hasUnpricedItem(items)
-  const payInPersonOnly = unpriced || (fulfilment === "pickup" && items.some((item) => item.kind === "fruit"))
+  // Paid in person, never online: Asima fruit orders when collected near the mess, preordered Pootharekulu when it arrives
+  const sweet = items.some((item) => item.kind === "sweet")
+  const payInPersonOnly = sweet || (fulfilment === "pickup" && items.some((item) => item.kind === "fruit"))
   const method = payInPersonOnly ? "counter" : chosenMethod
-  const amount = unpriced ? "" : ` ₹${total}`
-  const totalLabel = unpriced ? PRICE_SOON : `₹${total}`
   const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
   const setMethod = (m: "upi" | "counter") => {
     setMethodState(m)
@@ -2159,8 +2172,8 @@ function Payment({
           <div className="eyebrow">Step 3 of 3</div>
           <h1>Complete your payment</h1>
           <p>
-            {unpriced
-              ? `${POOTHAREKULU_NAME}'s price isn't set yet, so you pay when it arrives.`
+            {sweet
+              ? `Pay when your ${POOTHAREKULU_NAME} arrives.`
               : payInPersonOnly
               ? "Pay when you collect your order near the Asima mess."
               : fulfilment === "delivery"
@@ -2174,8 +2187,8 @@ function Payment({
               <h2>{payInPersonOnly ? "Payment" : "Select payment method"}</h2>
               {payInPersonOnly ? (
                 <p className="pay-at-pickup-note">
-                  {unpriced
-                    ? `${POOTHAREKULU_NAME} is paid when it arrives, by cash or scan.`
+                  {sweet
+                    ? `${POOTHAREKULU_NAME} preorders are paid when they arrive, by cash or scan.`
                     : "Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan."}
                 </p>
               ) : (
@@ -2314,7 +2327,7 @@ function Payment({
                   <Icon name="receipt" size={24} />
                 </div>
                 <div>
-                  <strong>{fulfilment === "delivery" ? `Pay${amount} on delivery` : `Pay${amount} at the Counter`}</strong>
+                  <strong>{fulfilment === "delivery" ? `Pay ₹${total} on delivery` : `Pay ₹${total} at the Counter`}</strong>
                   <p>
                     {fulfilment === "delivery"
                       ? "Pay the runner by cash or scan when your order reaches your room."
@@ -2350,7 +2363,7 @@ function Payment({
               <div className="totals">
                 <div>
                   <span>Subtotal</span>
-                  <strong>{unpriced ? PRICE_SOON : `₹${subtotal}`}</strong>
+                  <strong>₹{subtotal}</strong>
                 </div>
                 <div>
                   <span>{fee ? "Delivery" : "Pickup"}</span>
@@ -2358,7 +2371,7 @@ function Payment({
                 </div>
                 <div>
                   <span>Total</span>
-                  <strong>{totalLabel}</strong>
+                  <strong>₹{total}</strong>
                 </div>
               </div>
               <div className="desktop-payment-cta">
@@ -2371,7 +2384,7 @@ function Payment({
                     ? "Placing order..."
                     : method === "upi"
                     ? `I've Paid ₹${total} — Place Order`
-                    : `Place Order (Pay${amount} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
+                    : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
                 </PrimaryButton>
               </div>
             </section>
@@ -2381,7 +2394,7 @@ function Payment({
       <BottomBar>
         <div className="dock-price">
           <small>Total</small>
-          <strong>{totalLabel}</strong>
+          <strong>₹{total}</strong>
         </div>
         <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
           {!storeOpen
@@ -2392,7 +2405,7 @@ function Payment({
             ? "Placing order..."
             : method === "upi"
             ? `I've Paid ₹${total} — Place Order`
-            : `Place Order (Pay${amount} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
+            : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
         </PrimaryButton>
       </BottomBar>
     </>
