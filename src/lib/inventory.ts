@@ -91,13 +91,12 @@ export function toggleLeftOut(current: string[], name: string): string[] {
   return current.length >= MAX_LEFT_OUT ? current : [...current, name]
 }
 
-// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL, priced per piece in packs of 1, 2 or 5
+// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL, in packs of 1, 2 or 5 (bigger packs cost less a piece)
 export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
-export const POOTHAREKULU_PIECE_PRICE = 35
 export const POOTHAREKULU_PACKS = [
-  { label: "1 pc", pieces: 1 },
-  { label: "2 pcs", pieces: 2 },
-  { label: "5 pcs", pieces: 5 },
+  { label: "1 pc", pieces: 1, price: 35 },
+  { label: "2 pcs", pieces: 2, price: 60 },
+  { label: "5 pcs", pieces: 5, price: 150 },
 ]
 export type PootharekuluPack = (typeof POOTHAREKULU_PACKS)[number]
 export const SWEETS_ARRIVAL = "3–4 Nov"
@@ -106,7 +105,7 @@ export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
   id: `sweet-pootharekulu-${pack.pieces}`,
   name: POOTHAREKULU_NAME,
   detail: pack.label,
-  price: POOTHAREKULU_PIECE_PRICE * pack.pieces,
+  price: pack.price,
   quantity: 1,
   kind: "sweet",
 })

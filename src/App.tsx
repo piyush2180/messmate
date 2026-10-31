@@ -8,7 +8,6 @@ import {
   MAX_LEFT_OUT,
   POOTHAREKULU_NAME,
   POOTHAREKULU_PACKS,
-  POOTHAREKULU_PIECE_PRICE,
   PRICE_SOON,
   SWEETS_ARRIVAL,
   hasUnpricedItem,
@@ -880,7 +879,7 @@ function Home({
             line="Paper-thin, layered and melt-in-the-mouth."
             image={pootharekuluImage}
             video={pootharekuluVideo}
-            labels={["Traditional", `₹${POOTHAREKULU_PIECE_PRICE} a piece`, "1, 2 or 5 pcs"]}
+            labels={["Traditional", `From ₹${POOTHAREKULU_PACKS[0].price}`, "1, 2 or 5 pcs"]}
             cta="Preorder now"
             onClick={() => go("sweets")}
             soon={`Arriving ${SWEETS_ARRIVAL}`}
@@ -1003,14 +1002,14 @@ function SweetsPage({
                     onClick={() => setPack(option)}
                   >
                     <strong>{option.label}</strong>
-                    <small>₹{POOTHAREKULU_PIECE_PRICE * option.pieces}</small>
+                    <small>₹{option.price}</small>
                   </button>
                 ))}
               </div>
               <div className="product-bottom">
                 <div>
                   <small>{pack.label} pack</small>
-                  <strong>₹{POOTHAREKULU_PIECE_PRICE * pack.pieces}</strong>
+                  <strong>₹{pack.price}</strong>
                 </div>
                 <button type="button" className="preorder-btn" onClick={() => add(pootharekuluCartItem(pack))}>
                   Preorder

@@ -842,31 +842,31 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
   assert.ok([...weekday, ...weekend].every((s) => ALL_SLOTS.includes(s)))
 })
 
-test("FAQ Bot - Sweets & Snacks gives Pootharekulu's ₹35-a-piece packs and its 3–4 Nov preorder", () => {
+test("FAQ Bot - Sweets & Snacks gives Pootharekulu's pack prices and its 3–4 Nov preorder", () => {
   assert.match(
     getFaqResponse("do you have pootharekulu?"),
-    /^Premium Atreyapuram Pootharekhulu is ₹35 a piece: 1 pc ₹35, 2 pcs ₹70, 5 pcs ₹175 \(one pack per order\)\. It's on preorder and arrives on 3–4 Nov/,
+    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹35, 2 pcs ₹60, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives on 3–4 Nov/,
   )
   assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
-  assert.match(getFaqResponse("price of sweets?"), /₹35 a piece/)
+  assert.match(getFaqResponse("price of sweets?"), /5 pcs ₹150/)
   // The general price answer lists it too, without saying "preorder" (that's only for pickles while on Preorder)
   const price = getFaqResponse("how much does it cost?")
-  assert.match(price, /Pootharekhulu is ₹35 a piece \(packs of 1, 2 or 5\)/)
+  assert.match(price, /Pootharekhulu is ₹35 for 1 pc, ₹60 for 2 pcs, ₹150 for 5 pcs\./)
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
 })
 
-test("Pootharekulu - ₹35 a piece in packs of 1, 2 or 5", () => {
+test("Pootharekulu - packs of 1 (₹35), 2 (₹60) or 5 (₹150)", () => {
   assert.deepEqual(
     POOTHAREKULU_PACKS.map((pack) => [pootharekuluCartItem(pack).id, pootharekuluCartItem(pack).detail, pootharekuluCartItem(pack).price]),
     [
       ["sweet-pootharekulu-1", "1 pc", 35],
-      ["sweet-pootharekulu-2", "2 pcs", 70],
-      ["sweet-pootharekulu-5", "5 pcs", 175],
+      ["sweet-pootharekulu-2", "2 pcs", 60],
+      ["sweet-pootharekulu-5", "5 pcs", 150],
     ],
   )
   const twoPieces = pootharekuluCartItem(POOTHAREKULU_PACKS[1])
-  assert.equal(linePrice(twoPieces), "₹70")
-  assert.deepEqual(calculateOrderTotals([twoPieces], "delivery"), { subtotal: 70, fee: 5, total: 75 })
+  assert.equal(linePrice(twoPieces), "₹60")
+  assert.deepEqual(calculateOrderTotals([twoPieces], "delivery"), { subtotal: 60, fee: 5, total: 65 })
   // Orders placed before it had a price have ₹0 lines, which Track Orders shows as "Price soon"
   assert.equal(linePrice({ price: 0, quantity: 1 }), PRICE_SOON)
   assert.equal(hasUnpricedItem([{ price: 0 }]), true)
@@ -888,7 +888,7 @@ test("Pootharekulu - is always its own order, and a past one reorders as a fresh
   ]
   assert.deepEqual(
     repriceForReorder(past).map((i) => [i.id, i.detail, i.price, i.quantity]),
-    [["sweet-pootharekulu-5", "5 pcs", 175, 1]],
+    [["sweet-pootharekulu-5", "5 pcs", 150, 1]],
   )
   // Choosing another pack swaps it, leaving the rest of the cart alone
   const bowl = fruitBowlCartItem([])

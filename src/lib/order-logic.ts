@@ -1,4 +1,4 @@
-import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, PICKLES_ARRIVAL, POOTHAREKULU_NAME, POOTHAREKULU_PACKS, POOTHAREKULU_PIECE_PRICE, SWEETS_ARRIVAL, packOptions, pickleProducts } from "./inventory.ts"
+import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, PICKLES_ARRIVAL, POOTHAREKULU_NAME, POOTHAREKULU_PACKS, SWEETS_ARRIVAL, packOptions, pickleProducts } from "./inventory.ts"
 
 export type SupportMsg = {
   id: string
@@ -224,8 +224,8 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
   }
   // Pootharekulu has its own packs and preorder date, so sweets questions come before the general price answer
   if (/\b(sweets?|snacks?|mithai|pootharekulu|pootharekhulu|poothareku|putharekulu|pootarekulu|atreyapuram)\b/.test(q)) {
-    const packs = POOTHAREKULU_PACKS.map((p) => `${p.label} ₹${POOTHAREKULU_PIECE_PRICE * p.pieces}`).join(", ")
-    return `${POOTHAREKULU_NAME} is ₹${POOTHAREKULU_PIECE_PRICE} a piece: ${packs} (one pack per order). It's on preorder and arrives on ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
+    const packs = POOTHAREKULU_PACKS.map((p) => `${p.label} ₹${p.price}`).join(", ")
+    return `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's on preorder and arrives on ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
   }
   const ratingTalk = /\b(rating|ratings|review|reviews|feedback|stars?)\b/.test(q) || /\brate (my|the|this|our|your)\b/.test(q)
   if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\b(kitna|kitne|kitni|rates?)\b/.test(q)) {
@@ -233,7 +233,7 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
       const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder for ${PICKLES_ARRIVAL}` : ""}.`
-      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. ${POOTHAREKULU_NAME} is ₹${POOTHAREKULU_PIECE_PRICE} a piece (packs of 1, 2 or 5). Room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
+      return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. ${POOTHAREKULU_NAME} is ${POOTHAREKULU_PACKS.map((p) => `₹${p.price} for ${p.label}`).join(", ")}. Room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
     }
   }
   if (ratingTalk) {
