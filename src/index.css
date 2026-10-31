@@ -2487,10 +2487,3 @@ button.product-image-wrap { display: block; width: 100%; padding: 0; border: 0; 
 /* Home Sweets card: the making-of clip covers the photo (which shows until the clip loads) */
 .category-video { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .video-toggle { position: absolute; z-index: 2; right: 12px; bottom: 12px; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(37,37,37,.6); color: #fff; cursor: pointer; }
-@media (min-width: 768px) {
-  /* The card is wide here, so the clip sits whole and sharp at the right instead of a stretched close-up
-     (a video ignores top + bottom stretching, hence the explicit height) */
-  .category-video { inset: 20px 24px auto auto; width: auto; height: calc(100% - 40px); aspect-ratio: 9 / 16; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.25); }
-  .video-toggle { right: 32px; bottom: 28px; }
-  .category-card.sweet .arriving-soon-chip { left: 66px; right: auto; } /* beside the 03 badge, clear of the clip */
-}
