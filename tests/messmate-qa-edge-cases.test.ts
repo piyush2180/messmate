@@ -361,12 +361,12 @@ test("Support Messages - filters rapid duplicate clicks", () => {
 // ============================================================================
 test("FAQ Bot - resolves delivery and timing queries", () => {
   const reply1 = getFaqResponse("What are delivery timings?")
-  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) near the mess/)
+  assert.match(reply1, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends 9–11 AM\) near the mess/)
   assert.match(reply1, /Asima pickle orders don't have a set time yet/) // the morning window is for fruit bowls
   assert.match(reply1, /₹5/)
 
   const reply2 = getFaqResponse("what is the delivery slot?")
-  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends till 10:30 AM\) near the mess/)
+  assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends 9–11 AM\) near the mess/)
 })
 
 test("FAQ Bot - resolves pickup location queries: Asima fruit near the mess, Asima pickles from Room 104 or 210 or to the room, Kalam to the room", () => {
@@ -817,13 +817,15 @@ test("Fruit bowl - six fruits, and leaving one out tops up the others", () => {
   assert.doesNotMatch(reply, /grapes|pineapple/i)
 })
 
-test("Slots - Asima has one morning window (longer at weekends), Kalam picks an evening slot; chosen by the morning the order is for", () => {
+test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks an evening slot; chosen by the morning the order is for", () => {
   const weekday = ["8:30–9:30 AM"]
-  const weekend = ["8:30–10:30 AM"]
+  const weekend = ["9–11 AM"]
   const at = (s: string) => new Date(s) // local time, like the student's phone
   assert.deepEqual(slotsForHostel("Asima", at("2026-10-28T20:00:00")), weekday) // Wed night -> Thu morning
   assert.deepEqual(slotsForHostel("Asima", at("2026-10-30T21:00:00")), weekend) // Fri night -> Sat morning
-  assert.deepEqual(slotsForHostel("Asima", at("2026-10-31T10:00:00")), weekend) // Sat 10:00, before 10:30 -> this morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-10-31T10:45:00")), weekend) // Sat 10:45, before 11:00 -> this morning
+  assert.deepEqual(slotsForHostel("Asima", at("2026-10-31T11:15:00")), weekend) // Sat 11:15 -> Sunday morning, still the weekend window
+  assert.deepEqual(slotsForHostel("Asima", at("2026-11-01T11:15:00")), weekday) // Sun 11:15 -> Mon morning
   assert.deepEqual(slotsForHostel("Asima", at("2026-11-01T22:00:00")), weekday) // Sun night -> Mon morning
   assert.deepEqual(slotsForHostel("Asima", at("2026-11-02T09:00:00")), weekday) // Mon 9:00, before 9:30 -> this morning
   assert.deepEqual(slotsForHostel("Asima", at("2026-11-02T09:45:00")), weekday) // Mon 9:45 -> Tue morning

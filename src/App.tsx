@@ -1692,7 +1692,8 @@ function Checkout({
                 {hasFruit ? (
                   <span>
                     <strong>Asima · {MESS_PICKUP}</strong>
-                    <em>{hostelOpen.Asima ? `FREE · ${HOSTEL_HOURS.Asima}` : "Closed right now"}</em>
+                    {/* Just the coming morning's window (weekdays and weekends differ) */}
+                    <em>{hostelOpen.Asima ? `FREE · ${slotsForHostel("Asima")[0]}` : "Closed right now"}</em>
                   </span>
                 ) : (
                   <span>

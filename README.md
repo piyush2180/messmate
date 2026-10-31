@@ -157,13 +157,13 @@ Happy Tummy Co. Monorepo
 - **Fixed-Price Fruit Bowl**:
   - One ₹49 bowl with 6 fresh-cut fruits (Apple, Banana, Papaya, Pomegranate, Orange, Guava).
   - Students tap any fruit to leave it out (we add more of the others); sold-out fruits are left out automatically. The price stays ₹49.
-  - Shows each hostel's times: Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM (weekends till 10:30 AM) near the mess.
+  - Shows each hostel's times: Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM (weekends 9–11 AM) near the mess.
 - **Slide-Out Cart Drawer**:
   - Quantity increment/decrement controls with automatic zero-item removal guards.
   - Subtotal calculation shielded against floating-point precision errors.
 - **Fulfilment by hostel**:
   - **Kalam: Room Delivery (₹5 runner fee)**, to the student's room (3 digits plus A or B), in a *6:00–6:30 PM* or *6:30–7:00 PM* slot.
-  - **Asima fruit bowls: Pickup near the Asima mess (free)**, pickup only, 8:30–9:30 AM on weekdays and 8:30–10:30 AM at weekends (one window, nothing to pick), paid in person at pickup. An Asima order with a fruit bowl is all collected there.
+  - **Asima fruit bowls: Pickup near the Asima mess (free)**, pickup only, 8:30–9:30 AM on weekdays and 9–11 AM at weekends (one window, nothing to pick), paid in person at pickup. An Asima order with a fruit bowl is all collected there.
   - **Asima pickle-only orders: Pickup from Room 104 or 210 (free) or Room Delivery (₹5)** to the student's room: block A–D plus a floor room number, 001–010 up to 501–510 (saved like "104C"). Neither has a set time yet.
   - While pickles are on preorder, fruit bowls and pickles are ordered separately (they go out on different days).
 - **UPI & Cash Settlement**:

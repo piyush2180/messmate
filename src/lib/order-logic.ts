@@ -73,8 +73,8 @@ export const HOSTEL_SLOTS: Record<string, string[]> = {
   Kalam: ["6:00–6:30 PM", "6:30–7:00 PM"],
   Asima: ["8:30–9:30 AM"],
 }
-// Asima runs an hour longer on Saturday and Sunday mornings
-export const ASIMA_WEEKEND = ["8:30–10:30 AM"]
+// Asima's Saturday and Sunday window is later
+export const ASIMA_WEEKEND = ["9–11 AM"]
 export const ALL_SLOTS = [...HOSTEL_SLOTS.Asima, ...ASIMA_WEEKEND, ...HOSTEL_SLOTS.Kalam]
 // Rooms are a 3-digit number plus a letter, saved together like "214A". Kalam: side A or B.
 export const KALAM_ROOM = /^\d{3}[AB]$/
@@ -92,20 +92,21 @@ export const normalizeRoom = (room: string) => {
 }
 
 // Asima's hours are its pickup window; Asima room delivery has no set time yet
-export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends till 10:30 AM)" }
+export const HOSTEL_HOURS = { Kalam: "6:00–7:00 PM", Asima: "8:30–9:30 AM (weekends 9–11 AM)" }
 // The fruit page splits this on ", " into one line per hostel
 export const SERVICE_HOURS = `Kalam room delivery ${HOSTEL_HOURS.Kalam}, Asima pickup ${HOSTEL_HOURS.Asima} near the mess`
 
 /**
  * The slots a hostel offers for its next service. Asima's next morning is today until that
- * morning's window closes (9:30, or 10:30 at weekends), then tomorrow; weekend mornings get the longer window.
+ * morning's window closes (9:30, or 11:00 at weekends), then tomorrow; weekend mornings get the later window.
  */
 export function slotsForHostel(hostel: string, now: Date = new Date()): string[] {
   if (hostel === "Kalam") return HOSTEL_SLOTS.Kalam
   if (hostel !== "Asima") return ALL_SLOTS
   const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6
   const morning = new Date(now)
-  if (now.getTime() >= new Date(now).setHours(isWeekend(now) ? 10 : 9, 30, 0, 0)) morning.setDate(morning.getDate() + 1)
+  const closes = isWeekend(now) ? new Date(now).setHours(11, 0, 0, 0) : new Date(now).setHours(9, 30, 0, 0)
+  if (now.getTime() >= closes) morning.setDate(morning.getDate() + 1)
   return isWeekend(morning) ? ASIMA_WEEKEND : HOSTEL_SLOTS.Asima
 }
 
