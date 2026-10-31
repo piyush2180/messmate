@@ -6,6 +6,7 @@ import {
   FRUIT_BOWL_NAME,
   FRUIT_BOWL_PRICE,
   MAX_LEFT_OUT,
+  POOTHAREKULU_NAME,
   POOTHAREKULU_PACK,
   PRICE_SOON,
   SWEETS_ARRIVAL,
@@ -671,7 +672,7 @@ function BottomBar({ children }: { children: ReactNode }) {
 const CATEGORY_LOOK = {
   pickle: { number: "01", eyebrow: "Mess meal upgrade", alt: "Homemade pickle in a bowl" },
   fruit: { number: "02", eyebrow: "Made fresh for you", alt: "Fresh mixed fruit bowl" },
-  sweet: { number: "03", eyebrow: "Something sweet", alt: "Pootharekulu rolls" },
+  sweet: { number: "03", eyebrow: "Something sweet", alt: `${POOTHAREKULU_NAME} rolls` },
 }
 
 // A card's clip stays a photo (and downloads nothing) until its corner button is pressed; then it plays silently on a
@@ -870,7 +871,7 @@ function Home({
             type="sweet"
             title="Sweets & Snacks"
             punchline="A sweet finish to mess dinner."
-            line="Starting with Pootharekulu: paper-thin, layered and melt-in-the-mouth."
+            line={`Starting with ${POOTHAREKULU_NAME}: paper-thin, layered and melt-in-the-mouth.`}
             image={pootharekuluImage}
             video={pootharekuluVideo}
             labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} pack`]}
@@ -900,8 +901,9 @@ function Home({
   )
 }
 
-// How Pootharekulu is made: opens over the page in a frame the clip's own shape, and only loads once tapped
-function MakingVideo({ onClose }: { onClose: () => void }) {
+// How Pootharekulu is made: opens over the page in a frame the clip's own shape, and only loads once tapped.
+// Preorder now under it goes straight to the cart.
+function MakingVideo({ onClose, onPreorder }: { onClose: () => void; onPreorder: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
@@ -913,24 +915,27 @@ function MakingVideo({ onClose }: { onClose: () => void }) {
   return (
     <div className="notice-backdrop" onClick={onClose}>
       <div
-        className="video-card"
+        className="video-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="How Pootharekulu is made"
+        aria-label={`How ${POOTHAREKULU_NAME} is made`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Started from the tap, so it plays with sound; if a browser still blocks it, the controls are there */}
-        <video
-          ref={(el) => {
-            el?.play().catch(() => {})
-          }}
-          src={pootharekuluVideo}
-          controls
-          playsInline
-        />
-        <button type="button" className="notice-close" onClick={onClose} aria-label="Close video">
-          <Icon name="close" size={16} />
-        </button>
+        <div className="video-card">
+          {/* Started from the tap, so it plays with sound; if a browser still blocks it, the controls are there */}
+          <video
+            ref={(el) => {
+              el?.play().catch(() => {})
+            }}
+            src={pootharekuluVideo}
+            controls
+            playsInline
+          />
+          <button type="button" className="notice-close" onClick={onClose} aria-label="Close video">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+        <PrimaryButton onClick={onPreorder}>Preorder now</PrimaryButton>
       </div>
     </div>
   )
@@ -966,19 +971,19 @@ function SweetsPage({
             <br />
             <em>snacks.</em>
           </h1>
-          <p>Traditional sweets for after mess dinner, starting with Pootharekulu.</p>
+          <p>Traditional sweets for after mess dinner, starting with {POOTHAREKULU_NAME}.</p>
         </section>
         <div className="product-grid">
           <article className="product-card sweet-card">
             <button type="button" className="product-image-wrap watch-making" onClick={() => setShowVideo(true)}>
-              <img src={pootharekuluImage} alt="Pootharekulu rolls" />
+              <img src={pootharekuluImage} alt={`${POOTHAREKULU_NAME} rolls`} />
               <span className="arriving-soon-chip">Arriving {SWEETS_ARRIVAL}</span>
               <span className="watch-badge">
                 <Icon name="play" size={12} /> Watch how it's made
               </span>
             </button>
             <div className="product-info">
-              <h3>Pootharekulu</h3>
+              <h3>{POOTHAREKULU_NAME}</h3>
               <p>Paper-thin layered rolls that melt in your mouth.</p>
               <div className="product-bottom">
                 <div>
@@ -993,7 +998,7 @@ function SweetsPage({
           </article>
         </div>
       </main>
-      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} />}
+      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={() => add(pootharekuluCartItem())} />}
     </>
   )
 }
@@ -1527,7 +1532,7 @@ function Cart({
                   <Icon name="clock" size={16} />
                   {items.some((item) => item.kind === "sweet") ? (
                     <span>
-                      Pootharekulu arrives on <strong>{SWEETS_ARRIVAL}</strong>, so please order it separately from your other
+                      {POOTHAREKULU_NAME} arrives on <strong>{SWEETS_ARRIVAL}</strong>, so please order it separately from your other
                       items.
                     </span>
                   ) : (
@@ -2151,7 +2156,7 @@ function Payment({
           <h1>Complete your payment</h1>
           <p>
             {unpriced
-              ? "Pootharekulu's price isn't set yet, so you pay when it arrives."
+              ? `${POOTHAREKULU_NAME}'s price isn't set yet, so you pay when it arrives.`
               : payInPersonOnly
               ? "Pay when you collect your order near the Asima mess."
               : fulfilment === "delivery"
@@ -2166,7 +2171,7 @@ function Payment({
               {payInPersonOnly ? (
                 <p className="pay-at-pickup-note">
                   {unpriced
-                    ? "Pootharekulu is paid when it arrives, by cash or scan."
+                    ? `${POOTHAREKULU_NAME} is paid when it arrives, by cash or scan.`
                     : "Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan."}
                 </p>
               ) : (

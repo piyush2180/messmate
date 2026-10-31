@@ -92,7 +92,7 @@ export function toggleLeftOut(current: string[], name: string): string[] {
 }
 
 // Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL
-export const POOTHAREKULU_NAME = "Pootharekulu"
+export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
 export const POOTHAREKULU_PACK = "5 pcs"
 export const SWEETS_ARRIVAL = "3–4 Nov"
 // Its price isn't set yet, so it goes in the cart at ₹0
@@ -170,9 +170,8 @@ export function repriceForReorder(items: CartItem[]): CartItem[] {
     if (item?.kind === "fruit") {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
     }
-    if (item?.kind === "sweet") {
-      return item.name === POOTHAREKULU_NAME ? [{ ...pootharekuluCartItem(), quantity }] : []
-    }
+    // Pootharekulu is the only sweet, so a past line (even one under its old name) reorders as today's
+    if (item?.kind === "sweet") return [{ ...pootharekuluCartItem(), quantity }]
     const product = pickleProducts.find((p) => p.name === item?.name)
     // A past preorder line reorders as a plain pack; whether it's a preorder is decided again at checkout
     const pack = packOptions.find((p) => p.label === String(item?.detail ?? "").replace(PREORDER_TAG, ""))

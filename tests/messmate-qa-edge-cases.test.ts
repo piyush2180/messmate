@@ -840,7 +840,8 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
 })
 
 test("FAQ Bot - Sweets & Snacks says Pootharekulu is on preorder for 3–4 Nov, with no price yet", () => {
-  assert.match(getFaqResponse("do you have pootharekulu?"), /on preorder and arrives on 3–4 Nov/)
+  assert.match(getFaqResponse("do you have pootharekulu?"), /^Premium Atreyapuram Pootharekhulu \(5 pcs pack\) is on preorder and arrives on 3–4 Nov/)
+  assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
   const price = getFaqResponse("price of sweets?")
   assert.match(price, /price isn't set yet/)
   assert.doesNotMatch(price, /₹/)
@@ -864,12 +865,13 @@ test("Pootharekulu - is always its own order, and a past one reorders as a fresh
   assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true)
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], false), true) // pickles in stock go out sooner
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles arrive on another day
-  const past: CartItem[] = [{ ...pootharekuluCartItem(), detail: "5 pcs · Preorder", price: 150, quantity: 3 }]
+  // Placed before the rename, under the old name
+  const past: CartItem[] = [{ ...pootharekuluCartItem(), name: "Pootharekulu", detail: "5 pcs · Preorder", price: 150, quantity: 3 }]
   assert.deepEqual(
     repriceForReorder(past).map((i) => [i.name, i.detail, i.price, i.quantity]),
-    [["Pootharekulu", "5 pcs", 0, 3]],
+    [["Premium Atreyapuram Pootharekhulu", "5 pcs", 0, 3]],
   )
-  assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Pootharekulu", when: "3–4 Nov" })
+  assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Premium Atreyapuram Pootharekhulu", when: "3–4 Nov" })
   assert.equal(preorderWait([{ kind: "pickle", detail: "50g · Preorder" }])?.what, "pickles")
 })
 
