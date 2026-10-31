@@ -138,6 +138,7 @@ type IconName =
   | "bell"
   | "zap"
   | "play"
+  | "pause"
   | "whatsapp"
 
 // Our supplier's (Food On Farm Pickles) mango pickle photo.
@@ -422,6 +423,13 @@ function Icon({
 
     play: <polygon points="6 3 20 12 6 21 6 3" fill="currentColor" />,
 
+    pause: (
+      <>
+        <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" />
+        <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" />
+      </>
+    ),
+
     // WhatsApp glyph (Simple Icons, CC0): a filled shape, unlike the stroked icons above.
     whatsapp: (
       <path
@@ -666,12 +674,44 @@ const CATEGORY_LOOK = {
   sweet: { number: "03", eyebrow: "Something sweet", alt: "Pootharekulu rolls" },
 }
 
+// A card's clip plays silently on a loop over its photo, with a corner button to pause it. Phones set to reduce
+// motion get the photo until they press play.
+function CardVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [paused, setPaused] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)
+  useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    video.muted = true // on the element itself: iOS only autoplays muted video
+    if (paused) video.pause()
+    else video.play().catch(() => setPaused(true))
+  }, [paused])
+
+  return (
+    <>
+      <video ref={ref} className="category-video" src={src} muted loop playsInline preload={paused ? "none" : "auto"} aria-hidden="true" />
+      <button
+        type="button"
+        className="video-toggle"
+        aria-label={paused ? "Play the video" : "Pause the video"}
+        onClick={(e) => {
+          e.stopPropagation() // the rest of the card opens its page
+          setPaused(!paused)
+        }}
+      >
+        <Icon name={paused ? "play" : "pause"} size={12} />
+      </button>
+    </>
+  )
+}
+
 function CategoryCard({
   type,
   title,
   punchline,
   line,
   image,
+  video,
   labels,
   cta,
   onClick,
@@ -682,6 +722,7 @@ function CategoryCard({
   punchline: string
   line: string
   image: string
+  video?: string
   labels: string[]
   cta: string
   onClick: () => void
@@ -692,6 +733,7 @@ function CategoryCard({
     <article className={`category-card ${type}`} onClick={onClick} style={{ cursor: "pointer" }}>
       <div className="category-image">
         <img src={image} alt={look.alt} />
+        {video && <CardVideo src={video} />}
         <span className="category-number">{look.number}</span>
         {soon && <span className="arriving-soon-chip">{soon}</span>}
       </div>
@@ -831,6 +873,7 @@ function Home({
             punchline="A sweet finish to mess dinner."
             line="Starting with Pootharekulu: paper-thin, layered and melt-in-the-mouth."
             image={pootharekuluImage}
+            video={pootharekuluVideo}
             labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} pack`]}
             cta="Preorder now"
             onClick={() => go("sweets")}
