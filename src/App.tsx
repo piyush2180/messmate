@@ -1651,6 +1651,10 @@ function Field({
           placeholder={placeholder}
           maxLength={maxLength}
           autoComplete={autoComplete}
+          // Names and room numbers aren't dictionary words: on Android, tapping a red-underlined word opens a
+          // spelling menu instead of the cursor, so the student can't type until they pick something from it
+          spellCheck={false}
+          autoCorrect="off"
         />
       )}
     </label>
@@ -3896,6 +3900,8 @@ function SupportChatWidget({
                     placeholder="e.g. Ananya"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    spellCheck={false} // same Android spelling-menu trap as the checkout name box
+                    autoCorrect="off"
                     required
                   />
                 </div>
