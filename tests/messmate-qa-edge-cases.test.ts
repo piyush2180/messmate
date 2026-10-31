@@ -41,6 +41,7 @@ import {
   preorderWait,
   pootharekuluCartItem,
   POOTHAREKULU_PACKS,
+  maxQuantity,
   hasUnpricedItem,
   linePrice,
   PRICE_SOON,
@@ -853,7 +854,7 @@ test("FAQ Bot - Sweets & Snacks gives Pootharekulu's ₹35-a-piece packs and its
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
 })
 
-test("Pootharekulu - ₹35 a piece in packs of 1, 2 or 5, each pack its own cart line", () => {
+test("Pootharekulu - ₹35 a piece in packs of 1, 2 or 5", () => {
   assert.deepEqual(
     POOTHAREKULU_PACKS.map((pack) => [pootharekuluCartItem(pack).id, pootharekuluCartItem(pack).detail, pootharekuluCartItem(pack).price]),
     [
@@ -862,13 +863,13 @@ test("Pootharekulu - ₹35 a piece in packs of 1, 2 or 5, each pack its own cart
       ["sweet-pootharekulu-5", "5 pcs", 175],
     ],
   )
-  const twoPacks = { ...pootharekuluCartItem(POOTHAREKULU_PACKS[1]), quantity: 2 }
-  assert.equal(linePrice(twoPacks), "₹140")
-  assert.deepEqual(calculateOrderTotals([twoPacks], "delivery"), { subtotal: 140, fee: 5, total: 145 })
+  const twoPieces = pootharekuluCartItem(POOTHAREKULU_PACKS[1])
+  assert.equal(linePrice(twoPieces), "₹70")
+  assert.deepEqual(calculateOrderTotals([twoPieces], "delivery"), { subtotal: 70, fee: 5, total: 75 })
   // Orders placed before it had a price have ₹0 lines, which Track Orders shows as "Price soon"
   assert.equal(linePrice({ price: 0, quantity: 1 }), PRICE_SOON)
   assert.equal(hasUnpricedItem([{ price: 0 }]), true)
-  assert.equal(hasUnpricedItem([twoPacks]), false)
+  assert.equal(hasUnpricedItem([twoPieces]), false)
   assert.equal(hasUnpricedItem(null), false) // a bad row from the database doesn't crash the page
 })
 
@@ -878,20 +879,31 @@ test("Pootharekulu - is always its own order, and a past one reorders as a fresh
   assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true)
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], false), true) // pickles in stock go out sooner
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles arrive on another day
-  // Placed before the rename and before it had a price (a ₹0 line), or still sitting in a saved cart at ₹0
+  // A ₹0 line from before the rename and the price, and a second pack size: both come back at today's prices
   const past: CartItem[] = [
     { id: "sweet-pootharekulu", name: "Pootharekulu", detail: "5 pcs · Preorder", price: 0, quantity: 3, kind: "sweet" },
-    { id: "sweet-pootharekulu", name: "Premium Atreyapuram Pootharekhulu", detail: "5 pcs", price: 0, quantity: 1, kind: "sweet" },
-    { id: "sweet-pootharekulu-2", name: "Premium Atreyapuram Pootharekhulu", detail: "2 pcs · Preorder", price: 70, quantity: 1, kind: "sweet" },
+    { id: "sweet-pootharekulu-2", name: "Premium Atreyapuram Pootharekhulu", detail: "2 pcs · Preorder", price: 70, quantity: 2, kind: "sweet" },
   ]
   assert.deepEqual(
     repriceForReorder(past).map((i) => [i.id, i.detail, i.price, i.quantity]),
     [
       ["sweet-pootharekulu-5", "5 pcs", 175, 3],
-      ["sweet-pootharekulu-5", "5 pcs", 175, 1],
-      ["sweet-pootharekulu-2", "2 pcs", 70, 1],
+      ["sweet-pootharekulu-2", "2 pcs", 70, 2],
     ],
   )
+})
+
+test("Order limits - at most 20 of a Pootharekulu pack and 10 of anything else, even from an old order or saved cart", () => {
+  assert.equal(maxQuantity(pootharekuluCartItem(POOTHAREKULU_PACKS[0])), 20)
+  assert.equal(maxQuantity(fruitBowlCartItem([])), 10)
+  assert.equal(maxQuantity(pickleCartItem(pickleProducts[0], packOptions[0])), 10)
+  const huge: CartItem[] = [
+    { ...pootharekuluCartItem(POOTHAREKULU_PACKS[0]), quantity: 25 },
+    { ...fruitBowlCartItem([]), quantity: 14 },
+    { ...pickleCartItem(pickleProducts[0], packOptions[0]), quantity: 99 },
+    { ...fruitBowlCartItem(["Papaya"]), quantity: 3 },
+  ]
+  assert.deepEqual(repriceForReorder(huge).map((i) => i.quantity), [20, 10, 10, 3])
   assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Premium Atreyapuram Pootharekhulu", when: "3–4 Nov" })
   assert.equal(preorderWait([{ kind: "pickle", detail: "50g · Preorder" }])?.what, "pickles")
 })

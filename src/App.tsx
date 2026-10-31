@@ -20,6 +20,7 @@ import {
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
+  maxQuantity,
   getPickupPin,
   mixesPreorder,
   packOptions,
@@ -636,11 +637,13 @@ function Quantity({
   onChange,
   small = false,
   label,
+  max = Infinity,
 }: {
   value: number
   onChange: (value: number) => void
   small?: boolean
   label?: string
+  max?: number
 }) {
   const of = label ? ` of ${label}` : ""
   return (
@@ -653,7 +656,8 @@ function Quantity({
       </button>
       <span>{value}</span>
       <button
-        onClick={() => onChange(value + 1)}
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
         aria-label={`Increase quantity${of}`}
       >
         <Icon name="plus" size={16} />
@@ -1529,6 +1533,7 @@ function Cart({
                           }
                           small
                           label={`${item.name}, ${item.detail}`}
+                          max={maxQuantity(item)}
                         />
                         <strong>{linePrice(item)}</strong>
                       </div>
@@ -4508,7 +4513,7 @@ export default function App() {
       return exists
         ? current.map((entry) =>
             entry.id === item.id
-              ? { ...entry, quantity: entry.quantity + 1 }
+              ? { ...entry, quantity: Math.min(entry.quantity + 1, maxQuantity(entry)) }
               : entry,
           )
         : [...current, item]
@@ -4544,7 +4549,7 @@ export default function App() {
       for (const item of current) {
         const i = merged.findIndex((m) => m.id === item.id)
         if (i === -1) merged.push(item)
-        else merged[i] = { ...merged[i], quantity: merged[i].quantity + item.quantity }
+        else merged[i] = { ...merged[i], quantity: Math.min(merged[i].quantity + item.quantity, maxQuantity(item)) }
       }
       return merged
     })

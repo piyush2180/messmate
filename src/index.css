@@ -2494,3 +2494,5 @@ button.product-image-wrap { display: block; width: 100%; padding: 0; border: 0; 
 .sweet-packs .pack-option { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; }
 .sweet-packs .pack-option strong { font-size: 13px; }
 .sweet-packs .pack-option small { color: var(--muted); font-size: 11px; font-weight: 700; }
+/* + stops at the most a line can hold (20 of a Pootharekulu pack, 10 of anything else) */
+.quantity button:disabled { opacity: .3; cursor: not-allowed; }

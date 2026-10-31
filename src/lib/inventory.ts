@@ -110,6 +110,8 @@ export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
   quantity: 1,
   kind: "sweet",
 })
+/** The most of one cart line someone can order, so no one places a fake huge order: 20 of a Pootharekulu pack, 10 of anything else. */
+export const maxQuantity = (item: Pick<CartItem, "kind">) => (item?.kind === "sweet" ? 20 : 10)
 
 // Orders placed before Pootharekulu had a price have ₹0 lines: they show "Price soon" (paid in person on arrival)
 export const PRICE_SOON = "Price soon"
@@ -172,7 +174,7 @@ export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: 
 
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   return items.flatMap((item) => {
-    const quantity = Math.max(1, Math.floor(Number(item?.quantity)) || 1)
+    const quantity = Math.min(Math.max(1, Math.floor(Number(item?.quantity)) || 1), maxQuantity(item))
     if (item?.kind === "fruit") {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
     }
