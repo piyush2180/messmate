@@ -7,14 +7,18 @@ import {
   FRUIT_BOWL_PRICE,
   MAX_LEFT_OUT,
   POOTHAREKULU_PACK,
-  POOTHAREKULU_PRICE,
+  PRICE_SOON,
+  SWEETS_ARRIVAL,
+  hasUnpricedItem,
+  linePrice,
+  pootharekuluCartItem,
+  preorderWait,
   PICKLES_ARRIVAL,
   PICKLES_ARRIVAL_SHORT,
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
   getPickupPin,
-  hasPreorderLine,
   mixesPreorder,
   packOptions,
   pickleCartItem,
@@ -182,15 +186,25 @@ const soldOutNames = (rows: Array<{ id: string; name: string; is_available: bool
 // Supplier (Shopify) photo at a given width
 const sized = (url: string, width: number) => url.replace(/width=\d+/, `width=${width}`)
 
-// A pickle line's text while pickles are on Preorder (the placed order gets PREORDER_TAG instead)
-const preorderDetail = (item: CartItem, preorder: boolean) =>
-  preorder && item.kind === "pickle" ? (
+// A preordered line's text: pickles while they're on Preorder, Pootharekulu always (the placed order gets PREORDER_TAG instead)
+const preorderDetail = (item: CartItem, preorder: boolean) => {
+  const arrives = item.kind === "sweet" ? SWEETS_ARRIVAL : preorder && item.kind === "pickle" ? PICKLES_ARRIVAL : null
+  return arrives ? (
     <>
-      {item.detail} · Preorder, delivered on <strong>{PICKLES_ARRIVAL}</strong>
+      {item.detail} · Preorder, delivered on <strong>{arrives}</strong>
     </>
   ) : (
     item.detail
   )
+}
+// Cart thumbnails and labels per kind of item
+const itemImage = (item: CartItem) =>
+  item.kind === "pickle"
+    ? sized(pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage, 480)
+    : item.kind === "sweet"
+      ? pootharekuluImage
+      : fruitImage
+const ITEM_KIND_LABEL = { pickle: "Homemade pickle", fruit: "Fresh bowl", sweet: "Sweets & Snacks" }
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
@@ -813,10 +827,10 @@ function Home({
             punchline="A sweet finish to mess dinner."
             line="Starting with Pootharekulu: paper-thin, layered and melt-in-the-mouth."
             image={pootharekuluImage}
-            labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} · ₹${POOTHAREKULU_PRICE}`]}
-            cta="Coming soon"
+            labels={["Traditional", "Paper-thin", `${POOTHAREKULU_PACK} pack`]}
+            cta="Preorder now"
             onClick={() => go("sweets")}
-            soon="Arriving soon"
+            soon={`Arriving ${SWEETS_ARRIVAL}`}
           />
         </section>
         <section className="coming-soon">
@@ -840,8 +854,16 @@ function Home({
   )
 }
 
-// Sweets & Snacks: only Pootharekulu for now, shown as Arriving soon (price and ordering come later)
-function SweetsPage({ go, cartCount }: { go: (screen: Screen) => void; cartCount: number }) {
+// Sweets & Snacks: only Pootharekulu for now, on preorder until it arrives
+function SweetsPage({
+  go,
+  cartCount,
+  add,
+}: {
+  go: (screen: Screen) => void
+  cartCount: number
+  add: (item: CartItem) => void
+}) {
   return (
     <>
       <Header
@@ -855,7 +877,7 @@ function SweetsPage({ go, cartCount }: { go: (screen: Screen) => void; cartCount
       />
       <main className="screen-content pickles-page">
         <section className="screen-intro pickle-intro">
-          <div className="eyebrow">New on the menu soon</div>
+          <div className="eyebrow">On preorder now</div>
           <h1>
             Sweets &
             <br />
@@ -867,7 +889,7 @@ function SweetsPage({ go, cartCount }: { go: (screen: Screen) => void; cartCount
           <article className="product-card sweet-card">
             <div className="product-image-wrap">
               <img src={pootharekuluImage} alt="Pootharekulu rolls" />
-              <span className="arriving-soon-chip">Arriving soon</span>
+              <span className="arriving-soon-chip">Arriving {SWEETS_ARRIVAL}</span>
             </div>
             <div className="product-info">
               <h3>Pootharekulu</h3>
@@ -875,10 +897,10 @@ function SweetsPage({ go, cartCount }: { go: (screen: Screen) => void; cartCount
               <div className="product-bottom">
                 <div>
                   <small>{POOTHAREKULU_PACK} pack</small>
-                  <strong>₹{POOTHAREKULU_PRICE}</strong>
+                  <strong>{PRICE_SOON}</strong>
                 </div>
-                <button type="button" className="coming-soon-btn" disabled>
-                  Coming soon
+                <button type="button" className="preorder-btn" onClick={() => add(pootharekuluCartItem())}>
+                  Preorder
                 </button>
               </div>
             </div>
@@ -1347,6 +1369,7 @@ function Cart({
     (sum, item) => sum + item.price * item.quantity,
     0,
   )
+  const subtotalLabel = hasUnpricedItem(items) ? PRICE_SOON : `₹${subtotal}`
 
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -1382,20 +1405,9 @@ function Cart({
               <div className="cart-list">
                 {items.map((item) => (
                   <article className="cart-card" key={item.id}>
-                    <img
-                      src={
-                        item.kind === "pickle"
-                          ? sized(pickleProducts.find((p) => p.name === item.name)?.image ?? pickleImage, 480)
-                          : fruitImage
-                      }
-                      alt=""
-                    />
+                    <img src={itemImage(item)} alt="" />
                     <div className="cart-item-copy">
-                      <span className={`item-kind ${item.kind}`}>
-                        {item.kind === "pickle"
-                          ? "Homemade pickle"
-                          : "Fresh bowl"}
-                      </span>
+                      <span className={`item-kind ${item.kind}`}>{ITEM_KIND_LABEL[item.kind]}</span>
                       <h3>{item.name}</h3>
                       <p>{preorderDetail(item, preorder)}</p>
                       {soldOutNote(item, soldOutItems) && (
@@ -1410,7 +1422,7 @@ function Cart({
                           small
                           label={`${item.name}, ${item.detail}`}
                         />
-                        <strong>₹{item.price * item.quantity}</strong>
+                        <strong>{linePrice(item)}</strong>
                       </div>
                     </div>
                     <button
@@ -1426,10 +1438,17 @@ function Cart({
               {separate && (
                 <div className="preorder-date-note">
                   <Icon name="clock" size={16} />
-                  <span>
-                    Preordered pickles arrive on <strong>{PICKLES_ARRIVAL}</strong>, so please order them separately from fruit
-                    bowls.
-                  </span>
+                  {items.some((item) => item.kind === "sweet") ? (
+                    <span>
+                      Pootharekulu arrives on <strong>{SWEETS_ARRIVAL}</strong>, so please order it separately from your other
+                      items.
+                    </span>
+                  ) : (
+                    <span>
+                      Preordered pickles arrive on <strong>{PICKLES_ARRIVAL}</strong>, so please order them separately from fruit
+                      bowls.
+                    </span>
+                  )}
                 </div>
               )}
               <div className="add-more">
@@ -1442,7 +1461,7 @@ function Cart({
               <div className="price-card">
                 <div>
                   <span>Subtotal</span>
-                  <strong>₹{subtotal}</strong>
+                  <strong>{subtotalLabel}</strong>
                 </div>
                 <div>
                   <span>Delivery</span>
@@ -1450,7 +1469,7 @@ function Cart({
                 </div>
                 <div className="price-total">
                   <span>Total</span>
-                  <strong>₹{subtotal}</strong>
+                  <strong>{subtotalLabel}</strong>
                 </div>
                 <div className="desktop-cart-cta">
                   <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
@@ -1480,7 +1499,7 @@ function Cart({
         <BottomBar>
           <div className="dock-price">
             <small>Total</small>
-            <strong>₹{subtotal}</strong>
+            <strong>{subtotalLabel}</strong>
           </div>
           <PrimaryButton disabled={blocked} onClick={() => go("checkout")}>
             {ctaLabel}
@@ -1969,9 +1988,13 @@ function Payment({
   const [chosenMethod, setMethodState] = useState<"upi" | "counter">(() =>
     safeStorage.getItem("ht_pay_method", "") === "counter" ? "counter" : "upi",
   )
-  // Asima fruit orders are paid in person when collected near the mess, never online
-  const payAtPickupOnly = fulfilment === "pickup" && items.some((item) => item.kind === "fruit")
-  const method = payAtPickupOnly ? "counter" : chosenMethod
+  // Asima fruit orders are paid in person when collected near the mess, never online, and Pootharekulu (no price yet)
+  // when it arrives
+  const unpriced = hasUnpricedItem(items)
+  const payInPersonOnly = unpriced || (fulfilment === "pickup" && items.some((item) => item.kind === "fruit"))
+  const method = payInPersonOnly ? "counter" : chosenMethod
+  const amount = unpriced ? "" : ` ₹${total}`
+  const totalLabel = unpriced ? PRICE_SOON : `₹${total}`
   const [utr, setUtrState] = useState(() => (safeStorage.getItem("ht_pay_utr", "") || "").replace(/\D/g, "").slice(0, 12))
   const setMethod = (m: "upi" | "counter") => {
     setMethodState(m)
@@ -2040,7 +2063,9 @@ function Payment({
           <div className="eyebrow">Step 3 of 3</div>
           <h1>Complete your payment</h1>
           <p>
-            {payAtPickupOnly
+            {unpriced
+              ? "Pootharekulu's price isn't set yet, so you pay when it arrives."
+              : payInPersonOnly
               ? "Pay when you collect your order near the Asima mess."
               : fulfilment === "delivery"
                 ? "Scan & pay via PhonePe QR, or pay when it reaches your room."
@@ -2050,9 +2075,13 @@ function Payment({
         <div className="payment-layout">
           <div className="payment-left-col">
             <section className="payment-methods">
-              <h2>{payAtPickupOnly ? "Payment" : "Select payment method"}</h2>
-              {payAtPickupOnly ? (
-                <p className="pay-at-pickup-note">Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan.</p>
+              <h2>{payInPersonOnly ? "Payment" : "Select payment method"}</h2>
+              {payInPersonOnly ? (
+                <p className="pay-at-pickup-note">
+                  {unpriced
+                    ? "Pootharekulu is paid when it arrives, by cash or scan."
+                    : "Asima fruit bowl orders are paid when you collect them near the mess, by cash or scan."}
+                </p>
               ) : (
                 <button
                   type="button"
@@ -2189,7 +2218,7 @@ function Payment({
                   <Icon name="receipt" size={24} />
                 </div>
                 <div>
-                  <strong>{fulfilment === "delivery" ? `Pay ₹${total} on delivery` : `Pay ₹${total} at the Counter`}</strong>
+                  <strong>{fulfilment === "delivery" ? `Pay${amount} on delivery` : `Pay${amount} at the Counter`}</strong>
                   <p>
                     {fulfilment === "delivery"
                       ? "Pay the runner by cash or scan when your order reaches your room."
@@ -2219,13 +2248,13 @@ function Payment({
                       <small className="cart-sold-out">{soldOutNote(item, soldOutItems)}</small>
                     )}
                   </span>
-                  <strong>₹{item.price * item.quantity}</strong>
+                  <strong>{linePrice(item)}</strong>
                 </div>
               ))}
               <div className="totals">
                 <div>
                   <span>Subtotal</span>
-                  <strong>₹{subtotal}</strong>
+                  <strong>{unpriced ? PRICE_SOON : `₹${subtotal}`}</strong>
                 </div>
                 <div>
                   <span>{fee ? "Delivery" : "Pickup"}</span>
@@ -2233,7 +2262,7 @@ function Payment({
                 </div>
                 <div>
                   <span>Total</span>
-                  <strong>₹{total}</strong>
+                  <strong>{totalLabel}</strong>
                 </div>
               </div>
               <div className="desktop-payment-cta">
@@ -2246,7 +2275,7 @@ function Payment({
                     ? "Placing order..."
                     : method === "upi"
                     ? `I've Paid ₹${total} — Place Order`
-                    : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
+                    : `Place Order (Pay${amount} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
                 </PrimaryButton>
               </div>
             </section>
@@ -2256,7 +2285,7 @@ function Payment({
       <BottomBar>
         <div className="dock-price">
           <small>Total</small>
-          <strong>₹{total}</strong>
+          <strong>{totalLabel}</strong>
         </div>
         <PrimaryButton disabled={isSubmitting || items.length === 0 || blocked} onClick={handleSubmit}>
           {!storeOpen
@@ -2267,7 +2296,7 @@ function Payment({
             ? "Placing order..."
             : method === "upi"
             ? `I've Paid ₹${total} — Place Order`
-            : `Place Order (Pay ₹${total} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
+            : `Place Order (Pay${amount} ${fulfilment === "delivery" ? "on delivery" : "at Counter"})`}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -2303,6 +2332,7 @@ function Confirmation({
   const [cancelled, setCancelled] = useState(Boolean(isCancelled))
   if (isCancelled && !cancelled) setCancelled(true)
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+  const wait = preorderWait(items)
 
   return (
     <main className="confirmation">
@@ -2395,12 +2425,12 @@ function Confirmation({
               </span>
             </div>
           </div>
-          {hasPreorderLine(items) && (
+          {wait && (
             <div className="preorder-date-note">
               <Icon name="clock" size={16} />
               <span>
-                Your pickles will be {fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
-                <strong>{PICKLES_ARRIVAL}</strong>.
+                Your {wait.what} will be {fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
+                <strong>{wait.when}</strong>.
               </span>
             </div>
           )}
@@ -2827,7 +2857,7 @@ function OrdersPage({
                         <small>Order #{order.order_number}</small>
                         <span className="order-ticket-pin-pill">PIN: {getPickupPin(order)}</span>
                       </div>
-                      <strong>₹{order.total}</strong>
+                      <strong>{hasUnpricedItem(order.items) ? PRICE_SOON : `₹${order.total}`}</strong>
                       <span
                         style={{
                           fontSize: "9px",
@@ -2991,22 +3021,28 @@ function OrdersPage({
                             <strong>{item.name}</strong>
                             <small>{item.detail}</small>
                           </span>
-                          <strong>₹{item.price * item.quantity}</strong>
+                          <strong>{linePrice(item)}</strong>
                         </div>
                       ))}
-                    {picklesSoon && hasPreorderLine(order.items) && !["delivered", "cancelled", "no_show"].includes(order.status) && (
-                      <div className="preorder-date-note">
-                        <Icon name="clock" size={16} />
-                        <span>
-                          Pickles in this order will be {order.fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
-                          <strong>{PICKLES_ARRIVAL}</strong>.
-                        </span>
-                      </div>
-                    )}
+                    {(() => {
+                      // Pickle notes go once pickles are on sale; Pootharekulu stays on preorder until it's delivered
+                      const wait = preorderWait(order.items)
+                      if (!wait || (wait.what === "pickles" && !picklesSoon)) return null
+                      if (["delivered", "cancelled", "no_show"].includes(order.status)) return null
+                      return (
+                        <div className="preorder-date-note">
+                          <Icon name="clock" size={16} />
+                          <span>
+                            {wait.what === "pickles" ? "Pickles" : wait.what} in this order will be{" "}
+                            {order.fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on <strong>{wait.when}</strong>.
+                          </span>
+                        </div>
+                      )
+                    })()}
                     <div className="totals">
                       <div>
                         <span>Subtotal</span>
-                        <strong>₹{order.subtotal}</strong>
+                        <strong>{hasUnpricedItem(order.items) ? PRICE_SOON : `₹${order.subtotal}`}</strong>
                       </div>
                       <div>
                         <span>{order.fulfilment === "pickup" ? "Pickup" : "Delivery"}</span>
@@ -3037,7 +3073,7 @@ function OrdersPage({
                       </div>
                       <div>
                         <span>Total</span>
-                        <strong>₹{order.total}</strong>
+                        <strong>{hasUnpricedItem(order.items) ? PRICE_SOON : `₹${order.total}`}</strong>
                       </div>
                     </div>
 
@@ -4439,14 +4475,14 @@ export default function App() {
       const preorder = typeof status?.pickles_coming_soon === "boolean" ? status.pickles_coming_soon : picklesSoon
       setPicklesSoon(preorder)
       if (mixesPreorder(cart, preorder)) {
-        alert("Fruit bowls and preordered pickles need separate orders, so the order wasn't placed.")
+        alert("Items that arrive on different days need separate orders, so the order wasn't placed.")
         go("cart")
         return
       }
-      // Pickles ordered on Preorder say so on the order, so the kitchen sends them once they arrive
-      const orderItems = preorder
-        ? cart.map((item) => (item.kind === "pickle" ? { ...item, detail: `${item.detail}${PREORDER_TAG}` } : item))
-        : cart
+      // Preordered items say so on the order, so the kitchen sends them once they arrive: pickles while on Preorder, Pootharekulu always
+      const orderItems = cart.map((item) =>
+        item.kind === "sweet" || (preorder && item.kind === "pickle") ? { ...item, detail: `${item.detail}${PREORDER_TAG}` } : item,
+      )
 
       const { subtotal, fee, total } = calculateOrderTotals(cart, fulfilment)
       const orderTotal = total
@@ -4677,7 +4713,7 @@ export default function App() {
             preorder={picklesSoon}
           />
         )}
-        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} />}
+        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} />}
         {screen === "fruit-builder" && (
           <FruitBuilder
             go={go}

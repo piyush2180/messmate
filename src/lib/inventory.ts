@@ -11,7 +11,7 @@ export type CartItem = {
   detail: string
   price: number
   quantity: number
-  kind: "pickle" | "fruit"
+  kind: "pickle" | "fruit" | "sweet"
 }
 
 // Photos come from our supplier's (Food On Farm Pickles) Shopify CDN; `width=800` keeps them light on mobile data.
@@ -91,9 +91,26 @@ export function toggleLeftOut(current: string[], name: string): string[] {
   return current.length >= MAX_LEFT_OUT ? current : [...current, name]
 }
 
-// Sweets & Snacks: shown as Coming soon, not orderable yet
+// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL
+export const POOTHAREKULU_NAME = "Pootharekulu"
 export const POOTHAREKULU_PACK = "5 pcs"
-export const POOTHAREKULU_PRICE = 150
+export const SWEETS_ARRIVAL = "3–4 Nov"
+// Its price isn't set yet, so it goes in the cart at ₹0
+export const pootharekuluCartItem = (): CartItem => ({
+  id: "sweet-pootharekulu",
+  name: POOTHAREKULU_NAME,
+  detail: POOTHAREKULU_PACK,
+  price: 0,
+  quantity: 1,
+  kind: "sweet",
+})
+
+// A ₹0 line has no price yet: it shows "Price soon" and is paid in person when it arrives
+export const PRICE_SOON = "Price soon"
+export const hasUnpricedItem = (items: Array<{ price?: unknown }> | null | undefined) =>
+  Array.isArray(items) && items.some((item) => !Number(item?.price))
+export const linePrice = (item: { price?: unknown; quantity?: unknown }) =>
+  Number(item.price) ? `₹${Number(item.price) * Number(item.quantity)}` : PRICE_SOON
 
 export function pickleCartItem(product: PickleProduct, pack: PackOption): CartItem {
   return {
@@ -135,15 +152,26 @@ export const PICKLES_ARRIVAL_SHORT = "5–6 Nov"
 export const PICKLES_ARRIVAL = `${PICKLES_ARRIVAL_SHORT} (approx)`
 export const hasPreorderLine = (items: Array<{ detail?: string }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => String(item?.detail ?? "").includes(PREORDER_TAG))
-// Fruit bowls go out within a day but preordered pickles only on PICKLES_ARRIVAL, and an order has one status, so they're ordered apart
-export const mixesPreorder = (items: Array<{ kind?: string }>, preorder: boolean) =>
-  preorder && items.some((item) => item.kind === "fruit") && items.some((item) => item.kind === "pickle")
+/** What a placed order's preorder lines are waiting for (an order never mixes preordered pickles and Pootharekulu). */
+export const preorderWait = (items: Array<{ detail?: string; kind?: string }> | null | undefined) =>
+  !hasPreorderLine(items)
+    ? null
+    : (items ?? []).some((item) => item?.kind === "sweet")
+      ? { what: POOTHAREKULU_NAME, when: SWEETS_ARRIVAL }
+      : { what: "pickles", when: PICKLES_ARRIVAL }
+// Fruit bowls (and in-stock pickles) go out within a day, preordered pickles on PICKLES_ARRIVAL and Pootharekulu on
+// SWEETS_ARRIVAL. An order has one status, so items that arrive on different days are ordered apart.
+export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: boolean) =>
+  new Set(items.map((item) => (item.kind === "sweet" ? "sweet" : item.kind === "pickle" && picklesPreorder ? "pickle" : "now"))).size > 1
 
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   return items.flatMap((item) => {
     const quantity = Math.max(1, Math.floor(Number(item?.quantity)) || 1)
     if (item?.kind === "fruit") {
       return item.name === FRUIT_BOWL_NAME ? [{ ...item, price: FRUIT_BOWL_PRICE, quantity }] : []
+    }
+    if (item?.kind === "sweet") {
+      return item.name === POOTHAREKULU_NAME ? [{ ...pootharekuluCartItem(), quantity }] : []
     }
     const product = pickleProducts.find((p) => p.name === item?.name)
     // A past preorder line reorders as a plain pack; whether it's a preorder is decided again at checkout

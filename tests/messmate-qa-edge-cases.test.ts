@@ -38,6 +38,11 @@ import {
   PREORDER_TAG,
   hasPreorderLine,
   mixesPreorder,
+  preorderWait,
+  pootharekuluCartItem,
+  hasUnpricedItem,
+  linePrice,
+  PRICE_SOON,
   MAX_LEFT_OUT,
   toggleLeftOut,
   type CartItem,
@@ -834,10 +839,38 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
   assert.ok([...weekday, ...weekend].every((s) => ALL_SLOTS.includes(s)))
 })
 
-test("FAQ Bot - Sweets & Snacks says Pootharekulu is coming soon, with its price", () => {
-  assert.match(getFaqResponse("do you have pootharekulu?"), /coming soon/i)
-  assert.match(getFaqResponse("price of sweets?"), /Pootharekulu: 5 pcs for ₹150/)
+test("FAQ Bot - Sweets & Snacks says Pootharekulu is on preorder for 3–4 Nov, with no price yet", () => {
+  assert.match(getFaqResponse("do you have pootharekulu?"), /on preorder and arrives on 3–4 Nov/)
+  const price = getFaqResponse("price of sweets?")
+  assert.match(price, /price isn't set yet/)
+  assert.doesNotMatch(price, /₹/)
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
+})
+
+test("Pootharekulu - goes in the cart at ₹0, shown as 'Price soon' and paid when it arrives", () => {
+  const sweet = { ...pootharekuluCartItem(), quantity: 2 }
+  assert.equal(linePrice(sweet), PRICE_SOON)
+  assert.equal(linePrice({ price: 40, quantity: 2 }), "₹80")
+  assert.equal(hasUnpricedItem([sweet]), true)
+  assert.equal(hasUnpricedItem([{ price: 49 }, { price: 40 }]), false)
+  assert.equal(hasUnpricedItem(null), false) // a bad row from the database doesn't crash the page
+  // Room delivery still adds the ₹5 fee, which is collected with the Pootharekulu
+  assert.deepEqual(calculateOrderTotals([sweet], "delivery"), { subtotal: 0, fee: 5, total: 5 })
+})
+
+test("Pootharekulu - is always its own order, and a past one reorders as a fresh preorder", () => {
+  const sweet = { kind: "sweet" }
+  assert.equal(mixesPreorder([sweet, sweet], false), false)
+  assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true)
+  assert.equal(mixesPreorder([sweet, { kind: "pickle" }], false), true) // pickles in stock go out sooner
+  assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles arrive on another day
+  const past: CartItem[] = [{ ...pootharekuluCartItem(), detail: "5 pcs · Preorder", price: 150, quantity: 3 }]
+  assert.deepEqual(
+    repriceForReorder(past).map((i) => [i.name, i.detail, i.price, i.quantity]),
+    [["Pootharekulu", "5 pcs", 0, 3]],
+  )
+  assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Pootharekulu", when: "3–4 Nov" })
+  assert.equal(preorderWait([{ kind: "pickle", detail: "50g · Preorder" }])?.what, "pickles")
 })
 
 test("Kalam room - 3 digits plus A or B, saved together like 214A", () => {

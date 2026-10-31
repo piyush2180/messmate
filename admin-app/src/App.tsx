@@ -2039,7 +2039,10 @@ function OrderCard({
               <span>{String(item.name ?? "")}</span>
               {item.detail && <small className="item-subdetail">({String(item.detail)})</small>}
             </span>
-            <span className="item-price-tag">₹{Number(item.price) * Number(item.quantity)}</span>
+            <span className="item-price-tag">
+              {/* ₹0: no price yet (Pootharekulu), collected when it's handed over */}
+              {Number(item.price) ? `₹${Number(item.price) * Number(item.quantity)}` : "Price soon"}
+            </span>
           </div>
         ))}
       </div>

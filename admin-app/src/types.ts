@@ -4,7 +4,7 @@ export type CartItem = {
   detail: string
   price: number
   quantity: number
-  kind: "pickle" | "fruit"
+  kind: "pickle" | "fruit" | "sweet"
 }
 
 export type OrderStatus =

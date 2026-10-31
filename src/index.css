@@ -2474,3 +2474,6 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* A hostel the admin has closed can't be picked at checkout */
 .fulfilment-card.closed { opacity: .55; cursor: not-allowed; }
 .fulfilment-card.closed em { color: var(--terracotta-dark); }
+/* Pootharekulu: preorder button and cart label */
+.product-bottom .preorder-btn { width: auto; height: auto; padding: 7px 14px; border-radius: 999px; background: var(--terracotta); color: #fff; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.item-kind.sweet { color: #9a7228; }

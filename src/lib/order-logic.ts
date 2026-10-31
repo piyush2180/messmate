@@ -1,4 +1,4 @@
-import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, PICKLES_ARRIVAL, POOTHAREKULU_PACK, POOTHAREKULU_PRICE, packOptions, pickleProducts } from "./inventory.ts"
+import { DEFAULT_MENU_ITEMS, FRUIT_BOWL_PRICE, MAX_LEFT_OUT, PICKLES_ARRIVAL, POOTHAREKULU_PACK, SWEETS_ARRIVAL, packOptions, pickleProducts } from "./inventory.ts"
 
 export type SupportMsg = {
   id: string
@@ -222,9 +222,9 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
   if (q.includes("reorder") || word("again") || q.includes("repeat") || q.includes("previous")) {
     return "In 'Track Orders', click the 'Reorder This Meal' button on any past order to refill your cart instantly!"
   }
-  // Sweets & Snacks isn't on sale yet, so this comes before the price answer
+  // Pootharekulu is on preorder, so sweets questions come before the price answer
   if (/\b(sweets?|snacks?|mithai|pootharekulu|poothareku|putharekulu|pootarekulu)\b/.test(q)) {
-    return `Sweets & Snacks are coming soon, starting with Pootharekulu: ${POOTHAREKULU_PACK} for ₹${POOTHAREKULU_PRICE}. You'll be able to order it once it's on the menu!`
+    return `Pootharekulu (${POOTHAREKULU_PACK} pack) is on preorder and arrives on ${SWEETS_ARRIVAL}. Its price isn't set yet, so you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
   }
   const ratingTalk = /\b(rating|ratings|review|reviews|feedback|stars?)\b/.test(q) || /\brate (my|the|this|our|your)\b/.test(q)
   if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\b(kitna|kitne|kitni|rates?)\b/.test(q)) {
