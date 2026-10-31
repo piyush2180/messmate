@@ -46,7 +46,7 @@ export function isValidIndianPhone(raw: string | undefined | null): boolean {
 // Room delivery fee in ₹ (Kalam, and Asima pickle-only orders); pickup is free. The orders.delivery_fee CHECK constraint must allow it.
 export const DELIVERY_FEE = 5
 // Asima pickle-only orders are collected from one of these rooms (fruit bowls near the Asima mess)
-export const ASIMA_PICKUP = "Room 104 or 210"
+export const ASIMA_PICKUP = "Block D, Room 104 or 210"
 
 export type HostelOpen = { Kalam: boolean; Asima: boolean }
 /** Each hostel's Open / Closed switch. Before their SQL is run the store-wide switch stands in, and no row means open. */

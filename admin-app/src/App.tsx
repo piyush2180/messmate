@@ -110,7 +110,7 @@ const SLOT_OPTIONS = ["8:30–9:30 AM", "9–11 AM", "6:00–6:30 PM", "6:30–7
 // no set time yet; fruit bowl pickups keep their spot and morning slot (keep in step with the store's pickupPointFor)
 const isPicklePickup = (order: OrderRecord) =>
   order.fulfilment === "pickup" && !(Array.isArray(order.items) && order.items.some((item) => item?.kind === "fruit"))
-const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Room 104 or 210" : order.hostel || "Campus pickup")
+const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Block D, Room 104 or 210" : order.hostel || "Campus pickup")
 const orderSlot = (order: OrderRecord) => (isPicklePickup(order) ? "" : order.slot || "")
 
 type Hostel = "Kalam" | "Asima"
