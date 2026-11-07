@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import "./index.css"
 import App from "./App"
 import ErrorBoundary from "./ErrorBoundary"
+import DiwaliSparkles from "./DiwaliSparkles"
 
 const rootEl = document.getElementById("root")
 if (rootEl) {
@@ -10,6 +11,7 @@ if (rootEl) {
     <StrictMode>
       <ErrorBoundary>
         <App />
+        <DiwaliSparkles />
       </ErrorBoundary>
     </StrictMode>
   )
