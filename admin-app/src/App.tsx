@@ -115,7 +115,27 @@ const orderSlot = (order: OrderRecord) => (isPicklePickup(order) ? "" : order.sl
 
 type Hostel = "Kalam" | "Asima"
 const HOSTELS: Hostel[] = ["Kalam", "Asima"]
-type StoreStatusRow = { is_open?: unknown; kalam_open?: unknown; asima_open?: unknown; pickles_coming_soon?: unknown }
+type StoreStatusRow = {
+  is_open?: unknown
+  kalam_open?: unknown
+  asima_open?: unknown
+  pickles_coming_soon?: unknown
+  fruit_open?: unknown
+  pickles_open?: unknown
+  sweets_open?: unknown
+}
+// Fruit bowls, pickles and sweets each have their own switch too; a missing column (SQL not run yet) counts as open
+type Kind = "fruit" | "pickle" | "sweet"
+const KINDS: Array<{ kind: Kind; column: "fruit_open" | "pickles_open" | "sweets_open"; label: string }> = [
+  { kind: "fruit", column: "fruit_open", label: "Fruit bowls" },
+  { kind: "pickle", column: "pickles_open", label: "Pickles" },
+  { kind: "sweet", column: "sweets_open", label: "Sweets" },
+]
+const kindsOpen = (row: StoreStatusRow | null): Record<Kind, boolean> => ({
+  fruit: row?.fruit_open !== false,
+  pickle: row?.pickles_open !== false,
+  sweet: row?.sweets_open !== false,
+})
 // Each hostel's switch; before its SQL is run (or with no row yet) the store-wide switch stands in for both
 const hostelsOpen = (row: StoreStatusRow | null): Record<Hostel, boolean> => {
   const open = row?.is_open !== false
@@ -232,6 +252,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [storeStatusMissing, setStoreStatusMissing] = useState(false)
   // A row without kalam_open means the hostel switches' SQL hasn't been run yet
   const [hostelSwitchesMissing, setHostelSwitchesMissing] = useState(false)
+  // Fruit bowl / pickle / sweet switches (null until loaded); a row without fruit_open means their SQL hasn't been run
+  const [kindOpen, setKindOpen] = useState<Record<Kind, boolean> | null>(null)
+  const [kindSwitchesMissing, setKindSwitchesMissing] = useState(false)
   // Pickles Preorder switch ("Arriving soon" in the store); null until loaded, or while its SQL hasn't been run
   const [picklesSoon, setPicklesSoon] = useState<boolean | null>(null)
 
@@ -474,6 +497,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         setStoreStatusMissing(false)
         setHostelOpen(hostelsOpen(data))
         setHostelSwitchesMissing(Boolean(data) && typeof data.kalam_open !== "boolean")
+        setKindOpen(kindsOpen(data))
+        setKindSwitchesMissing(Boolean(data) && typeof data.fruit_open !== "boolean")
         // No row yet means pickles are on sale; a row without the column means its SQL hasn't been run
         setPicklesSoon(!data ? false : typeof data.pickles_coming_soon === "boolean" ? data.pickles_coming_soon : null)
       })
@@ -518,6 +543,24 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  const handleToggleKind = async ({ kind, column, label }: (typeof KINDS)[number]) => {
+    if (!supabase || kindOpen === null) return
+    const before = kindOpen
+    const next = { ...before, [kind]: !before[kind] }
+    if (!next[kind] && !confirm(`Close ${label.toLowerCase()}? Students won't be able to order them until you open them again.`)) return
+    setKindOpen(next)
+    const { error } = await supabase.from("store_status").upsert({ id: 1, [column]: next[kind], updated_at: new Date().toISOString() })
+    if (error) {
+      console.error("Item switch not saved:", error.message)
+      setKindOpen(before)
+      alert(
+        ["PGRST204", "PGRST205", "42703", "42P01"].includes(error.code)
+          ? "The Fruit bowls / Pickles / Sweets switches need the latest SQL in Supabase. Please run it first."
+          : "Couldn't change the switch. Please check the connection and try again."
+      )
+    }
+  }
+
   useEffect(() => {
     loadCounterSales()
     loadExpenses()
@@ -527,6 +570,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "store_status" }, (payload) => {
         const row = payload.new as StoreStatusRow
         if (row) setHostelOpen(hostelsOpen(row))
+        if (row) setKindOpen(kindsOpen(row))
         if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
       })
       .subscribe()
@@ -1089,6 +1133,24 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
           )
+        )}
+        {!storeStatusMissing && kindOpen !== null && (
+          <div className="store-status-row kinds">
+            {kindSwitchesMissing && (
+              <div className="store-status-bar missing">Run the latest SQL in Supabase to use the Fruit bowls / Pickles / Sweets switches.</div>
+            )}
+            {KINDS.map((k) => (
+              <div key={k.kind} className={`store-status-bar ${kindOpen[k.kind] ? "open" : "closed"}`}>
+                <span>
+                  <span className="store-status-dot" />
+                  {kindOpen[k.kind] ? `${k.label} are open` : `${k.label} are closed: students can't order them`}
+                </span>
+                <button type="button" className="action-btn-small" disabled={kindSwitchesMissing} onClick={() => handleToggleKind(k)}>
+                  {kindOpen[k.kind] ? `Close ${k.label.toLowerCase()}` : `Open ${k.label.toLowerCase()}`}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
         {(!isOnline || !liveOk) && (
           <div className="admin-banner offline" role="status">

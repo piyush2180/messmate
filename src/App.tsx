@@ -44,6 +44,10 @@ import {
   hostelsOpen,
   isHostelOpen,
   type HostelOpen,
+  KIND_CLOSED,
+  closedKindIn,
+  kindsOpen,
+  type KindsOpen,
   HOSTEL_HOURS,
   HOSTEL_SLOTS,
   KALAM_ROOM,
@@ -211,8 +215,19 @@ const itemImage = (item: CartItem) =>
       : fruitImage
 const ITEM_KIND_LABEL = { pickle: "Homemade pickle", fruit: "Fresh bowl", sweet: "Sweets & Snacks" }
 
+const ALL_KINDS_OPEN: KindsOpen = { fruit: true, pickle: true, sweet: true }
+const CLOSED_CHIP = "Closed right now"
+// Shown on a page whose fruit bowl / pickle / sweet switch is closed in admin
+const KindClosedNote = ({ kind }: { kind: keyof KindsOpen }) => (
+  <div className="preorder-date-note" role="status">
+    <Icon name="clock" size={16} />
+    <span>{KIND_CLOSED[kind]}. Please check back later.</span>
+  </div>
+)
+
 // Why a cart line can't be ordered right now, or null when it can
-function soldOutNote(item: CartItem, soldOut: Set<string>): string | null {
+function soldOutNote(item: CartItem, soldOut: Set<string>, open?: KindsOpen): string | null {
+  if (open && !open[item.kind]) return `${KIND_CLOSED[item.kind]}. Remove it to continue.`
   if (soldOut.has(item.name)) return "Sold out. Remove it to continue."
   if (item.kind !== "fruit") return null
   const leftOut = bowlLeftOut(item.id)
@@ -767,11 +782,13 @@ function Home({
   cartCount,
   cartTotal,
   picklesSoon = false,
+  kindOpen = ALL_KINDS_OPEN,
 }: {
   go: (screen: Screen) => void
   cartCount: number
   cartTotal: number
   picklesSoon?: boolean
+  kindOpen?: KindsOpen
 }) {
   return (
     <>
@@ -859,7 +876,7 @@ function Home({
             labels={["Homemade", "South Indian", "Small-batch"]}
             cta={picklesSoon ? "Preorder pickles" : "Explore pickles"}
             onClick={() => go("pickles")}
-            soon={picklesSoon ? `Delivering ${PICKLES_ARRIVAL}` : undefined}
+            soon={!kindOpen.pickle ? CLOSED_CHIP : picklesSoon ? `Delivering ${PICKLES_ARRIVAL}` : undefined}
           />
           <CategoryCard
             type="fruit"
@@ -870,6 +887,7 @@ function Home({
             labels={["Fresh", `₹${FRUIT_BOWL_PRICE} fixed`, "Made to order"]}
             cta="Order a bowl"
             onClick={() => go("fruit-builder")}
+            soon={kindOpen.fruit ? undefined : CLOSED_CHIP}
           />
           <CategoryCard
             type="sweet"
@@ -881,7 +899,7 @@ function Home({
             labels={["Traditional", `From ₹${POOTHAREKULU_PACKS[0].price}`, "1, 2 or 5 pcs"]}
             cta="Preorder now"
             onClick={() => go("sweets")}
-            soon={`Arriving ${SWEETS_ARRIVAL}`}
+            soon={kindOpen.sweet ? `Arriving ${SWEETS_ARRIVAL}` : CLOSED_CHIP}
           />
         </section>
         <section className="coming-soon">
@@ -907,7 +925,7 @@ function Home({
 
 // How Pootharekulu is made: opens over the page in a frame the clip's own shape, and only loads once tapped.
 // Preorder now under it goes straight to the cart.
-function MakingVideo({ onClose, onPreorder }: { onClose: () => void; onPreorder: () => void }) {
+function MakingVideo({ onClose, onPreorder }: { onClose: () => void; onPreorder?: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
@@ -939,7 +957,7 @@ function MakingVideo({ onClose, onPreorder }: { onClose: () => void; onPreorder:
             <Icon name="close" size={16} />
           </button>
         </div>
-        <PrimaryButton onClick={onPreorder}>Preorder now</PrimaryButton>
+        {onPreorder && <PrimaryButton onClick={onPreorder}>Preorder now</PrimaryButton>}
       </div>
     </div>
   )
@@ -950,10 +968,12 @@ function SweetsPage({
   go,
   cartCount,
   add,
+  closed = false,
 }: {
   go: (screen: Screen) => void
   cartCount: number
   add: (item: CartItem) => void
+  closed?: boolean
 }) {
   const [showVideo, setShowVideo] = useState(false)
   const [pack, setPack] = useState(POOTHAREKULU_PACKS[0])
@@ -978,11 +998,12 @@ function SweetsPage({
           </h1>
           <p>Traditional sweets for after mess dinner, starting with {POOTHAREKULU_NAME}.</p>
         </section>
+        {closed && <KindClosedNote kind="sweet" />}
         <div className="product-grid">
           <article className="product-card sweet-card">
             <button type="button" className="product-image-wrap watch-making" onClick={() => setShowVideo(true)}>
               <img src={pootharekuluImage} alt={`${POOTHAREKULU_NAME} rolls`} />
-              <span className="arriving-soon-chip">Arriving {SWEETS_ARRIVAL}</span>
+              <span className="arriving-soon-chip">{closed ? CLOSED_CHIP : `Arriving ${SWEETS_ARRIVAL}`}</span>
               <span className="watch-badge">
                 <Icon name="play" size={12} /> Watch how it's made
               </span>
@@ -1010,15 +1031,15 @@ function SweetsPage({
                   <small>{pack.label} pack</small>
                   <strong>₹{pack.price}</strong>
                 </div>
-                <button type="button" className="preorder-btn" onClick={() => add(pootharekuluCartItem(pack))}>
-                  Preorder
+                <button type="button" className="preorder-btn" disabled={closed} onClick={() => add(pootharekuluCartItem(pack))}>
+                  {closed ? "Closed" : "Preorder"}
                 </button>
               </div>
             </div>
           </article>
         </div>
       </main>
-      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={() => add(pootharekuluCartItem(pack))} />}
+      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={closed ? undefined : () => add(pootharekuluCartItem(pack))} />}
     </>
   )
 }
@@ -1029,12 +1050,14 @@ function PickleList({
   cartCount,
   soldOutItems,
   preorder = false,
+  closed = false,
 }: {
   go: (screen: Screen) => void
   selectProduct: (name: string) => void
   cartCount: number
   soldOutItems?: Set<string>
   preorder?: boolean
+  closed?: boolean
 }) {
   return (
     <>
@@ -1057,6 +1080,7 @@ function PickleList({
           </h1>
           <p>Authentic South Indian flavours, homemade with care.</p>
         </section>
+        {closed && <KindClosedNote kind="pickle" />}
         <div className="product-grid">
           {pickleProducts.map((product) => {
             const isSoldOut = soldOutItems?.has(product.name)
@@ -1071,7 +1095,7 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
-                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Delivering {PICKLES_ARRIVAL}</span>}
+                  {!isSoldOut && (closed || preorder) && <span className="arriving-soon-chip">{closed ? CLOSED_CHIP : `Delivering ${PICKLES_ARRIVAL}`}</span>}
                 </div>
                 <div className="product-info">
                   <div className="product-meta-row">
@@ -1114,6 +1138,7 @@ function PickleDetail({
   cartCount = 0,
   isSoldOut = false,
   preorder = false,
+  closed = false,
 }: {
   go: (screen: Screen) => void
   productName: string
@@ -1121,14 +1146,15 @@ function PickleDetail({
   cartCount?: number
   isSoldOut?: boolean
   preorder?: boolean
+  closed?: boolean
 }) {
   const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
-  const addLabel = isSoldOut ? "Currently Sold Out" : preorder ? "Preorder" : "Add to cart"
+  const addLabel = closed ? "Closed right now" : isSoldOut ? "Currently Sold Out" : preorder ? "Preorder" : "Add to cart"
   const pack = packOptions[0]
   const item = pickleCartItem(product, pack)
 
   const handleAdd = () => {
-    if (isSoldOut) return
+    if (isSoldOut || closed) return
     add(item)
   }
 
@@ -1160,7 +1186,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
-            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Delivering {PICKLES_ARRIVAL}</span>}
+            {(closed || preorder) && !isSoldOut && <span className="arriving-soon-chip inline">{closed ? CLOSED_CHIP : `Delivering ${PICKLES_ARRIVAL}`}</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
@@ -1212,10 +1238,10 @@ function PickleDetail({
                   className="desktop-pack-tag"
                   style={isSoldOut ? { color: "#d90429", background: "#fee2e2" } : {}}
                 >
-                  {isSoldOut ? "Temporarily Sold Out" : preorder ? `Delivering ${PICKLES_ARRIVAL} · preorder now` : "In stock today"}
+                  {isSoldOut ? "Temporarily Sold Out" : closed ? CLOSED_CHIP : preorder ? `Delivering ${PICKLES_ARRIVAL} · preorder now` : "In stock today"}
                 </div>
               </div>
-              <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
+              <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut || closed}>
                 {addLabel}
               </PrimaryButton>
             </div>
@@ -1227,7 +1253,7 @@ function PickleDetail({
           <small>{pack.label} pack</small>
           <strong>₹{item.price}</strong>
         </div>
-        <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
+        <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut || closed}>
           {addLabel}
         </PrimaryButton>
       </BottomBar>
@@ -1240,11 +1266,13 @@ function FruitBuilder({
   add,
   cartCount,
   soldOutItems,
+  closed = false,
 }: {
   go: (screen: Screen) => void
   add: (item: CartItem) => void
   cartCount: number
   soldOutItems?: Set<string>
+  closed?: boolean
 }) {
   const [leftOut, setLeftOut] = useState<string[]>([])
 
@@ -1256,7 +1284,7 @@ function FruitBuilder({
     .filter((name) => leftOut.includes(name) || isFruitSoldOut(name))
   const includedCount = fruits.length - skipped.length
   const bowlSoldOut = Boolean(soldOutItems?.has(FRUIT_BOWL_NAME))
-  const canAdd = includedCount > 0 && !bowlSoldOut
+  const canAdd = includedCount > 0 && !bowlSoldOut && !closed
 
   const toggle = (name: string) => setLeftOut((current) => toggleLeftOut(current, name))
   const limitReached = leftOut.length >= MAX_LEFT_OUT
@@ -1396,7 +1424,7 @@ function FruitBuilder({
                   disabled={!canAdd}
                   onClick={handleAdd}
                 >
-                  {bowlSoldOut ? "Sold out today" : `Add bowl to cart (₹${FRUIT_BOWL_PRICE})`}
+                  {closed ? "Closed right now" : bowlSoldOut ? "Sold out today" : `Add bowl to cart (₹${FRUIT_BOWL_PRICE})`}
                 </PrimaryButton>
               </div>
             </div>
@@ -1415,7 +1443,7 @@ function FruitBuilder({
           disabled={!canAdd}
           onClick={handleAdd}
         >
-          {bowlSoldOut ? "Sold out today" : "Add bowl to cart"}
+          {closed ? "Closed right now" : bowlSoldOut ? "Sold out today" : "Add bowl to cart"}
         </PrimaryButton>
       </BottomBar>
     </>
@@ -1456,6 +1484,7 @@ function Cart({
   remove,
   go,
   soldOutItems,
+  kindOpen,
   storeOpen,
   preorder = false,
 }: {
@@ -1464,17 +1493,18 @@ function Cart({
   remove: (id: string) => void
   go: (screen: Screen) => void
   soldOutItems: Set<string>
+  kindOpen: KindsOpen
   storeOpen: boolean
   preorder?: boolean
 }) {
   const separate = mixesPreorder(items, preorder)
-  const blocked = !storeOpen || separate || items.some((item) => soldOutNote(item, soldOutItems))
+  const blocked = !storeOpen || separate || items.some((item) => soldOutNote(item, soldOutItems, kindOpen))
   const ctaLabel = !storeOpen
     ? CLOSED_MESSAGE
     : separate
       ? "Order them separately"
       : blocked
-        ? "Remove the sold-out item above"
+        ? "Remove the item marked above"
         : "Go to checkout"
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -1520,8 +1550,8 @@ function Cart({
                       <span className={`item-kind ${item.kind}`}>{ITEM_KIND_LABEL[item.kind]}</span>
                       <h3>{item.name}</h3>
                       <p>{preorderDetail(item, preorder)}</p>
-                      {soldOutNote(item, soldOutItems) && (
-                        <p className="cart-sold-out">{soldOutNote(item, soldOutItems)}</p>
+                      {soldOutNote(item, soldOutItems, kindOpen) && (
+                        <p className="cart-sold-out">{soldOutNote(item, soldOutItems, kindOpen)}</p>
                       )}
                       <div className="cart-controls">
                         {item.kind === "sweet" ? (
@@ -2088,6 +2118,7 @@ function Payment({
   onPay,
   isSubmitting,
   soldOutItems,
+  kindOpen,
   storeOpen,
   preorder = false,
 }: {
@@ -2097,10 +2128,11 @@ function Payment({
   onPay: (method: "upi" | "counter", utr?: string) => void
   isSubmitting: boolean
   soldOutItems: Set<string>
+  kindOpen: KindsOpen
   storeOpen: boolean
   preorder?: boolean
 }) {
-  const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems))
+  const blocked = !storeOpen || items.some((item) => soldOutNote(item, soldOutItems, kindOpen))
   // Same calculation handlePay uses, so the amount shown is the amount saved.
   const { subtotal, fee, total } = calculateOrderTotals(items, fulfilment)
 
@@ -2367,8 +2399,8 @@ function Payment({
                   <span>
                     <strong>{item.name}</strong>
                     <small>{preorderDetail(item, preorder)}</small>
-                    {soldOutNote(item, soldOutItems) && (
-                      <small className="cart-sold-out">{soldOutNote(item, soldOutItems)}</small>
+                    {soldOutNote(item, soldOutItems, kindOpen) && (
+                      <small className="cart-sold-out">{soldOutNote(item, soldOutItems, kindOpen)}</small>
                     )}
                   </span>
                   <strong>{linePrice(item)}</strong>
@@ -2393,7 +2425,7 @@ function Payment({
                   {!storeOpen
                     ? CLOSED_MESSAGE
                     : blocked
-                    ? "An item sold out: edit your cart"
+                    ? "An item can't be ordered: edit your cart"
                     : isSubmitting
                     ? "Placing order..."
                     : method === "upi"
@@ -2414,7 +2446,7 @@ function Payment({
           {!storeOpen
             ? CLOSED_MESSAGE
             : blocked
-            ? "An item sold out: edit your cart"
+            ? "An item can't be ordered: edit your cart"
             : isSubmitting
             ? "Placing order..."
             : method === "upi"
@@ -3308,6 +3340,7 @@ async function askAi(
   history: Array<{ sender: "user" | "bot"; text: string }>,
   hostelOpen: HostelOpen,
   picklesSoon: boolean,
+  kindOpen: KindsOpen,
 ): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10000)
@@ -3323,6 +3356,9 @@ async function askAi(
         kalamOpen: hostelOpen.Kalam,
         asimaOpen: hostelOpen.Asima,
         picklesSoon,
+        fruitOpen: kindOpen.fruit,
+        picklesOpen: kindOpen.pickle,
+        sweetsOpen: kindOpen.sweet,
       }),
       signal: controller.signal,
     })
@@ -3341,11 +3377,13 @@ function SupportChatWidget({
   customerName = "",
   hostelOpen = { Kalam: true, Asima: true },
   picklesSoon = false,
+  kindOpen = ALL_KINDS_OPEN,
 }: {
   customerPhone?: string
   customerName?: string
   hostelOpen?: HostelOpen
   picklesSoon?: boolean
+  kindOpen?: KindsOpen
 }) {
   // The chat shows "away" only when both hostels are closed
   const storeOpen = hostelOpen.Kalam || hostelOpen.Asima
@@ -3595,7 +3633,7 @@ function SupportChatWidget({
     if (!faqInput.trim()) return
     const query = faqInput.trim()
     setFaqInput("")
-    const answer = getFaqResponse(query, picklesSoon, hostelOpen)
+    const answer = getFaqResponse(query, picklesSoon, hostelOpen, kindOpen)
     const known = answer !== FAQ_FALLBACK
     const botId = `faq-b-${Date.now() + 1}`
 
@@ -3607,7 +3645,7 @@ function SupportChatWidget({
     if (known) return
     // No instant answer (a greeting, small talk…): the AI helper replies; if it can't, a built-in
     // small-talk reply, and otherwise a pointer to the team
-    const reply = (await askAi(query, faqHistory, hostelOpen, picklesSoon)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
+    const reply = (await askAi(query, faqHistory, hostelOpen, picklesSoon, kindOpen)) ?? getSmallTalkReply(query) ?? FAQ_FALLBACK
     setFaqHistory((prev) => prev.map((m) => (m.id === botId ? { ...m, text: reply, showEscalate: true } : m)))
   }
 
@@ -4082,7 +4120,15 @@ function SupportChatWidget({
 const SCREENS: Screen[] = ["home", "pickles", "pickle-detail", "fruit-builder", "cart", "checkout", "fulfilment", "payment", "confirmation", "orders", "sweets"]
 // Steps that only make sense with something in the cart
 const NEEDS_CART: Screen[] = ["cart", "checkout", "fulfilment", "payment"]
-type StoreStatusRow = { is_open?: unknown; kalam_open?: unknown; asima_open?: unknown; pickles_coming_soon?: unknown }
+type StoreStatusRow = {
+  is_open?: unknown
+  kalam_open?: unknown
+  asima_open?: unknown
+  pickles_coming_soon?: unknown
+  fruit_open?: unknown
+  pickles_open?: unknown
+  sweets_open?: unknown
+}
 
 const SESSION_KEY = "ht_session"
 const SESSION_MAX_AGE = 6 * 60 * 60 * 1000 // an old cart from yesterday shouldn't come back
@@ -4273,8 +4319,11 @@ export default function App() {
   const storeOpen = hostelOpen.Kalam || hostelOpen.Asima
   // The admin's Preorder switch for pickles (the "Delivering today" chips); plain add-to-cart if it can't be read
   const [picklesSoon, setPicklesSoon] = useState(false)
+  // Fruit bowl / pickle / sweet switches from the admin; open if they can't be read
+  const [kindOpen, setKindOpen] = useState<KindsOpen>(ALL_KINDS_OPEN)
   const applyStoreStatus = (row: StoreStatusRow | null) => {
     if (row) setHostelOpen(hostelsOpen(row))
+    if (row) setKindOpen(kindsOpen(row))
     if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
   }
   const refreshStoreStatus = () =>
@@ -4570,7 +4619,7 @@ export default function App() {
       alert("Ordering isn't available right now, so your order was not placed. If you already paid, please tap Support to reach us.")
       return
     }
-    if (cart.some((item) => soldOutNote(item, soldOutItems))) {
+    if (cart.some((item) => soldOutNote(item, soldOutItems, kindOpen))) {
       alert("Something in your cart just sold out, so the order wasn't placed. Please remove it and try again.")
       go("cart")
       return
@@ -4597,6 +4646,14 @@ export default function App() {
           go("cart")
           return
         }
+      }
+      const freshKinds = kindsOpen(status)
+      setKindOpen(freshKinds)
+      const closedKind = closedKindIn(cart, freshKinds)
+      if (closedKind) {
+        alert(`${KIND_CLOSED[closedKind]}, so the order wasn't placed. Please remove it from your cart.`)
+        go("cart")
+        return
       }
       const preorder = typeof status?.pickles_coming_soon === "boolean" ? status.pickles_coming_soon : picklesSoon
       setPicklesSoon(preorder)
@@ -4815,7 +4872,7 @@ export default function App() {
         )}
 
         {screen === "home" && (
-          <Home go={go} cartCount={cartCount} cartTotal={total} picklesSoon={picklesSoon} />
+          <Home go={go} cartCount={cartCount} cartTotal={total} picklesSoon={picklesSoon} kindOpen={kindOpen} />
         )}
         {screen === "pickles" && (
           <PickleList
@@ -4823,6 +4880,7 @@ export default function App() {
             cartCount={cartCount}
             soldOutItems={soldOutItems}
             preorder={picklesSoon}
+            closed={!kindOpen.pickle}
             selectProduct={(name) => {
               setSelectedProduct(name)
               go("pickle-detail")
@@ -4837,15 +4895,17 @@ export default function App() {
             cartCount={cartCount}
             isSoldOut={soldOutItems.has(selectedProduct)}
             preorder={picklesSoon}
+            closed={!kindOpen.pickle}
           />
         )}
-        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} />}
+        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} />}
         {screen === "fruit-builder" && (
           <FruitBuilder
             go={go}
             add={add}
             cartCount={cartCount}
             soldOutItems={soldOutItems}
+            closed={!kindOpen.fruit}
           />
         )}
         {screen === "cart" && (
@@ -4857,6 +4917,7 @@ export default function App() {
             }
             go={go}
             soldOutItems={soldOutItems}
+            kindOpen={kindOpen}
             storeOpen={storeOpen}
             preorder={picklesSoon}
           />
@@ -4892,6 +4953,7 @@ export default function App() {
             onPay={handlePay}
             isSubmitting={isSubmitting}
             soldOutItems={soldOutItems}
+            kindOpen={kindOpen}
             storeOpen={isHostelOpen(hostelOpen, details.hostel)}
             preorder={picklesSoon}
           />
@@ -4943,6 +5005,7 @@ export default function App() {
           customerName={details.name}
           hostelOpen={hostelOpen}
           picklesSoon={picklesSoon}
+          kindOpen={kindOpen}
         />
       </div>
     </div>

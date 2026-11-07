@@ -13,6 +13,8 @@ import {
   ASIMA_ROOM,
   fulfilmentFor,
   hostelsOpen,
+  kindsOpen,
+  closedKindIn,
   isHostelOpen,
   KALAM_ROOM,
   normalizeRoom,
@@ -1000,4 +1002,17 @@ test("FAQ Bot - 'is the store open?' says which hostel is closed when only one i
   assert.match(getFaqResponse("is the store open?", false, { Kalam: true, Asima: false }), /Kalam is open and taking orders, but Asima is closed right now/)
   assert.match(getFaqResponse("are you open now?", false, { Kalam: false, Asima: true }), /Asima is open and taking orders, but Kalam is closed right now/)
   assert.match(getFaqResponse("is the store open?", false, { Kalam: false, Asima: false }), /closed right now, so ordering is paused/)
+})
+
+test("Item switches - fruit bowls, pickles and sweets close on their own; missing columns mean open", () => {
+  assert.deepEqual(kindsOpen({ fruit_open: true, pickles_open: false, sweets_open: true }), { fruit: true, pickle: false, sweet: true })
+  assert.deepEqual(kindsOpen({ is_open: true }), { fruit: true, pickle: true, sweet: true }) // SQL not run yet
+  assert.deepEqual(kindsOpen(null), { fruit: true, pickle: true, sweet: true })
+  const closedSweets = { fruit: true, pickle: true, sweet: false }
+  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "sweet" }], closedSweets), "sweet")
+  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "fruit" }], closedSweets), null)
+  // The instant answers follow the switches
+  assert.match(getFaqResponse("do you have pootharekulu?", false, true, closedSweets), /is closed right now. Please check back later!/)
+  assert.match(getFaqResponse("price of mango pickle?", false, true, closedSweets), /₹40/) // pickles still open
+  assert.match(getFaqResponse("fruit bowl available?", false, true, { fruit: false, pickle: true, sweet: true }), /^Fruit bowls are closed right now/)
 })

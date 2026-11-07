@@ -354,6 +354,10 @@ insert into public.store_status (id) values (1) on conflict (id) do nothing;
 alter table public.store_status add column if not exists kalam_open boolean not null default true;
 alter table public.store_status add column if not exists asima_open boolean not null default true;
 update public.store_status set kalam_open = is_open, asima_open = is_open where id = 1 and kalam_open and asima_open;
+-- Fruit bowls, pickles and sweets each have their own switch; a closed one can't be ordered from either hostel
+alter table public.store_status add column if not exists fruit_open boolean not null default true;
+alter table public.store_status add column if not exists pickles_open boolean not null default true;
+alter table public.store_status add column if not exists sweets_open boolean not null default true;
 
 alter table public.store_status enable row level security;
 

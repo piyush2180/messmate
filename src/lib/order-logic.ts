@@ -59,6 +59,23 @@ export const hostelsOpen = (row: { is_open?: unknown; kalam_open?: unknown; asim
 }
 export const isHostelOpen = (open: HostelOpen, hostel: string) => (hostel === "Asima" ? open.Asima : open.Kalam)
 
+export type ItemKind = "pickle" | "fruit" | "sweet"
+export type KindsOpen = Record<ItemKind, boolean>
+/** Fruit bowls, pickles and sweets each have their own Open / Closed switch. Missing (no row, or SQL not run yet) means open. */
+export const kindsOpen = (row: { fruit_open?: unknown; pickles_open?: unknown; sweets_open?: unknown } | null | undefined): KindsOpen => ({
+  fruit: row?.fruit_open !== false,
+  pickle: row?.pickles_open !== false,
+  sweet: row?.sweets_open !== false,
+})
+export const KIND_CLOSED: Record<ItemKind, string> = {
+  fruit: "Fruit bowls are closed right now",
+  pickle: "Pickles are closed right now",
+  sweet: `${POOTHAREKULU_NAME} is closed right now`,
+}
+/** The first closed kind in a cart, or null when everything in it can be ordered. */
+export const closedKindIn = (items: Array<{ kind?: string }>, open: KindsOpen): ItemKind | null =>
+  (items.find((item) => open[item.kind as ItemKind] === false)?.kind as ItemKind | undefined) ?? null
+
 /** Kalam always gets room delivery. Asima orders are picked up (fruit bowls near the mess, pickles from ASIMA_PICKUP), unless a pickle-only order asks for room delivery. */
 export const fulfilmentFor = (
   hostel: string,
@@ -187,8 +204,14 @@ const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUI
  * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
  * picklesSoon: the admin has pickles on Preorder ("Arriving soon"); students can still order them.
  * open: the admin's Open / Closed switches, for both hostels or each one.
+ * kinds: the admin's fruit bowl / pickle / sweet switches.
  */
-export function getFaqResponse(query: string, picklesSoon = false, open: boolean | HostelOpen = true): string {
+export function getFaqResponse(
+  query: string,
+  picklesSoon = false,
+  open: boolean | HostelOpen = true,
+  kinds: KindsOpen = { fruit: true, pickle: true, sweet: true },
+): string {
   const q = (query || "").toLowerCase().trim()
   // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
   const word = (w: string) => new RegExp(`\\b${w}\\b`).test(q)
@@ -210,6 +233,14 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
     const [on, off] = Kalam ? ["Kalam", "Asima"] : ["Asima", "Kalam"]
     return `${on} is open and taking orders, but ${off} is closed right now. Please check back later!`
   }
+  // A closed fruit bowl / pickle / sweet switch answers any question about that item
+  const mentioned: Record<ItemKind, RegExp> = {
+    fruit: /\b(fruits?|bowls?)\b/,
+    pickle: /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/,
+    sweet: /\b(sweets?|snacks?|mithai|pootharekulu|pootharekhulu|poothareku|putharekulu|pootarekulu|atreyapuram)\b/,
+  }
+  const closedAsked = (Object.keys(mentioned) as ItemKind[]).find((kind) => !kinds[kind] && mentioned[kind].test(q))
+  if (closedAsked) return `${KIND_CLOSED[closedAsked]}. Please check back later!`
   if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
     return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"
   }

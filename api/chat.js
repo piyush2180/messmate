@@ -99,6 +99,10 @@ export async function POST(request) {
       if (open === false) system += `\n- Right now ${hostel} is CLOSED and ${hostel} orders are paused; the other hostel is open. If asked about ordering for ${hostel}, say it's unavailable at the moment and to check back later.`
     }
   }
+  // The admin can close fruit bowls, pickles or sweets on their own
+  for (const [what, open] of [["Fruit bowls", body?.fruitOpen], ["Pickles", body?.picklesOpen], ["Pootharekhulu (Sweets & Snacks)", body?.sweetsOpen]]) {
+    if (open === false) system += `\n- Right now ${what} are CLOSED and can't be ordered. If asked about them, say they're unavailable at the moment and to check back later.`
+  }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
     system += "\n- Right now the homemade pickles are on PREORDER and are being delivered today: preordered pickles go out today, to the student's room, or ready at Block D, Room 104 or 210 for Asima pickup orders. Students can still preorder them on the Pickles page. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
