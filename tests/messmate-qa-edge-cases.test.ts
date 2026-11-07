@@ -13,7 +13,10 @@ import {
   ASIMA_ROOM,
   fulfilmentFor,
   hostelsOpen,
-  kindsOpen,
+  kindsByHostel,
+  kindsFor,
+  kindNote,
+  kindClosed,
   closedKindIn,
   isHostelOpen,
   KALAM_ROOM,
@@ -1007,17 +1010,25 @@ test("FAQ Bot - 'is the store open?' says which hostel is closed when only one i
   assert.match(getFaqResponse("is the store open?", false, { Kalam: false, Asima: false }), /closed right now, so ordering is paused/)
 })
 
-test("Item switches - fruit bowls, pickles and sweets close on their own; missing columns mean open", () => {
-  assert.deepEqual(kindsOpen({ fruit_open: true, pickles_open: false, sweets_open: true }), { fruit: true, pickle: false, sweet: true })
-  assert.deepEqual(kindsOpen({ is_open: true }), { fruit: true, pickle: true, sweet: true }) // SQL not run yet
-  assert.deepEqual(kindsOpen(null), { fruit: true, pickle: true, sweet: true })
-  const closedSweets = { fruit: true, pickle: true, sweet: false }
-  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "sweet" }], closedSweets), "sweet")
-  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "fruit" }], closedSweets), null)
+test("Item switches - fruit bowls, pickles and sweets close on their own in each hostel; missing columns mean open", () => {
+  const by = kindsByHostel({ fruit_kalam_open: false, fruit_asima_open: true, sweets_kalam_open: false, sweets_asima_open: false })
+  assert.deepEqual(by, { fruit: { Kalam: false, Asima: true }, pickle: { Kalam: true, Asima: true }, sweet: { Kalam: false, Asima: false } })
+  assert.deepEqual(kindsByHostel({ is_open: true }), kindsByHostel(null)) // SQL not run yet: all open
+  assert.equal(kindsByHostel(null).fruit.Kalam, true)
+  // Fruit closed only in Kalam: it can still go in a cart, but not a Kalam order
+  assert.deepEqual(kindsFor(by), { fruit: true, pickle: true, sweet: false })
+  assert.deepEqual(kindsFor(by, "Kalam"), { fruit: false, pickle: true, sweet: false })
+  assert.deepEqual(kindsFor(by, "Asima"), { fruit: true, pickle: true, sweet: false })
+  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "fruit" }], kindsFor(by, "Kalam")), "fruit")
+  assert.equal(closedKindIn([{ kind: "pickle" }, { kind: "fruit" }], kindsFor(by, "Asima")), null)
+  assert.equal(kindNote("fruit", by), "Fruit bowls are closed in Kalam right now; Asima can still order.")
+  assert.equal(kindNote("sweet", by), "Premium Atreyapuram Pootharekhulu is closed right now.")
+  assert.equal(kindNote("pickle", by), null)
+  assert.equal(kindClosed("pickle", "Asima"), "Pickles are closed in Asima right now")
   // The instant answers follow the switches
-  assert.match(getFaqResponse("do you have pootharekulu?", false, true, closedSweets), /is closed right now. Please check back later!/)
-  assert.match(getFaqResponse("price of mango pickle?", false, true, closedSweets), /₹40/) // pickles still open
-  assert.match(getFaqResponse("fruit bowl available?", false, true, { fruit: false, pickle: true, sweet: true }), /^Fruit bowls are closed right now/)
+  assert.match(getFaqResponse("do you have pootharekulu?", false, true, by), /is closed right now\. Please check back later!/)
+  assert.match(getFaqResponse("fruit bowl available?", false, true, by), /^Fruit bowls are closed in Kalam right now; Asima can still order\./)
+  assert.match(getFaqResponse("price of mango pickle?", false, true, by), /₹40/) // pickles open in both
 })
 
 test("Menu & Stock - every product on the store has a Sold Out button, in both apps", async () => {
@@ -1025,4 +1036,15 @@ test("Menu & Stock - every product on the store has a Sold Out button, in both a
   const products = [...pickleProducts.map((p) => p.name), FRUIT_BOWL_NAME, POOTHAREKULU_NAME] // each fruit has its own row too (category Fruits)
   for (const name of products) assert.ok(STORE_MENU.some((i) => i.name === name), `store menu misses ${name}`)
   assert.deepEqual(adminMenu.map((i) => [i.id, i.name, i.category]), STORE_MENU.map((i) => [i.id, i.name, i.category]))
+})
+
+test("Pootharekhulu Preorder switch - on sale it mixes with other items and the FAQ says it's available now", () => {
+  const sweet = { kind: "sweet" }
+  assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true) // on preorder (default): its own order
+  assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false, false), false) // on sale: one order
+  assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true, false), true) // preordered pickles still go alone
+  assert.match(getFaqResponse("do you have pootharekulu?"), /on preorder/)
+  const onSale = getFaqResponse("do you have pootharekulu?", false, true, undefined, false)
+  assert.match(onSale, /available now on the Sweets & Snacks page, and you pay in person when you get it\./)
+  assert.doesNotMatch(onSale, /preorder/i)
 })

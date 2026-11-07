@@ -60,17 +60,42 @@ export const hostelsOpen = (row: { is_open?: unknown; kalam_open?: unknown; asim
 export const isHostelOpen = (open: HostelOpen, hostel: string) => (hostel === "Asima" ? open.Asima : open.Kalam)
 
 export type ItemKind = "pickle" | "fruit" | "sweet"
+/** Whether each kind can be ordered (in one hostel, or in at least one). */
 export type KindsOpen = Record<ItemKind, boolean>
-/** Fruit bowls, pickles and sweets each have their own Open / Closed switch. Missing (no row, or SQL not run yet) means open. */
-export const kindsOpen = (row: { fruit_open?: unknown; pickles_open?: unknown; sweets_open?: unknown } | null | undefined): KindsOpen => ({
-  fruit: row?.fruit_open !== false,
-  pickle: row?.pickles_open !== false,
-  sweet: row?.sweets_open !== false,
-})
-export const KIND_CLOSED: Record<ItemKind, string> = {
-  fruit: "Fruit bowls are closed right now",
-  pickle: "Pickles are closed right now",
-  sweet: `${POOTHAREKULU_NAME} is closed right now`,
+/** Each kind's switch in each hostel. */
+export type KindsByHostel = Record<ItemKind, HostelOpen>
+export const ALL_KINDS_OPEN_BY_HOSTEL: KindsByHostel = {
+  fruit: { Kalam: true, Asima: true },
+  pickle: { Kalam: true, Asima: true },
+  sweet: { Kalam: true, Asima: true },
+}
+const KIND_COLUMN: Record<ItemKind, string> = { fruit: "fruit", pickle: "pickles", sweet: "sweets" }
+/** Fruit bowls, pickles and sweets have their own Open / Closed switch in each hostel (fruit_kalam_open…). Missing means open. */
+export const kindsByHostel = (row: Record<string, unknown> | null | undefined): KindsByHostel => {
+  const open = (kind: ItemKind, hostel: string) => row?.[`${KIND_COLUMN[kind]}_${hostel}_open`] !== false
+  return {
+    fruit: { Kalam: open("fruit", "kalam"), Asima: open("fruit", "asima") },
+    pickle: { Kalam: open("pickle", "kalam"), Asima: open("pickle", "asima") },
+    sweet: { Kalam: open("sweet", "kalam"), Asima: open("sweet", "asima") },
+  }
+}
+/** Per kind: open in that hostel, or (no hostel) open in at least one, so it can still be added to a cart. */
+export const kindsFor = (by: KindsByHostel, hostel?: string): KindsOpen => {
+  const one = (o: HostelOpen) => (hostel ? isHostelOpen(o, hostel) : o.Kalam || o.Asima)
+  return { fruit: one(by.fruit), pickle: one(by.pickle), sweet: one(by.sweet) }
+}
+/** "Pickles are closed right now", or "…closed in Kalam right now" for one hostel. */
+export const kindClosed = (kind: ItemKind, hostel?: string) => {
+  const where = hostel ? ` in ${hostel}` : ""
+  return kind === "sweet" ? `${POOTHAREKULU_NAME} is closed${where} right now` : `${kind === "fruit" ? "Fruit bowls" : "Pickles"} are closed${where} right now`
+}
+/** The line shown to students about a kind's switches, or null when it's open in both hostels. */
+export const kindNote = (kind: ItemKind, by: KindsByHostel): string | null => {
+  const { Kalam, Asima } = by[kind]
+  if (Kalam && Asima) return null
+  if (!Kalam && !Asima) return `${kindClosed(kind)}.`
+  const [off, on] = Kalam ? ["Asima", "Kalam"] : ["Kalam", "Asima"]
+  return `${kindClosed(kind, off)}; ${on} can still order.`
 }
 /** The first closed kind in a cart, or null when everything in it can be ordered. */
 export const closedKindIn = (items: Array<{ kind?: string }>, open: KindsOpen): ItemKind | null =>
@@ -204,13 +229,15 @@ const BOWL_FRUITS = `${BOWL_FRUIT_NAMES.slice(0, -1).join(", ")} and ${BOWL_FRUI
  * so specific topics (refunds, PINs, prices) come before broad ones (delivery, pickles).
  * picklesSoon: the admin has pickles on Preorder ("Arriving soon"); students can still order them.
  * open: the admin's Open / Closed switches, for both hostels or each one.
- * kinds: the admin's fruit bowl / pickle / sweet switches.
+ * kinds: the admin's fruit bowl / pickle / sweet switches in each hostel.
+ * sweetsSoon: the admin has Pootharekhulu on Preorder (otherwise it's on sale).
  */
 export function getFaqResponse(
   query: string,
   picklesSoon = false,
   open: boolean | HostelOpen = true,
-  kinds: KindsOpen = { fruit: true, pickle: true, sweet: true },
+  kinds: KindsByHostel = ALL_KINDS_OPEN_BY_HOSTEL,
+  sweetsSoon = true,
 ): string {
   const q = (query || "").toLowerCase().trim()
   // Whole words only, so "pineapple" isn't "pin", "nutritious" isn't "utr" and "frustrating" isn't "rating"
@@ -239,8 +266,8 @@ export function getFaqResponse(
     pickle: /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/,
     sweet: /\b(sweets?|snacks?|mithai|pootharekulu|pootharekhulu|poothareku|putharekulu|pootarekulu|atreyapuram)\b/,
   }
-  const closedAsked = (Object.keys(mentioned) as ItemKind[]).find((kind) => !kinds[kind] && mentioned[kind].test(q))
-  if (closedAsked) return `${KIND_CLOSED[closedAsked]}. Please check back later!`
+  const closedAsked = (Object.keys(mentioned) as ItemKind[]).find((kind) => kindNote(kind, kinds) && mentioned[kind].test(q))
+  if (closedAsked) return `${kindNote(closedAsked, kinds)} Please check back later!`
   if (word("pin") || q.includes("pickup code") || q.includes("verification code")) {
     return "Your unique 4-digit Pickup PIN is on your Order Confirmation screen and in 'Track Orders'. Show it when you collect your order!"
   }
@@ -256,7 +283,9 @@ export function getFaqResponse(
   // Pootharekulu has its own packs and preorder date, so sweets questions come before the general price answer
   if (/\b(sweets?|snacks?|mithai|pootharekulu|pootharekhulu|poothareku|putharekulu|pootarekulu|atreyapuram)\b/.test(q)) {
     const packs = POOTHAREKULU_PACKS.map((p) => `${p.label} ₹${p.price}`).join(", ")
-    return `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's on preorder and arrives ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
+    return sweetsSoon
+      ? `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's on preorder and arrives ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
+      : `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's available now on the Sweets & Snacks page, and you pay in person when you get it.`
   }
   const ratingTalk = /\b(rating|ratings|review|reviews|feedback|stars?)\b/.test(q) || /\brate (my|the|this|our|your)\b/.test(q)
   if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\b(kitna|kitne|kitni|rates?)\b/.test(q)) {

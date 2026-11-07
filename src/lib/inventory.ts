@@ -171,8 +171,10 @@ export const preorderWait = (items: Array<{ detail?: string; kind?: string }> | 
       : { what: "pickles", when: PICKLES_ARRIVAL }
 // Fruit bowls (and in-stock pickles) go out within a day, preordered pickles and Pootharekulu when they arrive
 // (PICKLES_ARRIVAL, SWEETS_ARRIVAL). An order has one status, so preorders are ordered apart from everything else.
-export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: boolean) =>
-  new Set(items.map((item) => (item.kind === "sweet" ? "sweet" : item.kind === "pickle" && picklesPreorder ? "pickle" : "now"))).size > 1
+export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: boolean, sweetsPreorder = true) =>
+  new Set(
+    items.map((item) => (item.kind === "sweet" && sweetsPreorder ? "sweet" : item.kind === "pickle" && picklesPreorder ? "pickle" : "now")),
+  ).size > 1
 
 export function repriceForReorder(items: CartItem[]): CartItem[] {
   const lines = items.flatMap((item) => {

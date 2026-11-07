@@ -350,15 +350,22 @@ create table if not exists public.store_status (
   updated_at timestamptz not null default now()
 );
 alter table public.store_status add column if not exists pickles_coming_soon boolean not null default false;
+-- Pootharekhulu's Preorder switch: on (the default) shows "Arriving soon" and makes it its own preordered order
+alter table public.store_status add column if not exists sweets_coming_soon boolean not null default true;
 insert into public.store_status (id) values (1) on conflict (id) do nothing;
 -- The hostel switches start as the old store-wide switch (only while both are still at their default)
 alter table public.store_status add column if not exists kalam_open boolean not null default true;
 alter table public.store_status add column if not exists asima_open boolean not null default true;
 update public.store_status set kalam_open = is_open, asima_open = is_open where id = 1 and kalam_open and asima_open;
--- Fruit bowls, pickles and sweets each have their own switch; a closed one can't be ordered from either hostel
-alter table public.store_status add column if not exists fruit_open boolean not null default true;
-alter table public.store_status add column if not exists pickles_open boolean not null default true;
-alter table public.store_status add column if not exists sweets_open boolean not null default true;
+-- Fruit bowls, pickles and sweets each have their own switch in each hostel; a closed one can't be ordered there
+alter table public.store_status add column if not exists fruit_kalam_open boolean not null default true;
+alter table public.store_status add column if not exists fruit_asima_open boolean not null default true;
+alter table public.store_status add column if not exists pickles_kalam_open boolean not null default true;
+alter table public.store_status add column if not exists pickles_asima_open boolean not null default true;
+alter table public.store_status add column if not exists sweets_kalam_open boolean not null default true;
+alter table public.store_status add column if not exists sweets_asima_open boolean not null default true;
+-- The earlier one-switch-per-item columns (both hostels at once) are replaced by the ones above
+alter table public.store_status drop column if exists fruit_open, drop column if exists pickles_open, drop column if exists sweets_open;
 
 alter table public.store_status enable row level security;
 

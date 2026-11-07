@@ -120,22 +120,18 @@ type StoreStatusRow = {
   kalam_open?: unknown
   asima_open?: unknown
   pickles_coming_soon?: unknown
-  fruit_open?: unknown
-  pickles_open?: unknown
-  sweets_open?: unknown
+  [column: string]: unknown
 }
-// Fruit bowls, pickles and sweets each have their own switch too; a missing column (SQL not run yet) counts as open
-type Kind = "fruit" | "pickle" | "sweet"
-const KINDS: Array<{ kind: Kind; column: "fruit_open" | "pickles_open" | "sweets_open"; label: string }> = [
-  { kind: "fruit", column: "fruit_open", label: "Fruit bowls" },
-  { kind: "pickle", column: "pickles_open", label: "Pickles" },
-  { kind: "sweet", column: "sweets_open", label: "Sweets" },
-]
-const kindsOpen = (row: StoreStatusRow | null): Record<Kind, boolean> => ({
-  fruit: row?.fruit_open !== false,
-  pickle: row?.pickles_open !== false,
-  sweet: row?.sweets_open !== false,
-})
+// Fruit bowls, pickles and sweets each have their own switch in each hostel (fruit_kalam_open…);
+// a missing column (SQL not run yet) counts as open
+const KIND_SWITCHES = [
+  { label: "Fruit bowls", column: "fruit" },
+  { label: "Pickles", column: "pickles" },
+  { label: "Sweets", column: "sweets" },
+].flatMap((k) => HOSTELS.map((hostel) => ({ label: k.label, hostel, column: `${k.column}_${hostel.toLowerCase()}_open` })))
+type KindSwitch = (typeof KIND_SWITCHES)[number]
+const kindsOpen = (row: StoreStatusRow | null): Record<string, boolean> =>
+  Object.fromEntries(KIND_SWITCHES.map((k) => [k.column, row?.[k.column] !== false]))
 // Each hostel's switch; before its SQL is run (or with no row yet) the store-wide switch stands in for both
 const hostelsOpen = (row: StoreStatusRow | null): Record<Hostel, boolean> => {
   const open = row?.is_open !== false
@@ -252,11 +248,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [storeStatusMissing, setStoreStatusMissing] = useState(false)
   // A row without kalam_open means the hostel switches' SQL hasn't been run yet
   const [hostelSwitchesMissing, setHostelSwitchesMissing] = useState(false)
-  // Fruit bowl / pickle / sweet switches (null until loaded); a row without fruit_open means their SQL hasn't been run
-  const [kindOpen, setKindOpen] = useState<Record<Kind, boolean> | null>(null)
+  // Fruit bowl / pickle / sweet switches per hostel, by column (null until loaded); a row without them means their SQL hasn't been run
+  const [kindOpen, setKindOpen] = useState<Record<string, boolean> | null>(null)
   const [kindSwitchesMissing, setKindSwitchesMissing] = useState(false)
   // Pickles Preorder switch ("Arriving soon" in the store); null until loaded, or while its SQL hasn't been run
   const [picklesSoon, setPicklesSoon] = useState<boolean | null>(null)
+  // Pootharekhulu's Preorder switch, the same way; null until loaded, or while its SQL hasn't been run
+  const [sweetsSoon, setSweetsSoon] = useState<boolean | null>(null)
 
   const [counterSales, setCounterSales] = useState<CounterSale[]>([])
   const [counterSalesState, setCounterSalesState] = useState<"loading" | "ready" | "missing" | "error">("loading")
@@ -498,9 +496,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         setHostelOpen(hostelsOpen(data))
         setHostelSwitchesMissing(Boolean(data) && typeof data.kalam_open !== "boolean")
         setKindOpen(kindsOpen(data))
-        setKindSwitchesMissing(Boolean(data) && typeof data.fruit_open !== "boolean")
+        setKindSwitchesMissing(Boolean(data) && typeof data.fruit_kalam_open !== "boolean")
         // No row yet means pickles are on sale; a row without the column means its SQL hasn't been run
         setPicklesSoon(!data ? false : typeof data.pickles_coming_soon === "boolean" ? data.pickles_coming_soon : null)
+        // No row yet means Pootharekhulu is still on preorder (as it started)
+        setSweetsSoon(!data ? true : typeof data.sweets_coming_soon === "boolean" ? data.sweets_coming_soon : null)
       })
   }
 
@@ -516,6 +516,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       console.error("Pickles switch not saved:", error.message)
       setPicklesSoon(!next)
       alert("Couldn't change the pickles switch. Please check the connection and try again.")
+    }
+  }
+
+  const handleToggleSweetsSoon = async () => {
+    if (!supabase || sweetsSoon === null) return
+    const next = !sweetsSoon
+    if (next && !confirm("Put Pootharekhulu on Preorder? Students will see \"Arriving soon\" and a Preorder button, and it will be ordered on its own and marked Preorder.")) return
+    setSweetsSoon(next)
+    const { error } = await supabase.from("store_status").upsert({ id: 1, sweets_coming_soon: next, updated_at: new Date().toISOString() })
+    if (error) {
+      console.error("Pootharekhulu switch not saved:", error.message)
+      setSweetsSoon(!next)
+      alert("Couldn't change the Pootharekhulu switch. Please check the connection and try again.")
     }
   }
 
@@ -543,13 +556,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-  const handleToggleKind = async ({ kind, column, label }: (typeof KINDS)[number]) => {
+  const handleToggleKind = async ({ label, hostel, column }: KindSwitch) => {
     if (!supabase || kindOpen === null) return
     const before = kindOpen
-    const next = { ...before, [kind]: !before[kind] }
-    if (!next[kind] && !confirm(`Close ${label.toLowerCase()}? Students won't be able to order them until you open them again.`)) return
+    const next = { ...before, [column]: !before[column] }
+    if (!next[column] && !confirm(`Close ${label.toLowerCase()} in ${hostel}? ${hostel} students won't be able to order them until you open them again.`)) return
     setKindOpen(next)
-    const { error } = await supabase.from("store_status").upsert({ id: 1, [column]: next[kind], updated_at: new Date().toISOString() })
+    const { error } = await supabase.from("store_status").upsert({ id: 1, [column]: next[column], updated_at: new Date().toISOString() })
     if (error) {
       console.error("Item switch not saved:", error.message)
       setKindOpen(before)
@@ -572,6 +585,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         if (row) setHostelOpen(hostelsOpen(row))
         if (row) setKindOpen(kindsOpen(row))
         if (typeof row?.pickles_coming_soon === "boolean") setPicklesSoon(row.pickles_coming_soon)
+        if (typeof row?.sweets_coming_soon === "boolean") setSweetsSoon(row.sweets_coming_soon)
       })
       .subscribe()
     // A counter sale or expense added or removed on another phone shows up here too
@@ -1135,18 +1149,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           )
         )}
         {!storeStatusMissing && kindOpen !== null && (
-          <div className="store-status-row kinds">
+          <div className="store-status-row">
             {kindSwitchesMissing && (
               <div className="store-status-bar missing">Run the latest SQL in Supabase to use the Fruit bowls / Pickles / Sweets switches.</div>
             )}
-            {KINDS.map((k) => (
-              <div key={k.kind} className={`store-status-bar ${kindOpen[k.kind] ? "open" : "closed"}`}>
+            {KIND_SWITCHES.map((k) => (
+              <div key={k.column} className={`store-status-bar ${kindOpen[k.column] ? "open" : "closed"}`}>
                 <span>
                   <span className="store-status-dot" />
-                  {kindOpen[k.kind] ? `${k.label} are open` : `${k.label} are closed: students can't order them`}
+                  {kindOpen[k.column] ? `${k.label} in ${k.hostel} are open` : `${k.label} in ${k.hostel} are closed`}
                 </span>
                 <button type="button" className="action-btn-small" disabled={kindSwitchesMissing} onClick={() => handleToggleKind(k)}>
-                  {kindOpen[k.kind] ? `Close ${k.label.toLowerCase()}` : `Open ${k.label.toLowerCase()}`}
+                  {kindOpen[k.column] ? `Close ${k.label.toLowerCase()} in ${k.hostel}` : `Open ${k.label.toLowerCase()} in ${k.hostel}`}
                 </button>
               </div>
             ))}
@@ -1416,6 +1430,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </span>
                 <button type="button" className="action-btn-small" onClick={handleTogglePicklesSoon}>
                   {picklesSoon ? "Put pickles on sale" : "Switch to Preorder"}
+                </button>
+              </div>
+            )}
+
+            {sweetsSoon === null ? (
+              hostelOpen !== null && (
+                <div className="store-status-bar missing">Run the latest SQL in Supabase to use the Pootharekhulu Preorder switch.</div>
+              )
+            ) : (
+              <div className={`store-status-bar ${sweetsSoon ? "soon" : "open"}`}>
+                <span>
+                  <span className="store-status-dot" />
+                  {sweetsSoon ? "Pootharekhulu is on Preorder: students see “Arriving soon”" : "Pootharekhulu is on sale"}
+                </span>
+                <button type="button" className="action-btn-small" onClick={handleToggleSweetsSoon}>
+                  {sweetsSoon ? "Put Pootharekhulu on sale" : "Switch to Preorder"}
                 </button>
               </div>
             )}

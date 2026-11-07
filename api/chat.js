@@ -99,9 +99,15 @@ export async function POST(request) {
       if (open === false) system += `\n- Right now ${hostel} is CLOSED and ${hostel} orders are paused; the other hostel is open. If asked about ordering for ${hostel}, say it's unavailable at the moment and to check back later.`
     }
   }
-  // The admin can close fruit bowls, pickles or sweets on their own
-  for (const [what, open] of [["Fruit bowls", body?.fruitOpen], ["Pickles", body?.picklesOpen], ["Pootharekhulu (Sweets & Snacks)", body?.sweetsOpen]]) {
-    if (open === false) system += `\n- Right now ${what} are CLOSED and can't be ordered. If asked about them, say they're unavailable at the moment and to check back later.`
+  // The admin can close fruit bowls, pickles or sweets in one hostel or both, e.g. closedItems: ["fruit:Kalam"]
+  const ITEM_NAMES = { fruit: "Fruit bowls", pickle: "Pickles", sweet: "Pootharekhulu (Sweets & Snacks)" }
+  const closed = Array.isArray(body?.closedItems) ? body.closedItems.filter((c) => /^(fruit|pickle|sweet):(Kalam|Asima)$/.test(c)) : []
+  for (const [kind, what] of Object.entries(ITEM_NAMES)) {
+    const where = closed.filter((c) => c.startsWith(`${kind}:`)).map((c) => c.split(":")[1])
+    if (where.length) system += `\n- Right now ${what} are CLOSED in ${where.join(" and ")} and can't be ordered there. If asked, say they're unavailable there at the moment and to check back later.`
+  }
+  if (body?.sweetsSoon === false) {
+    system += "\n- Update (this replaces the preorder part of the Sweets & Snacks fact): Pootharekhulu is NOT on preorder now. It's in stock and can be ordered right away on the Sweets & Snacks page, together with other items; it's still one pack per order and still paid in person when the student gets it."
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
