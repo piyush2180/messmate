@@ -15,7 +15,6 @@ import {
   pootharekuluCartItem,
   preorderWait,
   PICKLES_ARRIVAL,
-  PICKLES_ARRIVAL_SHORT,
   PREORDER_TAG,
   bowlLeftOut,
   fruitBowlCartItem,
@@ -197,7 +196,7 @@ const preorderDetail = (item: CartItem, preorder: boolean) => {
   const arrives = item.kind === "sweet" ? SWEETS_ARRIVAL : preorder && item.kind === "pickle" ? PICKLES_ARRIVAL : null
   return arrives ? (
     <>
-      {item.detail} · Preorder, delivered on <strong>{arrives}</strong>
+      {item.detail} · Preorder, delivered <strong>{arrives}</strong>
     </>
   ) : (
     item.detail
@@ -860,7 +859,7 @@ function Home({
             labels={["Homemade", "South Indian", "Small-batch"]}
             cta={picklesSoon ? "Preorder pickles" : "Explore pickles"}
             onClick={() => go("pickles")}
-            soon={picklesSoon ? `Arriving ${PICKLES_ARRIVAL}` : undefined}
+            soon={picklesSoon ? `Delivering ${PICKLES_ARRIVAL}` : undefined}
           />
           <CategoryCard
             type="fruit"
@@ -1072,8 +1071,7 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
-                  {/* A phone-width card has no room for "(approx)"; the pickle's own page and the cart show it */}
-                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Arriving {PICKLES_ARRIVAL_SHORT}</span>}
+                  {!isSoldOut && preorder && <span className="arriving-soon-chip">Delivering {PICKLES_ARRIVAL}</span>}
                 </div>
                 <div className="product-info">
                   <div className="product-meta-row">
@@ -1162,7 +1160,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
-            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Arriving {PICKLES_ARRIVAL}</span>}
+            {preorder && !isSoldOut && <span className="arriving-soon-chip inline">Delivering {PICKLES_ARRIVAL}</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
@@ -1214,7 +1212,7 @@ function PickleDetail({
                   className="desktop-pack-tag"
                   style={isSoldOut ? { color: "#d90429", background: "#fee2e2" } : {}}
                 >
-                  {isSoldOut ? "Temporarily Sold Out" : preorder ? `Arriving ${PICKLES_ARRIVAL} · preorder now` : "In stock today"}
+                  {isSoldOut ? "Temporarily Sold Out" : preorder ? `Delivering ${PICKLES_ARRIVAL} · preorder now` : "In stock today"}
                 </div>
               </div>
               <PrimaryButton tone="pickle" onClick={handleAdd} disabled={isSoldOut}>
@@ -1557,13 +1555,13 @@ function Cart({
                   <Icon name="clock" size={16} />
                   {items.some((item) => item.kind === "sweet") ? (
                     <span>
-                      {POOTHAREKULU_NAME} arrives on <strong>{SWEETS_ARRIVAL}</strong>, so please order it separately from your other
+                      {POOTHAREKULU_NAME} arrives <strong>{SWEETS_ARRIVAL}</strong>, so please order it separately from your other
                       items.
                     </span>
                   ) : (
                     <span>
-                      Preordered pickles arrive on <strong>{PICKLES_ARRIVAL}</strong>, so please order them separately from fruit
-                      bowls.
+                      Preordered pickles are delivered <strong>{PICKLES_ARRIVAL}</strong> in their own order, so please order fruit
+                      bowls separately.
                     </span>
                   )}
                 </div>
@@ -2554,7 +2552,7 @@ function Confirmation({
             <div className="preorder-date-note">
               <Icon name="clock" size={16} />
               <span>
-                Your {wait.what} will be {fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on{" "}
+                Your {wait.what} will be {fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"}{" "}
                 <strong>{wait.when}</strong>.
               </span>
             </div>
@@ -3159,7 +3157,7 @@ function OrdersPage({
                           <Icon name="clock" size={16} />
                           <span>
                             {wait.what === "pickles" ? "Pickles" : wait.what} in this order will be{" "}
-                            {order.fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} on <strong>{wait.when}</strong>.
+                            {order.fulfilment === "pickup" ? `ready at ${ASIMA_PICKUP}` : "delivered"} <strong>{wait.when}</strong>.
                           </span>
                         </div>
                       )
@@ -4160,8 +4158,8 @@ function ResumeNotice() {
         </button>
         <h2 id="resume-notice-title">Hey everyone! 👋</h2>
         <p>
-          We're happy to announce that we're back! Thank you for your patience and support. We look forward to serving you
-          again! ❤️
+          We're happy to announce that we're back! We're sorry for the delay, and thank you for your patience and support. We
+          look forward to serving you again! ❤️
         </p>
         <ul className="notice-hostels">
           <li>
@@ -4175,11 +4173,12 @@ function ResumeNotice() {
             </span>
           </li>
           <li>
-            <strong>Preorder</strong>
-            <span>
-              Homemade pickles (arriving around {PICKLES_ARRIVAL_SHORT}) and {POOTHAREKULU_NAME} (arriving{" "}
-              {SWEETS_ARRIVAL}) can both be preordered now
-            </span>
+            <strong>Pickles</strong>
+            <span>Homemade pickles are being delivered {PICKLES_ARRIVAL}</span>
+          </li>
+          <li>
+            <strong>Sweets</strong>
+            <span>{POOTHAREKULU_NAME} is coming {SWEETS_ARRIVAL}, and you can preorder it now</span>
           </li>
         </ul>
         <PrimaryButton onClick={close}>Got it</PrimaryButton>
@@ -4282,7 +4281,7 @@ export default function App() {
   // Each hostel's Open / Closed switch from the admin. Stays open if it can't be read, so ordering never breaks by accident.
   const [hostelOpen, setHostelOpen] = useState<HostelOpen>({ Kalam: true, Asima: true })
   const storeOpen = hostelOpen.Kalam || hostelOpen.Asima
-  // The admin's Preorder switch for pickles ("Arriving soon"); plain add-to-cart if it can't be read
+  // The admin's Preorder switch for pickles (the "Delivering today" chips); plain add-to-cart if it can't be read
   const [picklesSoon, setPicklesSoon] = useState(false)
   const applyStoreStatus = (row: StoreStatusRow | null) => {
     if (row) setHostelOpen(hostelsOpen(row))
@@ -4612,7 +4611,7 @@ export default function App() {
       const preorder = typeof status?.pickles_coming_soon === "boolean" ? status.pickles_coming_soon : picklesSoon
       setPicklesSoon(preorder)
       if (mixesPreorder(cart, preorder)) {
-        alert("Items that arrive on different days need separate orders, so the order wasn't placed.")
+        alert("Preorders need their own order, separate from other items, so the order wasn't placed.")
         go("cart")
         return
       }

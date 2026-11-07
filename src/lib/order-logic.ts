@@ -225,14 +225,14 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
   // Pootharekulu has its own packs and preorder date, so sweets questions come before the general price answer
   if (/\b(sweets?|snacks?|mithai|pootharekulu|pootharekhulu|poothareku|putharekulu|pootarekulu|atreyapuram)\b/.test(q)) {
     const packs = POOTHAREKULU_PACKS.map((p) => `${p.label} ₹${p.price}`).join(", ")
-    return `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's on preorder and arrives on ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
+    return `${POOTHAREKULU_NAME} comes in packs: ${packs} (one pack per order). It's on preorder and arrives ${SWEETS_ARRIVAL}, and you pay when it arrives. Preorder it now on the Sweets & Snacks page, as its own order!`
   }
   const ratingTalk = /\b(rating|ratings|review|reviews|feedback|stars?)\b/.test(q) || /\brate (my|the|this|our|your)\b/.test(q)
   if (q.includes("price") || q.includes("cost") || q.includes("how much") || /\b(kitna|kitne|kitni|rates?)\b/.test(q)) {
     if (!ratingTalk) {
       const chicken = pickleProducts.find((p) => p.diet === "non_veg")
       const veg = pickleProducts.find((p) => p.diet === "veg")
-      const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder for ${PICKLES_ARRIVAL}` : ""}.`
+      const pickles = `Pickles come in ${packOptions[0].label} packs: ₹${veg?.price} each${chicken ? ` (${chicken.name} ₹${chicken.price})` : ""}${picklesSoon ? `, on preorder and delivered ${PICKLES_ARRIVAL}` : ""}.`
       return `${pickles} Fruit bowls are a fixed ₹${FRUIT_BOWL_PRICE}. ${POOTHAREKULU_NAME} is ${POOTHAREKULU_PACKS.map((p) => `₹${p.price} for ${p.label}`).join(", ")}. Room delivery is ₹${DELIVERY_FEE}; Asima pickup is free.`
     }
   }
@@ -242,15 +242,15 @@ export function getFaqResponse(query: string, picklesSoon = false, open: boolean
   const aboutPickles = /\b(pickles?|achaa?r|mango|gongura|tomato|chicken)\b/.test(q)
   if (aboutPickles && /\b(fruits?|bowls?)\b/.test(q)) {
     return picklesSoon
-      ? `Pickles are on preorder and arrive on ${PICKLES_ARRIVAL}, while fruit bowls go out sooner, so please order them separately: one order for the fruit bowl and one for the pickles.`
+      ? `Preordered pickles are delivered ${PICKLES_ARRIVAL} in their own order, so please order them separately: one order for the fruit bowl and one for the pickles.`
       : "Yes! Add both to your cart. In Kalam they come to your room together; in Asima an order with a fruit bowl is all picked up near the Asima mess."
   }
   if (aboutPickles && /\b(deliver|delivery|delivered|room|pickup|pick up|collect|asima|kalam)\b/.test(q)) {
     const how = `In Asima, pickle orders are picked up free from ${ASIMA_PICKUP} or delivered to your room for ₹${DELIVERY_FEE}; in Kalam they come to your room (₹${DELIVERY_FEE}). Choose at checkout!`
-    return picklesSoon ? `Pickles arrive on ${PICKLES_ARRIVAL}. ${how}` : how
+    return picklesSoon ? `Pickles are delivered ${PICKLES_ARRIVAL}. ${how}` : how
   }
   if (picklesSoon && aboutPickles) {
-    return `Our homemade pickles arrive on ${PICKLES_ARRIVAL}, so preorder them now on the Pickles page and we'll deliver them then!`
+    return `Our homemade pickles are delivered ${PICKLES_ARRIVAL}, so preorder them now on the Pickles page!`
   }
   if (q.includes("sold out") || q.includes("stock") || q.includes("unavailable") || q.includes("out of stock")) {
     return "Items that run out in the kitchen are marked 'Sold Out' in real-time. Fresh batches are prepared before every delivery slot!"

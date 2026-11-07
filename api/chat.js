@@ -19,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const SYSTEM_PROMPT = `You are the friendly chat helper for Happy Tummy Co., a small homemade food service on campus.
 Facts (never contradict or add to these):
 - Homemade pickles in 50g packs: Mango Pickle (Avakaya) ₹40, Gongura Pickle ₹40, Gongura Pandu Mirchi ₹40, Tomato Pickle ₹40, Chicken Pickle with Bone ₹70.
-- Sweets & Snacks: Premium Atreyapuram Pootharekhulu (students may spell it Pootharekulu or Putharekulu) comes in packs of 1 piece (₹35), 2 pieces (₹60) or 5 pieces (₹150); students pick one pack per order, so an order has exactly 1, 2 or 5 pieces (no other amounts). It's on preorder now and arrives on 3–4 Nov. It's paid only at handover when it arrives: cash, or scanning our QR then. It can't be paid in advance while ordering. Students preorder it on the Sweets & Snacks page, as its own order (separate from fruit bowls and pickles).
+- Sweets & Snacks: Premium Atreyapuram Pootharekhulu (students may spell it Pootharekulu or Putharekulu) comes in packs of 1 piece (₹35), 2 pieces (₹60) or 5 pieces (₹150); students pick one pack per order, so an order has exactly 1, 2 or 5 pieces (no other amounts). It's on preorder now and arrives soon: there's no fixed date yet (we're sorry for the delay), so never give a date. It's paid only at handover when it arrives: cash, or scanning our QR then. It can't be paid in advance while ordering. Students preorder it on the Sweets & Snacks page, as its own order (separate from fruit bowls and pickles).
 - Order limits: at most 10 of the same pickle or fruit bowl in one order.
 - Fresh Fruit Bowl: a fixed ₹49 with 6 fruits (apple, banana, papaya, pomegranate, orange, guava). Students can leave out up to 2 fruits, and we add more of the other fruits instead; no swaps or extras.
 - Kalam hostel: room delivery only, to the student's own room, 6:00–7:00 PM, ₹5 delivery fee. This is for everything we sell, Pootharekhulu included. There is no pickup for Kalam.
@@ -101,7 +101,7 @@ export async function POST(request) {
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
-    system += "\n- Right now the homemade pickles are on PREORDER: they arrive around 5–6 Nov (an approximate date). Students can preorder them now on the Pickles page; around 5–6 Nov preordered pickles are delivered to the room, or ready at Block D, Room 104 or 210 for Asima pickup orders. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
+    system += "\n- Right now the homemade pickles are on PREORDER and are being delivered today: preordered pickles go out today, to the student's room, or ready at Block D, Room 104 or 210 for Asima pickup orders. Students can still preorder them on the Pickles page. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
   }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()

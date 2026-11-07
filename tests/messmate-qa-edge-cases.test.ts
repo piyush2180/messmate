@@ -798,12 +798,12 @@ test("Support merge - the same text sent twice is two messages once both are sav
 
 test("FAQ Bot - while pickles are on Preorder, pickle questions give the arrival date and say they can be preordered", () => {
   const reply = getFaqResponse("do you have pickles?", true)
-  assert.match(reply, /arrive on 5–6 Nov \(approx\)/)
+  assert.match(reply, /are delivered today/)
   assert.match(reply, /preorder/i)
-  assert.match(getFaqResponse("when will mango achar be back?", true), /5–6 Nov/) // not the delivery-times answer
+  assert.match(getFaqResponse("when will mango achar be back?", true), /delivered today/) // not the delivery-times answer
   const price = getFaqResponse("how much does it cost?", true)
   assert.match(price, /₹40 each/)
-  assert.match(price, /on preorder for 5–6 Nov \(approx\)\./)
+  assert.match(price, /on preorder and delivered today\./)
   assert.match(price, /fixed ₹49/)
   // Back on sale: the usual answers
   assert.match(getFaqResponse("do you have pickles?"), /Mango Pickle/)
@@ -843,10 +843,10 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
   assert.ok([...weekday, ...weekend].every((s) => ALL_SLOTS.includes(s)))
 })
 
-test("FAQ Bot - Sweets & Snacks gives Pootharekulu's pack prices and its 3–4 Nov preorder", () => {
+test("FAQ Bot - Sweets & Snacks gives Pootharekulu's pack prices and says it's on preorder, arriving soon", () => {
   assert.match(
     getFaqResponse("do you have pootharekulu?"),
-    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹35, 2 pcs ₹60, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives on 3–4 Nov/,
+    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹35, 2 pcs ₹60, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives soon,/,
   )
   assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
   assert.match(getFaqResponse("price of sweets?"), /5 pcs ₹150/)
@@ -880,7 +880,7 @@ test("Pootharekulu - is always its own order, and a past one reorders as a fresh
   assert.equal(mixesPreorder([sweet, sweet], false), false)
   assert.equal(mixesPreorder([sweet, { kind: "fruit" }], false), true)
   assert.equal(mixesPreorder([sweet, { kind: "pickle" }], false), true) // pickles in stock go out sooner
-  assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles arrive on another day
+  assert.equal(mixesPreorder([sweet, { kind: "pickle" }], true), true) // preordered pickles go in their own order
   // A ₹0 line from before the rename and the price (3 of them) and a second pack size: it comes back as one pack
   // at today's price, since an order only ever has 1, 2 or 5 pieces
   const past: CartItem[] = [
@@ -911,7 +911,7 @@ test("Order limits - one Pootharekulu pack and at most 10 of anything else, even
     { ...fruitBowlCartItem(["Papaya"]), quantity: 3 },
   ]
   assert.deepEqual(repriceForReorder(huge).map((i) => i.quantity), [1, 10, 10, 3])
-  assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Premium Atreyapuram Pootharekhulu", when: "3–4 Nov" })
+  assert.deepEqual(preorderWait([{ kind: "sweet", detail: "5 pcs · Preorder" }]), { what: "Premium Atreyapuram Pootharekhulu", when: "soon" })
   assert.equal(preorderWait([{ kind: "pickle", detail: "50g · Preorder" }])?.what, "pickles")
 })
 
@@ -983,7 +983,7 @@ test("FAQ Bot - fruit and pickles together: separate orders while pickles are on
 
 test("FAQ Bot - Asima pickle delivery questions give the pickup and room delivery options", () => {
   const reply = getFaqResponse("can I get pickles delivered to my room in asima?", true)
-  assert.match(reply, /arrive on 5–6 Nov/)
+  assert.match(reply, /^Pickles are delivered today\./)
   assert.match(reply, /picked up free from Block D, Room 104 or 210 or delivered to your room for ₹5/)
   assert.match(getFaqResponse("when will mango achar be back?", true), /preorder them now/) // plain pickle questions keep the preorder answer
 })

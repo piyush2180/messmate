@@ -91,7 +91,7 @@ export function toggleLeftOut(current: string[], name: string): string[] {
   return current.length >= MAX_LEFT_OUT ? current : [...current, name]
 }
 
-// Sweets & Snacks: Pootharekulu, on preorder until it arrives on SWEETS_ARRIVAL, in packs of 1, 2 or 5 (bigger packs cost less a piece)
+// Sweets & Snacks: Pootharekulu, on preorder until it arrives (SWEETS_ARRIVAL), in packs of 1, 2 or 5 (bigger packs cost less a piece)
 export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
 export const POOTHAREKULU_PACKS = [
   { label: "1 pc", pieces: 1, price: 35 },
@@ -99,7 +99,8 @@ export const POOTHAREKULU_PACKS = [
   { label: "5 pcs", pieces: 5, price: 150 },
 ]
 export type PootharekuluPack = (typeof POOTHAREKULU_PACKS)[number]
-export const SWEETS_ARRIVAL = "3–4 Nov"
+// Reads after "arriving" or "delivered": "soon", or "on 12 Nov" once there's a date (keep api/chat.js in step)
+export const SWEETS_ARRIVAL = "soon"
 /** Pootharekulu is one pack per order, so an order has exactly 1, 2 or 5 pieces. */
 export const pootharekuluCartItem = (pack: PootharekuluPack): CartItem => ({
   id: `sweet-pootharekulu-${pack.pieces}`,
@@ -156,9 +157,9 @@ export function bowlLeftOut(id: string): string[] {
 
 // Pickle lines ordered while pickles are on Preorder carry this after the pack size, so the kitchen sees it
 export const PREORDER_TAG = " · Preorder"
-// When preordered pickles arrive; shown while the admin's Preorder switch is on (keep api/chat.js in step)
-export const PICKLES_ARRIVAL_SHORT = "5–6 Nov"
-export const PICKLES_ARRIVAL = `${PICKLES_ARRIVAL_SHORT} (approx)`
+// When preordered pickles go out, read after "delivered": "today", or "on 5–6 Nov" once there's a date.
+// Shown while the admin's Preorder switch is on (keep api/chat.js in step)
+export const PICKLES_ARRIVAL = "today"
 export const hasPreorderLine = (items: Array<{ detail?: string }> | null | undefined) =>
   Array.isArray(items) && items.some((item) => String(item?.detail ?? "").includes(PREORDER_TAG))
 /** What a placed order's preorder lines are waiting for (an order never mixes preordered pickles and Pootharekulu). */
@@ -168,8 +169,8 @@ export const preorderWait = (items: Array<{ detail?: string; kind?: string }> | 
     : (items ?? []).some((item) => item?.kind === "sweet")
       ? { what: POOTHAREKULU_NAME, when: SWEETS_ARRIVAL }
       : { what: "pickles", when: PICKLES_ARRIVAL }
-// Fruit bowls (and in-stock pickles) go out within a day, preordered pickles on PICKLES_ARRIVAL and Pootharekulu on
-// SWEETS_ARRIVAL. An order has one status, so items that arrive on different days are ordered apart.
+// Fruit bowls (and in-stock pickles) go out within a day, preordered pickles and Pootharekulu when they arrive
+// (PICKLES_ARRIVAL, SWEETS_ARRIVAL). An order has one status, so preorders are ordered apart from everything else.
 export const mixesPreorder = (items: Array<{ kind?: string }>, picklesPreorder: boolean) =>
   new Set(items.map((item) => (item.kind === "sweet" ? "sweet" : item.kind === "pickle" && picklesPreorder ? "pickle" : "now"))).size > 1
 
