@@ -52,7 +52,7 @@ export type SupportMessage = {
 export type MenuItemStock = {
   id: string
   name: string
-  category: "Pickles" | "Fruits" | "Bowls"
+  category: "Pickles" | "Fruits" | "Bowls" | "Sweets"
   is_available: boolean
 }
 

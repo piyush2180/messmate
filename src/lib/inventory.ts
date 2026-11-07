@@ -1,7 +1,7 @@
 export type MenuItemStock = {
   id: string
   name: string
-  category: "Pickles" | "Fruits" | "Bowls"
+  category: "Pickles" | "Fruits" | "Bowls" | "Sweets"
   is_available: boolean
 }
 
@@ -209,6 +209,7 @@ export const DEFAULT_MENU_ITEMS: MenuItemStock[] = [
   { id: "fruit-pomegranate", name: "Pomegranate", category: "Fruits", is_available: true },
   { id: "fruit-orange", name: "Orange", category: "Fruits", is_available: true },
   { id: "fruit-guava", name: "Guava", category: "Fruits", is_available: true },
+  { id: "pootharekulu", name: POOTHAREKULU_NAME, category: "Sweets", is_available: true },
 ]
 
 export function getPickupPin(order: { pickup_code?: string; order_number?: number | string }): string {

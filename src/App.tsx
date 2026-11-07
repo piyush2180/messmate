@@ -217,13 +217,15 @@ const ITEM_KIND_LABEL = { pickle: "Homemade pickle", fruit: "Fresh bowl", sweet:
 
 const ALL_KINDS_OPEN: KindsOpen = { fruit: true, pickle: true, sweet: true }
 const CLOSED_CHIP = "Closed right now"
+const SOLD_OUT_CHIP = "Sold out"
 // Shown on a page whose fruit bowl / pickle / sweet switch is closed in admin
-const KindClosedNote = ({ kind }: { kind: keyof KindsOpen }) => (
+const StatusNote = ({ text }: { text: string }) => (
   <div className="preorder-date-note" role="status">
     <Icon name="clock" size={16} />
-    <span>{KIND_CLOSED[kind]}. Please check back later.</span>
+    <span>{text} Please check back later.</span>
   </div>
 )
+const KindClosedNote = ({ kind }: { kind: keyof KindsOpen }) => <StatusNote text={`${KIND_CLOSED[kind]}.`} />
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>, open?: KindsOpen): string | null {
@@ -783,12 +785,14 @@ function Home({
   cartTotal,
   picklesSoon = false,
   kindOpen = ALL_KINDS_OPEN,
+  soldOutItems = new Set<string>(),
 }: {
   go: (screen: Screen) => void
   cartCount: number
   cartTotal: number
   picklesSoon?: boolean
   kindOpen?: KindsOpen
+  soldOutItems?: Set<string>
 }) {
   return (
     <>
@@ -887,7 +891,7 @@ function Home({
             labels={["Fresh", `₹${FRUIT_BOWL_PRICE} fixed`, "Made to order"]}
             cta="Order a bowl"
             onClick={() => go("fruit-builder")}
-            soon={kindOpen.fruit ? undefined : CLOSED_CHIP}
+            soon={!kindOpen.fruit ? CLOSED_CHIP : soldOutItems.has(FRUIT_BOWL_NAME) ? "Sold out today" : undefined}
           />
           <CategoryCard
             type="sweet"
@@ -899,7 +903,7 @@ function Home({
             labels={["Traditional", `From ₹${POOTHAREKULU_PACKS[0].price}`, "1, 2 or 5 pcs"]}
             cta="Preorder now"
             onClick={() => go("sweets")}
-            soon={kindOpen.sweet ? `Arriving ${SWEETS_ARRIVAL}` : CLOSED_CHIP}
+            soon={!kindOpen.sweet ? CLOSED_CHIP : soldOutItems.has(POOTHAREKULU_NAME) ? SOLD_OUT_CHIP : `Arriving ${SWEETS_ARRIVAL}`}
           />
         </section>
         <section className="coming-soon">
@@ -969,11 +973,13 @@ function SweetsPage({
   cartCount,
   add,
   closed = false,
+  soldOut = false,
 }: {
   go: (screen: Screen) => void
   cartCount: number
   add: (item: CartItem) => void
   closed?: boolean
+  soldOut?: boolean
 }) {
   const [showVideo, setShowVideo] = useState(false)
   const [pack, setPack] = useState(POOTHAREKULU_PACKS[0])
@@ -998,12 +1004,12 @@ function SweetsPage({
           </h1>
           <p>Traditional sweets for after mess dinner, starting with {POOTHAREKULU_NAME}.</p>
         </section>
-        {closed && <KindClosedNote kind="sweet" />}
+        {closed ? <KindClosedNote kind="sweet" /> : soldOut && <StatusNote text={`${POOTHAREKULU_NAME} is sold out right now.`} />}
         <div className="product-grid">
           <article className="product-card sweet-card">
             <button type="button" className="product-image-wrap watch-making" onClick={() => setShowVideo(true)}>
               <img src={pootharekuluImage} alt={`${POOTHAREKULU_NAME} rolls`} />
-              <span className="arriving-soon-chip">{closed ? CLOSED_CHIP : `Arriving ${SWEETS_ARRIVAL}`}</span>
+              <span className="arriving-soon-chip">{closed ? CLOSED_CHIP : soldOut ? SOLD_OUT_CHIP : `Arriving ${SWEETS_ARRIVAL}`}</span>
               <span className="watch-badge">
                 <Icon name="play" size={12} /> Watch how it's made
               </span>
@@ -1031,15 +1037,15 @@ function SweetsPage({
                   <small>{pack.label} pack</small>
                   <strong>₹{pack.price}</strong>
                 </div>
-                <button type="button" className="preorder-btn" disabled={closed} onClick={() => add(pootharekuluCartItem(pack))}>
-                  {closed ? "Closed" : "Preorder"}
+                <button type="button" className="preorder-btn" disabled={closed || soldOut} onClick={() => add(pootharekuluCartItem(pack))}>
+                  {closed ? "Closed" : soldOut ? "Sold out" : "Preorder"}
                 </button>
               </div>
             </div>
           </article>
         </div>
       </main>
-      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={closed ? undefined : () => add(pootharekuluCartItem(pack))} />}
+      {showVideo && <MakingVideo onClose={() => setShowVideo(false)} onPreorder={closed || soldOut ? undefined : () => add(pootharekuluCartItem(pack))} />}
     </>
   )
 }
@@ -1186,6 +1192,7 @@ function PickleDetail({
             </aside>
           </div>
           <section className="detail-copy">
+            {isSoldOut && !closed && <StatusNote text={`${product.name} is sold out right now.`} />}
             {(closed || preorder) && !isSoldOut && <span className="arriving-soon-chip inline">{closed ? CLOSED_CHIP : `Delivering ${PICKLES_ARRIVAL}`}</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
@@ -1321,6 +1328,7 @@ function FruitBuilder({
                 <img src={fruitImage} alt="Fresh mixed fruit bowl" />
               </div>
             </section>
+            {closed ? <KindClosedNote kind="fruit" /> : bowlSoldOut && <StatusNote text="Fruit bowls are sold out today." />}
             <div className="builder-note">
               <Icon name="clock" size={18} />
               <span>
@@ -4872,7 +4880,7 @@ export default function App() {
         )}
 
         {screen === "home" && (
-          <Home go={go} cartCount={cartCount} cartTotal={total} picklesSoon={picklesSoon} kindOpen={kindOpen} />
+          <Home go={go} cartCount={cartCount} cartTotal={total} picklesSoon={picklesSoon} kindOpen={kindOpen} soldOutItems={soldOutItems} />
         )}
         {screen === "pickles" && (
           <PickleList
@@ -4898,7 +4906,7 @@ export default function App() {
             closed={!kindOpen.pickle}
           />
         )}
-        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} />}
+        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} soldOut={soldOutItems.has(POOTHAREKULU_NAME)} />}
         {screen === "fruit-builder" && (
           <FruitBuilder
             go={go}

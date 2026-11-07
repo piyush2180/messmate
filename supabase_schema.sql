@@ -230,7 +230,8 @@ values
   ('gongura-pandu-mirchi', 'Gongura Pandu Mirchi', 'Pickles', true),
   ('tomato', 'Tomato Pickle', 'Pickles', true),
   ('chicken', 'Chicken Pickle with Bone', 'Pickles', true),
-  ('fruit-bowl', 'Fresh Fruit Bowl', 'Bowls', true)
+  ('fruit-bowl', 'Fresh Fruit Bowl', 'Bowls', true),
+  ('pootharekulu', 'Premium Atreyapuram Pootharekhulu', 'Sweets', true)
 on conflict (id) do nothing;
 
 -- ============================================================================

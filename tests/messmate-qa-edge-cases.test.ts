@@ -32,6 +32,9 @@ import {
 } from "../src/lib/order-logic.ts"
 import {
   pickleProducts,
+  FRUIT_BOWL_NAME,
+  POOTHAREKULU_NAME,
+  DEFAULT_MENU_ITEMS as STORE_MENU,
   packOptions,
   pickleCartItem,
   bowlLeftOut,
@@ -1015,4 +1018,11 @@ test("Item switches - fruit bowls, pickles and sweets close on their own; missin
   assert.match(getFaqResponse("do you have pootharekulu?", false, true, closedSweets), /is closed right now. Please check back later!/)
   assert.match(getFaqResponse("price of mango pickle?", false, true, closedSweets), /₹40/) // pickles still open
   assert.match(getFaqResponse("fruit bowl available?", false, true, { fruit: false, pickle: true, sweet: true }), /^Fruit bowls are closed right now/)
+})
+
+test("Menu & Stock - every product on the store has a Sold Out button, in both apps", async () => {
+  const { DEFAULT_MENU_ITEMS: adminMenu } = await import("../admin-app/src/lib/inventory.ts")
+  const products = [...pickleProducts.map((p) => p.name), FRUIT_BOWL_NAME, POOTHAREKULU_NAME] // each fruit has its own row too (category Fruits)
+  for (const name of products) assert.ok(STORE_MENU.some((i) => i.name === name), `store menu misses ${name}`)
+  assert.deepEqual(adminMenu.map((i) => [i.id, i.name, i.category]), STORE_MENU.map((i) => [i.id, i.name, i.category]))
 })

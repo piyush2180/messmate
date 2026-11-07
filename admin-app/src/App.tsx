@@ -1391,7 +1391,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </p>
               </div>
               <div className="inventory-category-pills">
-                {["all", "pickles", "fruits", "bowls"].map((cat) => (
+                {["all", "pickles", "fruits", "bowls", "sweets"].map((cat) => (
                   <button
                     key={cat}
                     type="button"
