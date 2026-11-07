@@ -4163,16 +4163,6 @@ function ResumeNotice() {
         </p>
         <ul className="notice-hostels">
           <li>
-            <strong>Kalam</strong>
-            <span>Find us near the mess area in the evening, or preorder and get it delivered 6–7 PM</span>
-          </li>
-          <li>
-            <strong>Asima</strong>
-            <span>
-              Available at the counter near the mess: {HOSTEL_SLOTS.Asima[0]} on weekdays, {ASIMA_WEEKEND[0]} on weekends
-            </span>
-          </li>
-          <li>
             <strong>Pickles</strong>
             <span>Homemade pickles are being delivered {PICKLES_ARRIVAL}</span>
           </li>
