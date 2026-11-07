@@ -514,11 +514,17 @@ function Header({
   activeScreen?: Screen
   go?: (screen: Screen) => void
 }) {
+  // Back goes to the page the student came from, like the phone's Back; onBack is only for a first page (a link or reload)
+  const back = onBack && (() => {
+    const state = window.history.state
+    if (typeof state?.depth === "number" && state.depth > 0 && !state.chat) window.history.back()
+    else onBack()
+  })
   return (
     <header className="header">
       <div className="header-mobile-left">
         {onBack ? (
-          <button className="icon-button" onClick={onBack} aria-label="Go back">
+          <button className="icon-button" onClick={back} aria-label="Go back">
             <Icon name="arrow-left" />
           </button>
         ) : (
@@ -529,7 +535,7 @@ function Header({
       <div className="header-desktop-brand">
         <Brand onClick={go ? () => go("home") : undefined} />
         {onBack && (
-          <button className="desktop-back-btn" onClick={onBack}>
+          <button className="desktop-back-btn" onClick={back}>
             <Icon name="arrow-left" size={15} />
             <span>Back</span>
           </button>
