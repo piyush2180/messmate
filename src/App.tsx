@@ -165,7 +165,7 @@ const contactDigits = CONTACT_PHONE.replace(/\D/g, "")
 const ASIMA_CONTACTS = ["+91 82527 48806", "+91 99081 81705"]
 
 // Our only hostels. Kalam gets room delivery. In Asima, fruit bowl orders are collected near the mess, and
-// pickle-only orders from Room 104 or 210 unless they choose room delivery (see fulfilmentFor)
+// pickle-only orders from Room 104 unless they choose room delivery (see fulfilmentFor)
 const MESS_PICKUP = "Near Asima Mess"
 const ROOMS_PICKUP = `Asima, ${ASIMA_PICKUP}`
 const pickupPointFor = (items: Array<{ kind?: string }> | null | undefined) =>
@@ -1896,7 +1896,7 @@ function Checkout({
                 <span className="fulfilment-icon">
                   <Icon name="location" />
                 </span>
-                {/* Fruit bowls are collected near the mess in the morning window; pickle orders from Room 104 or 210, with no set time yet */}
+                {/* Fruit bowls are collected near the mess in the morning window; pickle orders from Room 104, with no set time yet */}
                 {hasFruit ? (
                   <span>
                     <strong>Asima · {MESS_PICKUP}</strong>
@@ -3187,7 +3187,7 @@ function OrdersPage({
                         </div>
                         <div>
                           <strong>
-                            {/* Fruit bowl orders are collected near the mess, pickle orders (older ones too) from Room 104 or 210 */}
+                            {/* Fruit bowl orders are collected near the mess, pickle orders (older ones too) from Room 104 */}
                             {order.fulfilment === "pickup"
                               ? pickupPointFor(order.items)
                               : `${order.hostel}, Room ${order.room}`}
@@ -4863,7 +4863,7 @@ export default function App() {
                 ) : (
                   <>
                     <strong>Order #{activeReadyOrder.order_number} is READY for Pickup!</strong>
-                    {/* Fruit bowls near the mess, pickle orders (older ones too) at Room 104 or 210 */}
+                    {/* Fruit bowls near the mess, pickle orders (older ones too) at Room 104 */}
                     <p>
                       {pickupPointFor(activeReadyOrder.items) === MESS_PICKUP ? <u>{MESS_PICKUP}</u> : <>At <u>{ASIMA_PICKUP}</u></>} · PIN:{" "}
                       <b>{getPickupPin(activeReadyOrder)}</b>

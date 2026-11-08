@@ -106,11 +106,11 @@ function mergeSupportMessages(
 const ENTRY_LABEL = { counter_sales: "counter sale", expenses: "expense" } as const
 // Pickup / delivery slots the store offers: Asima's morning window (9–11 AM at weekends), Kalam's evening slots (keep in step with src/lib/order-logic.ts)
 const SLOT_OPTIONS = ["8:30–9:30 AM", "9–11 AM", "6:00–6:30 PM", "6:30–7:00 PM"]
-// Asima pickle-only pickups (older ones saved as "Near Asima Mess" too) are collected from Room 104 or 210 and have
+// Asima pickle-only pickups (older ones saved as "Near Asima Mess" too) are collected from Room 104 and have
 // no set time yet; fruit bowl pickups keep their spot and morning slot (keep in step with the store's pickupPointFor)
 const isPicklePickup = (order: OrderRecord) =>
   order.fulfilment === "pickup" && !(Array.isArray(order.items) && order.items.some((item) => item?.kind === "fruit"))
-const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Block D, Room 104 or 210" : order.hostel || "Campus pickup")
+const pickupSpot = (order: OrderRecord) => (isPicklePickup(order) ? "Asima, Block D, Room 104" : order.hostel || "Campus pickup")
 const orderSlot = (order: OrderRecord) => (isPicklePickup(order) ? "" : order.slot || "")
 
 type Hostel = "Kalam" | "Asima"

@@ -24,7 +24,7 @@ Facts (never contradict or add to these):
 - Fresh Fruit Bowl: a fixed ₹49 with 6 fruits (apple, banana, papaya, pomegranate, orange, guava). Students can leave out up to 2 fruits, and we add more of the other fruits instead; no swaps or extras.
 - Kalam hostel: room delivery only, to the student's own room, 6:00–7:00 PM, ₹5 delivery fee. This is for everything we sell, Pootharekhulu included. There is no pickup for Kalam.
 - Asima fruit bowls: pickup only, near the Asima mess, free, 8:30–9:30 AM on weekdays and 9–11 AM on Saturdays and Sundays, paid in person at pickup. There is no fruit delivery in Asima. An Asima order with a fruit bowl is all collected near the mess.
-- Asima pickle-only orders and Asima Pootharekhulu orders: free pickup from Block D, Room 104 or 210 (hostel rooms in Block D, not at the mess), or delivery to the student's own room in Asima for ₹5. These have NO set time (the morning window is only for fruit bowls), so never give a time for them; say our team will confirm it.
+- Asima pickle-only orders and Asima Pootharekhulu orders: free pickup from Block D, Room 104 (a hostel room in Block D, not at the mess), or delivery to the student's own room in Asima for ₹5. These have NO set time (the morning window is only for fruit bowls), so never give a time for them; say our team will confirm it.
 - There are no other hostels or pickup points.
 - Payment: pickles and Pootharekhulu are paid only in person when the student gets them (cash, or scanning our QR then), at pickup or to the runner on room delivery; they can't be paid online or in advance while ordering. Asima fruit bowls are paid in person at pickup. Only Kalam fruit bowl orders can also be paid online while ordering, with the PhonePe/UPI QR (then enter the 12-digit UTR).
 - Orders are tracked in 'Track Orders' with the phone number; the 4-digit pickup PIN is shown there and on the confirmation screen.
@@ -111,7 +111,7 @@ export async function POST(request) {
   }
   if (body?.picklesSoon === true) {
     // Keep the date in step with PICKLES_ARRIVAL in src/lib/inventory.ts
-    system += "\n- Right now the homemade pickles are on PREORDER and are being delivered today: preordered pickles go out today, to the student's room, or ready at Block D, Room 104 or 210 for Asima pickup orders. Students can still preorder them on the Pickles page. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
+    system += "\n- Right now the homemade pickles are on PREORDER and are being delivered today: preordered pickles go out today, to the student's room, or ready at Block D, Room 104 for Asima pickup orders. Students can still preorder them on the Pickles page. While pickles are on preorder, fruit bowls and pickles have to be ordered separately."
   }
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: message }]
   const controller = new AbortController()

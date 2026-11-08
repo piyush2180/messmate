@@ -385,10 +385,10 @@ test("FAQ Bot - resolves delivery and timing queries", () => {
   assert.match(reply2, /Kalam room delivery 6:00–7:00 PM, Asima pickup 8:30–9:30 AM \(weekends 9–11 AM\) near the mess/)
 })
 
-test("FAQ Bot - resolves pickup location queries: Asima fruit near the mess, Asima pickles from Block D, Room 104 or 210 or to the room, Kalam to the room", () => {
+test("FAQ Bot - resolves pickup location queries: Asima fruit near the mess, Asima pickles from Block D, Room 104 or to the room, Kalam to the room", () => {
   const reply = getFaqResponse("Where is the pickup location at Kalam?")
   assert.match(reply, /fruit bowls are picked up near the Asima mess/)
-  assert.match(reply, /Pickle-only orders are picked up from Block D, Room 104 or 210 \(free\) or come to your room \(₹5\)/)
+  assert.match(reply, /Pickle-only orders are picked up from Block D, Room 104 \(free\) or come to your room \(₹5\)/)
   assert.match(reply, /Kalam orders come straight to your room/)
   assert.doesNotMatch(reply, /Room-341|Asima - 110/) // the old pickup counters are gone
   assert.equal(reply.includes("Hostel 3"), false) // Only Kalam and Asima exist
@@ -951,7 +951,7 @@ test("Fulfilment - Kalam is always room delivery; Asima picks up, and only pickl
   assert.equal(fulfilmentFor("Asima", [pickle]), "pickup") // free pickup unless room delivery is chosen
   assert.equal(fulfilmentFor("Asima", [pickle], true), "delivery")
   assert.equal(fulfilmentFor("Asima", [fruit], true), "pickup") // no fruit delivery at Asima
-  assert.equal(fulfilmentFor("Asima", [pickle, fruit], true), "pickup") // one trip to Room 104 or 210 covers both
+  assert.equal(fulfilmentFor("Asima", [pickle, fruit], true), "pickup") // one trip to Room 104 covers both
 })
 
 test("Fruit bowl - at most 2 fruits can be left out; tapping a left-out fruit adds it back", () => {
@@ -992,7 +992,7 @@ test("FAQ Bot - fruit and pickles together: separate orders while pickles are on
 test("FAQ Bot - Asima pickle delivery questions give the pickup and room delivery options", () => {
   const reply = getFaqResponse("can I get pickles delivered to my room in asima?", true)
   assert.match(reply, /^Pickles are delivered today\./)
-  assert.match(reply, /picked up free from Block D, Room 104 or 210 or delivered to your room for ₹5/)
+  assert.match(reply, /picked up free from Block D, Room 104 or delivered to your room for ₹5/)
   assert.match(getFaqResponse("when will mango achar be back?", true), /preorder them now/) // plain pickle questions keep the preorder answer
 })
 
