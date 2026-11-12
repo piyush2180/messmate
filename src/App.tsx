@@ -17,7 +17,8 @@ import {
   PICKLES_ARRIVAL,
   PREORDER_TAG,
   FEW_LEFT,
-  pickleReviews,
+  productReviews,
+  formReviewRows,
   type ReviewRow,
   bowlLeftOut,
   fruitBowlCartItem,
@@ -246,6 +247,105 @@ const Stars = ({ value, size = 14 }: { value: number; size?: number }) => (
 const reviewDate = (iso: string) => {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+}
+
+// Anyone can rate a product, ordered or not; one review per product on each phone
+function ReviewForm({ product, onAdded }: { product: string; onAdded: (row: ReviewRow) => void }) {
+  const key = `ht_reviewed_${product}`
+  const [done, setDone] = useState(() => Boolean(safeStorage.getItem(key, "")))
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState("")
+  const [sending, setSending] = useState(false)
+  if (done) return <p className="review-thanks">Thanks for rating {product}!</p>
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rating || sending || !supabase) return
+    setSending(true)
+    const text = comment.trim().slice(0, 300)
+    const { error } = await supabase.from("product_reviews").insert({ product, rating, comment: text || null })
+    setSending(false)
+    if (error) {
+      console.warn("Review not saved:", error.message)
+      alert("Couldn't save your review. Please try again.")
+      return
+    }
+    safeStorage.setItem(key, "1")
+    onAdded({ rating, rating_feedback: text, items: [{ name: product }], created_at: new Date().toISOString(), verified: false })
+    setDone(true)
+  }
+  return (
+    <form className="review-form" onSubmit={submit}>
+      <span className="review-form-title">Tried it? Rate it</span>
+      <div className="stars-selector" role="radiogroup" aria-label="Your rating">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            role="radio"
+            aria-checked={rating === star}
+            aria-label={`${star} star${star > 1 ? "s" : ""}`}
+            className="star-btn"
+            onClick={() => setRating(star)}
+          >
+            <Icon name="star" size={24} fill={star <= rating ? "#f59e0b" : "none"} />
+          </button>
+        ))}
+      </div>
+      {rating > 0 && (
+        <>
+          <textarea
+            className="rating-feedback-input review-comment"
+            placeholder="What did you think? (optional)"
+            maxLength={300}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <small className="rating-public-note">Shown on this page for everyone, without your name.</small>
+          <button type="submit" className="submit-rating-btn" disabled={sending}>
+            {sending ? "Sending..." : "Post review"}
+          </button>
+        </>
+      )}
+    </form>
+  )
+}
+
+function ProductReviews({
+  product,
+  reviewRows,
+  onReviewAdded,
+}: {
+  product: string
+  reviewRows: ReviewRow[]
+  onReviewAdded?: (row: ReviewRow) => void
+}) {
+  const reviews = productReviews(reviewRows, product)
+  return (
+    <section className="pickle-reviews" aria-label="Ratings and reviews">
+      <div className="section-heading">
+        <div>
+          <h2>Ratings & reviews</h2>
+          <p>
+            {reviews.count
+              ? `${reviews.average} out of 5 · ${reviews.count} ${reviews.count === 1 ? "rating" : "ratings"}`
+              : "No ratings yet. Be the first to rate it!"}
+          </p>
+        </div>
+        {reviews.count > 0 && <Stars value={reviews.average} size={18} />}
+      </div>
+      {onReviewAdded && <ReviewForm product={product} onAdded={onReviewAdded} />}
+      {reviews.comments.slice(0, 10).map((review, i) => (
+        <article className="review-card" key={i}>
+          <Stars value={review.rating} size={13} />
+          <p>“{review.text}”</p>
+          <small>
+            {review.verified ? "Verified buyer" : "Student"}
+            {reviewDate(review.date) && ` · ${reviewDate(review.date)}`}
+          </small>
+        </article>
+      ))}
+    </section>
+  )
 }
 
 // Why a cart line can't be ordered right now, or null when it can
@@ -1003,6 +1103,8 @@ function SweetsPage({
   add,
   closed = false,
   closedNote = null,
+  reviewRows = [],
+  onReviewAdded,
   soldOut = false,
   preorder = true,
 }: {
@@ -1011,6 +1113,8 @@ function SweetsPage({
   add: (item: CartItem) => void
   closed?: boolean
   closedNote?: string | null
+  reviewRows?: ReviewRow[]
+  onReviewAdded?: (row: ReviewRow) => void
   soldOut?: boolean
   preorder?: boolean
 }) {
@@ -1079,6 +1183,9 @@ function SweetsPage({
             </div>
           </article>
         </div>
+        <div className="sweets-reviews">
+          <ProductReviews product={POOTHAREKULU_NAME} reviewRows={reviewRows} onReviewAdded={onReviewAdded} />
+        </div>
       </main>
       {showVideo && <MakingVideo preorder={preorder} onClose={() => setShowVideo(false)} onPreorder={closed || soldOut ? undefined : () => add(pootharekuluCartItem(pack))} />}
     </>
@@ -1129,7 +1236,7 @@ function PickleList({
         <div className="product-grid">
           {pickleProducts.map((product) => {
             const isSoldOut = soldOutItems?.has(product.name)
-            const rated = pickleReviews(reviewRows, product.name)
+            const rated = productReviews(reviewRows, product.name)
             return (
               <article
                 className={`product-card ${isSoldOut ? "sold-out" : ""}`}
@@ -1193,6 +1300,7 @@ function PickleDetail({
   closed = false,
   closedNote = null,
   reviewRows = [],
+  onReviewAdded,
 }: {
   go: (screen: Screen) => void
   productName: string
@@ -1203,11 +1311,11 @@ function PickleDetail({
   closed?: boolean
   closedNote?: string | null
   reviewRows?: ReviewRow[]
+  onReviewAdded?: (row: ReviewRow) => void
 }) {
   const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
   const addLabel = closed ? "Closed right now" : isSoldOut ? "Currently Sold Out" : preorder ? "Preorder" : "Add to cart"
   const pack = packOptions[0]
-  const reviews = pickleReviews(reviewRows, product.name)
   const item = pickleCartItem(product, pack)
 
   const handleAdd = () => {
@@ -1305,26 +1413,7 @@ function PickleDetail({
                 {addLabel}
               </PrimaryButton>
             </div>
-            <section className="pickle-reviews" aria-labelledby="pickle-reviews-title">
-              <div className="section-heading">
-                <div>
-                  <h2 id="pickle-reviews-title">Ratings & reviews</h2>
-                  <p>
-                    {reviews.count
-                      ? `${reviews.average} out of 5 · ${reviews.count} ${reviews.count === 1 ? "rating" : "ratings"}`
-                      : "No ratings yet. After your order is delivered, rate it in Track Orders."}
-                  </p>
-                </div>
-                {reviews.count > 0 && <Stars value={reviews.average} size={18} />}
-              </div>
-              {reviews.comments.slice(0, 10).map((review, i) => (
-                <article className="review-card" key={i}>
-                  <Stars value={review.rating} size={13} />
-                  <p>“{review.text}”</p>
-                  <small>Verified buyer{reviewDate(review.date) && ` · ${reviewDate(review.date)}`}</small>
-                </article>
-              ))}
-            </section>
+            <ProductReviews product={product.name} reviewRows={reviewRows} onReviewAdded={onReviewAdded} />
           </section>
         </div>
       </main>
@@ -1348,6 +1437,8 @@ function FruitBuilder({
   soldOutItems,
   closed = false,
   closedNote = null,
+  reviewRows = [],
+  onReviewAdded,
 }: {
   go: (screen: Screen) => void
   add: (item: CartItem) => void
@@ -1355,6 +1446,8 @@ function FruitBuilder({
   soldOutItems?: Set<string>
   closed?: boolean
   closedNote?: string | null
+  reviewRows?: ReviewRow[]
+  onReviewAdded?: (row: ReviewRow) => void
 }) {
   const [leftOut, setLeftOut] = useState<string[]>([])
 
@@ -1464,6 +1557,7 @@ function FruitBuilder({
                 Don't want a fruit? Leave out up to {MAX_LEFT_OUT} and we'll add more of the others, so your bowl stays just as full.
               </span>
             </div>
+            <ProductReviews product={FRUIT_BOWL_NAME} reviewRows={reviewRows} onReviewAdded={onReviewAdded} />
           </div>
           <div className="builder-right-col">
             <div className="bowl-summary">
@@ -2858,7 +2952,7 @@ function OrderRatingWidget({
             onChange={(e) => setFeedback(e.target.value)}
             className="rating-feedback-input"
           />
-          <small className="rating-public-note">Your stars and comment will show on the pickle's page, without your name.</small>
+          <small className="rating-public-note">Your stars and comment will show on the product's page, without your name.</small>
           <button type="submit" className="submit-rating-btn" disabled={isSending}>
             {isSending ? "Submitting..." : "Submit Review"}
           </button>
@@ -4403,6 +4497,11 @@ export default function App() {
 
   // Rated orders, for the public stars and comments on each pickle (no names or phones are read)
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([])
+  // Reviews from the product pages (no order needed); empty until the product_reviews SQL has been run
+  const [formReviews, setFormReviews] = useState<ReviewRow[]>([])
+  const allReviews = useMemo(() => [...formReviews, ...reviewRows], [formReviews, reviewRows])
+  const [reviewsOn, setReviewsOn] = useState(false)
+  const addReview = reviewsOn ? (row: ReviewRow) => setFormReviews((current) => [row, ...current]) : undefined
   useEffect(() => {
     supabase
       ?.from("orders")
@@ -4412,6 +4511,16 @@ export default function App() {
       .limit(500)
       .then(({ data, error }) => {
         if (!error && data) setReviewRows(data)
+      })
+    supabase
+      ?.from("product_reviews")
+      .select("product, rating, comment, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error || !data) return
+        setFormReviews(formReviewRows(data))
+        setReviewsOn(true)
       })
   }, [])
 
@@ -5011,7 +5120,7 @@ export default function App() {
             preorder={picklesSoon}
             closed={!kindOpen.pickle}
             closedNote={kindNote("pickle", kindByHostel)}
-            reviewRows={reviewRows}
+            reviewRows={allReviews}
             selectProduct={(name) => {
               setSelectedProduct(name)
               go("pickle-detail")
@@ -5028,10 +5137,11 @@ export default function App() {
             preorder={picklesSoon}
             closed={!kindOpen.pickle}
             closedNote={kindNote("pickle", kindByHostel)}
-            reviewRows={reviewRows}
+            reviewRows={allReviews}
+            onReviewAdded={addReview}
           />
         )}
-        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} closedNote={kindNote("sweet", kindByHostel)} soldOut={soldOutItems.has(POOTHAREKULU_NAME)} preorder={sweetsSoon} />}
+        {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} closedNote={kindNote("sweet", kindByHostel)} reviewRows={allReviews} onReviewAdded={addReview} soldOut={soldOutItems.has(POOTHAREKULU_NAME)} preorder={sweetsSoon} />}
         {screen === "fruit-builder" && (
           <FruitBuilder
             go={go}
@@ -5040,6 +5150,8 @@ export default function App() {
             soldOutItems={soldOutItems}
             closed={!kindOpen.fruit}
             closedNote={kindNote("fruit", kindByHostel)}
+            reviewRows={allReviews}
+            onReviewAdded={addReview}
           />
         )}
         {screen === "cart" && (

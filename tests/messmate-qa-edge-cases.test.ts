@@ -35,7 +35,8 @@ import {
 } from "../src/lib/order-logic.ts"
 import {
   pickleProducts,
-  pickleReviews,
+  productReviews,
+  formReviewRows,
   FEW_LEFT,
   FRUIT_BOWL_NAME,
   POOTHAREKULU_NAME,
@@ -1060,11 +1061,24 @@ test("Pickle reviews - public stars and comments per pickle, newest first, no na
     { rating: 9, rating_feedback: "bad row", created_at: "2026-11-08T10:00:00Z", items: [{ name: "Gongura Pickle" }] }, // ignored
     { rating: null, rating_feedback: null, created_at: "2026-11-08T10:00:00Z", items: [{ name: "Gongura Pickle" }] }, // ignored
   ]
-  const gongura = pickleReviews(rows, "Gongura Pickle")
+  const gongura = productReviews(rows, "Gongura Pickle")
   assert.equal(gongura.count, 3)
   assert.equal(gongura.average, 4)
   assert.deepEqual(gongura.comments.map((c) => c.text), ["A bit too spicy", "Tastes like home!"])
-  assert.deepEqual(pickleReviews(rows, "Tomato Pickle"), { average: 0, count: 0, comments: [] })
+  assert.deepEqual(productReviews(rows, "Tomato Pickle"), { average: 0, count: 0, comments: [] })
   assert.deepEqual(FEW_LEFT, ["Gongura Pickle", "Gongura Pandu Mirchi"])
   for (const name of FEW_LEFT) assert.ok(pickleProducts.some((p) => p.name === name), name)
+})
+
+test("Open reviews - anyone's stars and comments join the verified ones, labelled apart", () => {
+  const orders = [{ rating: 5, rating_feedback: "From my order", created_at: "2026-11-09T10:00:00Z", items: [{ name: "Fresh Fruit Bowl" }] }]
+  const form = formReviewRows([
+    { product: "Fresh Fruit Bowl", rating: 3, comment: "Looks fresh, will order", created_at: "2026-11-12T10:00:00Z" },
+    { product: "Fresh Fruit Bowl", rating: 4, comment: null, created_at: "2026-11-11T10:00:00Z" },
+    { product: "Gongura Pickle", rating: 1, comment: "not this one", created_at: "2026-11-12T11:00:00Z" },
+  ])
+  const bowl = productReviews([...orders, ...form], "Fresh Fruit Bowl")
+  assert.equal(bowl.count, 3)
+  assert.equal(bowl.average, 4)
+  assert.deepEqual(bowl.comments.map((c) => [c.text, c.verified]), [["Looks fresh, will order", false], ["From my order", true]])
 })

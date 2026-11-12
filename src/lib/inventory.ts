@@ -78,13 +78,17 @@ export type PickleProduct = (typeof pickleProducts)[number]
 // Pickles running low: their card and page say "Only few left!" (until they're marked sold out)
 export const FEW_LEFT = ["Gongura Pickle", "Gongura Pandu Mirchi"]
 
-export type ReviewRow = { rating?: unknown; rating_feedback?: unknown; items?: unknown; created_at?: unknown }
-export type Review = { rating: number; text: string; date: string }
+/** A rated order (verified) or a review from the open form on a product page (verified: false). */
+export type ReviewRow = { rating?: unknown; rating_feedback?: unknown; items?: unknown; created_at?: unknown; verified?: boolean }
+export type Review = { rating: number; text: string; date: string; verified: boolean }
+/** product_reviews rows (anyone can post, no order needed) in the same shape as rated orders. */
+export const formReviewRows = (rows: Array<{ product?: unknown; rating?: unknown; comment?: unknown; created_at?: unknown }>): ReviewRow[] =>
+  rows.map((r) => ({ rating: r.rating, rating_feedback: r.comment, items: [{ name: r.product }], created_at: r.created_at, verified: false }))
 /**
- * A pickle's public ratings: each rated order counts for every pickle in it. Comments come newest first and never
- * carry the student's name (only the stars, the words and the date are read).
+ * A product's public ratings: each rated order counts for every product in it, plus reviews from the product page.
+ * Comments come newest first and never carry the student's name (only the stars, the words and the date are read).
  */
-export function pickleReviews(rows: ReviewRow[], name: string) {
+export function productReviews(rows: ReviewRow[], name: string) {
   const rated = rows.filter(
     (r) =>
       Number.isInteger(r.rating) &&
@@ -97,7 +101,7 @@ export function pickleReviews(rows: ReviewRow[], name: string) {
   const average = count ? Math.round((rated.reduce((sum, r) => sum + (r.rating as number), 0) / count) * 10) / 10 : 0
   const comments: Review[] = rated
     .filter((r) => typeof r.rating_feedback === "string" && r.rating_feedback.trim())
-    .map((r) => ({ rating: r.rating as number, text: String(r.rating_feedback).trim(), date: String(r.created_at ?? "") }))
+    .map((r) => ({ rating: r.rating as number, text: String(r.rating_feedback).trim(), date: String(r.created_at ?? ""), verified: r.verified !== false }))
     .sort((x, y) => y.date.localeCompare(x.date))
   return { average, count, comments }
 }

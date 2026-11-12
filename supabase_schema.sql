@@ -427,3 +427,33 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ============================================================================
+-- 10. Product Reviews (stars and a comment on any product, no order needed)
+-- Anyone can add one and everyone can read them; only staff can delete (to remove spam or rude ones).
+-- Students can only send the product, stars and comment: the id and date are set here.
+-- ============================================================================
+create table if not exists public.product_reviews (
+  id bigint generated always as identity primary key,
+  product text not null check (product in (
+    'Mango Pickle (Avakaya)', 'Gongura Pickle', 'Gongura Pandu Mirchi', 'Tomato Pickle', 'Chicken Pickle with Bone',
+    'Fresh Fruit Bowl', 'Premium Atreyapuram Pootharekhulu'
+  )),
+  rating integer not null check (rating between 1 and 5),
+  comment text check (comment is null or char_length(comment) <= 300),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_product_reviews_created_at on public.product_reviews (created_at desc);
+
+alter table public.product_reviews enable row level security;
+drop policy if exists "Anyone can read reviews" on public.product_reviews;
+create policy "Anyone can read reviews" on public.product_reviews for select using (true);
+drop policy if exists "Anyone can add a review" on public.product_reviews;
+create policy "Anyone can add a review" on public.product_reviews for insert with check (true);
+drop policy if exists "Staff can remove reviews" on public.product_reviews;
+create policy "Staff can remove reviews" on public.product_reviews for delete to authenticated using (public.is_staff());
+
+revoke all on public.product_reviews from anon, authenticated;
+grant select on public.product_reviews to anon, authenticated;
+grant insert (product, rating, comment) on public.product_reviews to anon, authenticated;
+grant delete on public.product_reviews to authenticated;

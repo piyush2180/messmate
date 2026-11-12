@@ -311,6 +311,38 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     return DEFAULT_MENU_ITEMS
   })
   const [inventoryCategory, setInventoryCategory] = useState<string>("all")
+  // Reviews anyone posted on a product page; staff can delete spam or rude ones ("missing" until their SQL is run)
+  type ProductReview = { id: number; product: string; rating: number; comment: string | null; created_at: string }
+  const [productReviews, setProductReviews] = useState<ProductReview[]>([])
+  const [productReviewsState, setProductReviewsState] = useState<"loading" | "ready" | "missing" | "error">("loading")
+  const loadProductReviews = () => {
+    supabase
+      ?.from("product_reviews")
+      .select("id, product, rating, comment, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (error) {
+          setProductReviewsState(error.code === "PGRST205" || error.code === "42P01" ? "missing" : "error")
+          return
+        }
+        setProductReviews(data as ProductReview[])
+        setProductReviewsState("ready")
+      })
+  }
+  useEffect(() => {
+    if (tab === "inventory") loadProductReviews()
+  }, [tab])
+  const handleDeleteReview = async (review: ProductReview) => {
+    if (!supabase || !confirm(`Delete this ${review.rating}-star review of ${review.product}? It disappears from the store.`)) return
+    const { error } = await supabase.from("product_reviews").delete().eq("id", review.id)
+    if (error) {
+      console.error("Review not deleted:", error.message)
+      alert("Couldn't delete the review. Please check the connection and try again.")
+      return
+    }
+    setProductReviews((current) => current.filter((r) => r.id !== review.id))
+  }
 
   // Filters & Timeframe
   const [search, setSearch] = useState("")
@@ -1474,6 +1506,36 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="admin-reviews">
+              <h3>Customer reviews</h3>
+              <p>Posted on the product pages by anyone, ordered or not. Delete spam or rude ones; ratings given on orders aren't listed here.</p>
+              {productReviewsState === "missing" ? (
+                <div className="store-status-bar missing">Run the product_reviews SQL in Supabase to see reviews here.</div>
+              ) : productReviewsState === "error" ? (
+                <p>Couldn't load reviews. Open this tab again to retry.</p>
+              ) : productReviewsState === "loading" ? (
+                <p>Loading reviews…</p>
+              ) : productReviews.length === 0 ? (
+                <p>No reviews yet.</p>
+              ) : (
+                productReviews.map((review) => (
+                  <div key={review.id} className="admin-review-row">
+                    <div>
+                      <strong>
+                        {"★".repeat(review.rating)}
+                        <span className="admin-review-empty">{"★".repeat(5 - review.rating)}</span> {review.product}
+                      </strong>
+                      {review.comment && <p>“{review.comment}”</p>}
+                      <small>{new Date(review.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</small>
+                    </div>
+                    <button type="button" className="action-btn-small" onClick={() => handleDeleteReview(review)}>
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
