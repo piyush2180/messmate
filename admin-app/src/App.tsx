@@ -333,6 +333,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     if (tab === "analytics") loadProductReviews()
   }, [tab])
+  // An order's rating can be removed (spam or rude); the order itself stays, and the store stops showing that review
+  const handleDeleteOrderReview = async (order: OrderRecord) => {
+    if (!supabase || !confirm(`Delete the ${order.rating}-star review on order #${order.order_number}? The order stays; only the review goes.`)) return
+    const { error } = await supabase.from("orders").update({ rating: null, rating_feedback: null }).eq("id", order.id)
+    if (error) {
+      console.error("Order review not deleted:", error.message)
+      alert("Couldn't delete the review. Please check the connection and try again.")
+      return
+    }
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, rating: undefined, rating_feedback: undefined } : o)))
+  }
   const handleDeleteReview = async (review: ProductReview) => {
     if (!supabase || !confirm(`Delete this ${review.rating}-star review of ${review.product}? It disappears from the store.`)) return
     const { error } = await supabase.from("product_reviews").delete().eq("id", review.id)
@@ -2013,7 +2024,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   {reviews.map((o) => {
                     const stars = Math.max(0, Math.min(5, Math.round(o.rating || 0)))
                     return (
-                      <li key={o.id}>
+                      <li key={o.id} className="product-review-item">
                         <div className="review-top">
                           <span className="review-stars" aria-label={`${stars} out of 5 stars`}>
                             {"★".repeat(stars)}
@@ -2024,6 +2035,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                           </small>
                         </div>
                         <p>{o.rating_feedback ? `"${o.rating_feedback}"` : "No written feedback"}</p>
+                        <button type="button" className="action-btn-small" onClick={() => handleDeleteOrderReview(o)}>
+                          Delete
+                        </button>
                       </li>
                     )
                   })}
