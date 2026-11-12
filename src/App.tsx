@@ -16,6 +16,9 @@ import {
   preorderWait,
   PICKLES_ARRIVAL,
   PREORDER_TAG,
+  FEW_LEFT,
+  pickleReviews,
+  type ReviewRow,
   bowlLeftOut,
   fruitBowlCartItem,
   maxQuantity,
@@ -231,6 +234,19 @@ const StatusNote = ({ text }: { text: string }) => (
 )
 // "Closed right now" when closed in both hostels, "Closed in Kalam" for one, null when open in both
 const closedChip = (o: HostelOpen) => (!o.Kalam && !o.Asima ? CLOSED_CHIP : !o.Kalam ? "Closed in Kalam" : !o.Asima ? "Closed in Asima" : null)
+
+// Read-only stars for a rating out of 5 (rounded to the nearest whole star)
+const Stars = ({ value, size = 14 }: { value: number; size?: number }) => (
+  <span className="review-stars" role="img" aria-label={`${value} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((n) => (
+      <Icon key={n} name="star" size={size} fill={n <= Math.round(value) ? "#f59e0b" : "none"} />
+    ))}
+  </span>
+)
+const reviewDate = (iso: string) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+}
 
 // Why a cart line can't be ordered right now, or null when it can
 function soldOutNote(item: CartItem, soldOut: Set<string>, open?: KindsOpen, hostel?: string): string | null {
@@ -1077,6 +1093,7 @@ function PickleList({
   preorder = false,
   closed = false,
   closedNote = null,
+  reviewRows = [],
 }: {
   go: (screen: Screen) => void
   selectProduct: (name: string) => void
@@ -1085,6 +1102,7 @@ function PickleList({
   preorder?: boolean
   closed?: boolean
   closedNote?: string | null
+  reviewRows?: ReviewRow[]
 }) {
   return (
     <>
@@ -1111,6 +1129,7 @@ function PickleList({
         <div className="product-grid">
           {pickleProducts.map((product) => {
             const isSoldOut = soldOutItems?.has(product.name)
+            const rated = pickleReviews(reviewRows, product.name)
             return (
               <article
                 className={`product-card ${isSoldOut ? "sold-out" : ""}`}
@@ -1122,6 +1141,7 @@ function PickleList({
                 <div className="product-image-wrap">
                   <img src={sized(product.image, 480)} alt={product.name} />
                   {isSoldOut && <span className="sold-out-chip">SOLD OUT</span>}
+                  {!isSoldOut && FEW_LEFT.includes(product.name) && <span className="few-left-chip">Only few left!</span>}
                   {!isSoldOut && (closed || preorder) && <span className="arriving-soon-chip">{closed ? CLOSED_CHIP : `Delivering ${PICKLES_ARRIVAL}`}</span>}
                 </div>
                 <div className="product-info">
@@ -1136,6 +1156,11 @@ function PickleList({
                     </span>
                   </div>
                   <h3>{product.name}</h3>
+                  {rated.count > 0 && (
+                    <span className="card-rating">
+                      <Stars value={rated.average} size={12} /> {rated.average} ({rated.count})
+                    </span>
+                  )}
                   <p>{product.desc}</p>
                   <div className="product-bottom">
                     <div>
@@ -1167,6 +1192,7 @@ function PickleDetail({
   preorder = false,
   closed = false,
   closedNote = null,
+  reviewRows = [],
 }: {
   go: (screen: Screen) => void
   productName: string
@@ -1176,10 +1202,12 @@ function PickleDetail({
   preorder?: boolean
   closed?: boolean
   closedNote?: string | null
+  reviewRows?: ReviewRow[]
 }) {
   const product = pickleProducts.find((p) => p.name === productName) ?? pickleProducts[0]
   const addLabel = closed ? "Closed right now" : isSoldOut ? "Currently Sold Out" : preorder ? "Preorder" : "Add to cart"
   const pack = packOptions[0]
+  const reviews = pickleReviews(reviewRows, product.name)
   const item = pickleCartItem(product, pack)
 
   const handleAdd = () => {
@@ -1218,6 +1246,7 @@ function PickleDetail({
             {closedNote && <StatusNote text={closedNote} />}
             {isSoldOut && !closed && <StatusNote text={`${product.name} is sold out right now.`} />}
             {(closed || preorder) && !isSoldOut && <span className="arriving-soon-chip inline">{closed ? CLOSED_CHIP : `Delivering ${PICKLES_ARRIVAL}`}</span>}
+            {!isSoldOut && FEW_LEFT.includes(product.name) && <span className="few-left-chip inline">Only few left!</span>}
             <div className="eyebrow">Homemade · Small-batch</div>
             <h1>{product.name}</h1>
             <p>{product.about}</p>
@@ -1276,6 +1305,26 @@ function PickleDetail({
                 {addLabel}
               </PrimaryButton>
             </div>
+            <section className="pickle-reviews" aria-labelledby="pickle-reviews-title">
+              <div className="section-heading">
+                <div>
+                  <h2 id="pickle-reviews-title">Ratings & reviews</h2>
+                  <p>
+                    {reviews.count
+                      ? `${reviews.average} out of 5 · ${reviews.count} ${reviews.count === 1 ? "rating" : "ratings"}`
+                      : "No ratings yet. After your order is delivered, rate it in Track Orders."}
+                  </p>
+                </div>
+                {reviews.count > 0 && <Stars value={reviews.average} size={18} />}
+              </div>
+              {reviews.comments.slice(0, 10).map((review, i) => (
+                <article className="review-card" key={i}>
+                  <Stars value={review.rating} size={13} />
+                  <p>“{review.text}”</p>
+                  <small>Verified buyer{reviewDate(review.date) && ` · ${reviewDate(review.date)}`}</small>
+                </article>
+              ))}
+            </section>
           </section>
         </div>
       </main>
@@ -2809,6 +2858,7 @@ function OrderRatingWidget({
             onChange={(e) => setFeedback(e.target.value)}
             className="rating-feedback-input"
           />
+          <small className="rating-public-note">Your stars and comment will show on the pickle's page, without your name.</small>
           <button type="submit" className="submit-rating-btn" disabled={isSending}>
             {isSending ? "Submitting..." : "Submit Review"}
           </button>
@@ -4351,6 +4401,20 @@ export default function App() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Rated orders, for the public stars and comments on each pickle (no names or phones are read)
+  const [reviewRows, setReviewRows] = useState<ReviewRow[]>([])
+  useEffect(() => {
+    supabase
+      ?.from("orders")
+      .select("rating, rating_feedback, items, created_at")
+      .not("rating", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (!error && data) setReviewRows(data)
+      })
+  }, [])
+
   // Real-time Sold Out items state
   const [soldOutItems, setSoldOutItems] = useState<Set<string>>(() => new Set())
 
@@ -4947,6 +5011,7 @@ export default function App() {
             preorder={picklesSoon}
             closed={!kindOpen.pickle}
             closedNote={kindNote("pickle", kindByHostel)}
+            reviewRows={reviewRows}
             selectProduct={(name) => {
               setSelectedProduct(name)
               go("pickle-detail")
@@ -4963,6 +5028,7 @@ export default function App() {
             preorder={picklesSoon}
             closed={!kindOpen.pickle}
             closedNote={kindNote("pickle", kindByHostel)}
+            reviewRows={reviewRows}
           />
         )}
         {screen === "sweets" && <SweetsPage go={go} cartCount={cartCount} add={add} closed={!kindOpen.sweet} closedNote={kindNote("sweet", kindByHostel)} soldOut={soldOutItems.has(POOTHAREKULU_NAME)} preorder={sweetsSoon} />}

@@ -35,6 +35,8 @@ import {
 } from "../src/lib/order-logic.ts"
 import {
   pickleProducts,
+  pickleReviews,
+  FEW_LEFT,
   FRUIT_BOWL_NAME,
   POOTHAREKULU_NAME,
   DEFAULT_MENU_ITEMS as STORE_MENU,
@@ -854,28 +856,28 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
 test("FAQ Bot - Sweets & Snacks gives Pootharekulu's pack prices and says it's on preorder, arriving soon", () => {
   assert.match(
     getFaqResponse("do you have pootharekulu?"),
-    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹35, 2 pcs ₹60, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives soon,/,
+    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹40, 2 pcs ₹70, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives soon,/,
   )
   assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
   assert.match(getFaqResponse("price of sweets?"), /5 pcs ₹150/)
   // The general price answer lists it too, without saying "preorder" (that's only for pickles while on Preorder)
   const price = getFaqResponse("how much does it cost?")
-  assert.match(price, /Pootharekhulu is ₹35 for 1 pc, ₹60 for 2 pcs, ₹150 for 5 pcs\./)
+  assert.match(price, /Pootharekhulu is ₹40 for 1 pc, ₹70 for 2 pcs, ₹150 for 5 pcs\./)
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
 })
 
-test("Pootharekulu - packs of 1 (₹35), 2 (₹60) or 5 (₹150)", () => {
+test("Pootharekulu - packs of 1 (₹40), 2 (₹70) or 5 (₹150)", () => {
   assert.deepEqual(
     POOTHAREKULU_PACKS.map((pack) => [pootharekuluCartItem(pack).id, pootharekuluCartItem(pack).detail, pootharekuluCartItem(pack).price]),
     [
-      ["sweet-pootharekulu-1", "1 pc", 35],
-      ["sweet-pootharekulu-2", "2 pcs", 60],
+      ["sweet-pootharekulu-1", "1 pc", 40],
+      ["sweet-pootharekulu-2", "2 pcs", 70],
       ["sweet-pootharekulu-5", "5 pcs", 150],
     ],
   )
   const twoPieces = pootharekuluCartItem(POOTHAREKULU_PACKS[1])
-  assert.equal(linePrice(twoPieces), "₹60")
-  assert.deepEqual(calculateOrderTotals([twoPieces], "delivery"), { subtotal: 60, fee: 5, total: 65 })
+  assert.equal(linePrice(twoPieces), "₹70")
+  assert.deepEqual(calculateOrderTotals([twoPieces], "delivery"), { subtotal: 70, fee: 5, total: 75 })
   // Orders placed before it had a price have ₹0 lines, which Track Orders shows as "Price soon"
   assert.equal(linePrice({ price: 0, quantity: 1 }), PRICE_SOON)
   assert.equal(hasUnpricedItem([{ price: 0 }]), true)
@@ -1047,4 +1049,22 @@ test("Pootharekhulu Preorder switch - on sale it mixes with other items and the 
   const onSale = getFaqResponse("do you have pootharekulu?", false, true, undefined, false)
   assert.match(onSale, /available now on the Sweets & Snacks page, and you pay in person when you get it\./)
   assert.doesNotMatch(onSale, /preorder/i)
+})
+
+test("Pickle reviews - public stars and comments per pickle, newest first, no names", () => {
+  const rows = [
+    { rating: 5, rating_feedback: "Tastes like home!", created_at: "2026-11-02T10:00:00Z", items: [{ name: "Gongura Pickle" }, { name: "Fresh Fruit Bowl" }] },
+    { rating: 4, rating_feedback: "  ", created_at: "2026-11-05T10:00:00Z", items: [{ name: "Gongura Pickle" }] },
+    { rating: 3, rating_feedback: "A bit too spicy", created_at: "2026-11-06T10:00:00Z", items: [{ name: "Gongura Pickle" }] },
+    { rating: 5, rating_feedback: "Great mango", created_at: "2026-11-07T10:00:00Z", items: [{ name: "Mango Pickle (Avakaya)" }] },
+    { rating: 9, rating_feedback: "bad row", created_at: "2026-11-08T10:00:00Z", items: [{ name: "Gongura Pickle" }] }, // ignored
+    { rating: null, rating_feedback: null, created_at: "2026-11-08T10:00:00Z", items: [{ name: "Gongura Pickle" }] }, // ignored
+  ]
+  const gongura = pickleReviews(rows, "Gongura Pickle")
+  assert.equal(gongura.count, 3)
+  assert.equal(gongura.average, 4)
+  assert.deepEqual(gongura.comments.map((c) => c.text), ["A bit too spicy", "Tastes like home!"])
+  assert.deepEqual(pickleReviews(rows, "Tomato Pickle"), { average: 0, count: 0, comments: [] })
+  assert.deepEqual(FEW_LEFT, ["Gongura Pickle", "Gongura Pandu Mirchi"])
+  for (const name of FEW_LEFT) assert.ok(pickleProducts.some((p) => p.name === name), name)
 })

@@ -75,6 +75,33 @@ export const pickleProducts = [
 
 export type PickleProduct = (typeof pickleProducts)[number]
 
+// Pickles running low: their card and page say "Only few left!" (until they're marked sold out)
+export const FEW_LEFT = ["Gongura Pickle", "Gongura Pandu Mirchi"]
+
+export type ReviewRow = { rating?: unknown; rating_feedback?: unknown; items?: unknown; created_at?: unknown }
+export type Review = { rating: number; text: string; date: string }
+/**
+ * A pickle's public ratings: each rated order counts for every pickle in it. Comments come newest first and never
+ * carry the student's name (only the stars, the words and the date are read).
+ */
+export function pickleReviews(rows: ReviewRow[], name: string) {
+  const rated = rows.filter(
+    (r) =>
+      Number.isInteger(r.rating) &&
+      (r.rating as number) >= 1 &&
+      (r.rating as number) <= 5 &&
+      Array.isArray(r.items) &&
+      r.items.some((item) => item?.name === name),
+  )
+  const count = rated.length
+  const average = count ? Math.round((rated.reduce((sum, r) => sum + (r.rating as number), 0) / count) * 10) / 10 : 0
+  const comments: Review[] = rated
+    .filter((r) => typeof r.rating_feedback === "string" && r.rating_feedback.trim())
+    .map((r) => ({ rating: r.rating as number, text: String(r.rating_feedback).trim(), date: String(r.created_at ?? "") }))
+    .sort((x, y) => y.date.localeCompare(x.date))
+  return { average, count, comments }
+}
+
 // Every pickle is sold in a single 50g pack. Pack price = product's 50g price × units.
 export const packOptions = [{ label: "50g", units: 1, note: "Just enough to start a new habit." }]
 
@@ -94,8 +121,8 @@ export function toggleLeftOut(current: string[], name: string): string[] {
 // Sweets & Snacks: Pootharekulu, on preorder until it arrives (SWEETS_ARRIVAL), in packs of 1, 2 or 5 (bigger packs cost less a piece)
 export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
 export const POOTHAREKULU_PACKS = [
-  { label: "1 pc", pieces: 1, price: 35 },
-  { label: "2 pcs", pieces: 2, price: 60 },
+  { label: "1 pc", pieces: 1, price: 40 },
+  { label: "2 pcs", pieces: 2, price: 70 },
   { label: "5 pcs", pieces: 5, price: 150 },
 ]
 export type PootharekuluPack = (typeof POOTHAREKULU_PACKS)[number]
