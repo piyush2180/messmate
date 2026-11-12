@@ -1949,12 +1949,5 @@ button, input, select, textarea {
 .store-status-row .store-status-bar { margin: 0; }
 @media (min-width: 900px) { .store-status-row { grid-template-columns: 1fr 1fr; } .store-status-row .store-status-bar.missing { grid-column: 1 / -1; } }
 
-/* Menu & Stock: reviews posted on product pages */
-.admin-reviews { margin-top: 28px; }
-.admin-reviews h3 { font-size: 16px; color: var(--olive); font-weight: 800; }
-.admin-reviews > p { font-size: 12px; color: var(--muted); margin: 2px 0 12px; }
-.admin-review-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid rgba(0, 0, 0, .08); border-radius: 12px; background: #fff; }
-.admin-review-row strong { font-size: 13px; color: #f59e0b; }
-.admin-review-row .admin-review-empty { color: #d6d3cc; }
-.admin-review-row p { margin: 4px 0; font-size: 13px; overflow-wrap: anywhere; }
-.admin-review-row small { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+/* Analytics: reviews posted on product pages, each with a Delete button */
+.product-review-item .action-btn-small { margin-top: 6px; }

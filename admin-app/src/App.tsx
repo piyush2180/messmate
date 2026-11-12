@@ -331,7 +331,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       })
   }
   useEffect(() => {
-    if (tab === "inventory") loadProductReviews()
+    if (tab === "analytics") loadProductReviews()
   }, [tab])
   const handleDeleteReview = async (review: ProductReview) => {
     if (!supabase || !confirm(`Delete this ${review.rating}-star review of ${review.product}? It disappears from the store.`)) return
@@ -1507,36 +1507,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               ))}
             </div>
-
-            <div className="admin-reviews">
-              <h3>Customer reviews</h3>
-              <p>Posted on the product pages by anyone, ordered or not. Delete spam or rude ones; ratings given on orders aren't listed here.</p>
-              {productReviewsState === "missing" ? (
-                <div className="store-status-bar missing">Run the product_reviews SQL in Supabase to see reviews here.</div>
-              ) : productReviewsState === "error" ? (
-                <p>Couldn't load reviews. Open this tab again to retry.</p>
-              ) : productReviewsState === "loading" ? (
-                <p>Loading reviews…</p>
-              ) : productReviews.length === 0 ? (
-                <p>No reviews yet.</p>
-              ) : (
-                productReviews.map((review) => (
-                  <div key={review.id} className="admin-review-row">
-                    <div>
-                      <strong>
-                        {"★".repeat(review.rating)}
-                        <span className="admin-review-empty">{"★".repeat(5 - review.rating)}</span> {review.product}
-                      </strong>
-                      {review.comment && <p>“{review.comment}”</p>}
-                      <small>{new Date(review.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</small>
-                    </div>
-                    <button type="button" className="action-btn-small" onClick={() => handleDeleteReview(review)}>
-                      Delete
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         )}
 
@@ -2057,6 +2027,47 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       </li>
                     )
                   })}
+                </ul>
+              )}
+            </div>
+
+            {/* Reviews anyone posted on a product page (no order needed); staff can delete spam or rude ones */}
+            <div className="analytics-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="analytics-card-title">
+                <div>
+                  <span>Product page reviews</span>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "normal", marginTop: "2px" }}>
+                    Posted by anyone, ordered or not. Delete spam or rude ones and they disappear from the store.
+                  </div>
+                </div>
+              </div>
+              {productReviewsState === "missing" ? (
+                <div className="store-status-bar missing">Run the product_reviews SQL in Supabase to see reviews here.</div>
+              ) : productReviewsState === "error" ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>Couldn't load reviews. Open this tab again to retry.</p>
+              ) : productReviewsState === "loading" ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>Loading reviews…</p>
+              ) : productReviews.length === 0 ? (
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0" }}>No reviews yet.</p>
+              ) : (
+                <ul className="review-list">
+                  {productReviews.map((review) => (
+                    <li key={review.id} className="product-review-item">
+                      <div className="review-top">
+                        <span className="review-stars" aria-label={`${review.rating} out of 5 stars`}>
+                          {"★".repeat(review.rating)}
+                          {"☆".repeat(5 - review.rating)}
+                        </span>
+                        <small>
+                          {review.product} · {formatWhen(review.created_at)}
+                        </small>
+                      </div>
+                      <p>{review.comment ? `"${review.comment}"` : "No written feedback"}</p>
+                      <button type="button" className="action-btn-small" onClick={() => handleDeleteReview(review)}>
+                        Delete
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
