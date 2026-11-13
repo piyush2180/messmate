@@ -857,21 +857,21 @@ test("Slots - Asima has one morning window (9–11 AM at weekends), Kalam picks 
 test("FAQ Bot - Sweets & Snacks gives Pootharekulu's pack prices and says it's on preorder, arriving soon", () => {
   assert.match(
     getFaqResponse("do you have pootharekulu?"),
-    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹40, 2 pcs ₹70, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives soon,/,
+    /^Premium Atreyapuram Pootharekhulu comes in packs: 1 pc ₹35, 2 pcs ₹70, 5 pcs ₹150 \(one pack per order\)\. It's on preorder and arrives soon,/,
   )
   assert.match(getFaqResponse("when do the atreyapuram pootharekhulu come"), /on preorder/) // the new spelling is caught too
   assert.match(getFaqResponse("price of sweets?"), /5 pcs ₹150/)
   // The general price answer lists it too, without saying "preorder" (that's only for pickles while on Preorder)
   const price = getFaqResponse("how much does it cost?")
-  assert.match(price, /Pootharekhulu is ₹40 for 1 pc, ₹70 for 2 pcs, ₹150 for 5 pcs\./)
+  assert.match(price, /Pootharekhulu is ₹35 for 1 pc, ₹70 for 2 pcs, ₹150 for 5 pcs\./)
   assert.match(getFaqResponse("how much is a fruit bowl?"), /fixed ₹49/) // other price questions unchanged
 })
 
-test("Pootharekulu - packs of 1 (₹40), 2 (₹70) or 5 (₹150)", () => {
+test("Pootharekulu - packs of 1 (₹35), 2 (₹70) or 5 (₹150)", () => {
   assert.deepEqual(
     POOTHAREKULU_PACKS.map((pack) => [pootharekuluCartItem(pack).id, pootharekuluCartItem(pack).detail, pootharekuluCartItem(pack).price]),
     [
-      ["sweet-pootharekulu-1", "1 pc", 40],
+      ["sweet-pootharekulu-1", "1 pc", 35],
       ["sweet-pootharekulu-2", "2 pcs", 70],
       ["sweet-pootharekulu-5", "5 pcs", 150],
     ],

@@ -125,7 +125,7 @@ export function toggleLeftOut(current: string[], name: string): string[] {
 // Sweets & Snacks: Pootharekulu, on preorder until it arrives (SWEETS_ARRIVAL), in packs of 1, 2 or 5 (bigger packs cost less a piece)
 export const POOTHAREKULU_NAME = "Premium Atreyapuram Pootharekhulu"
 export const POOTHAREKULU_PACKS = [
-  { label: "1 pc", pieces: 1, price: 40 },
+  { label: "1 pc", pieces: 1, price: 35 },
   { label: "2 pcs", pieces: 2, price: 70 },
   { label: "5 pcs", pieces: 5, price: 150 },
 ]
