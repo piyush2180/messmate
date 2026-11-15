@@ -2520,4 +2520,9 @@ button.product-image-wrap { display: block; width: 100%; padding: 0; border: 0; 
 .review-form .star-btn { background: none; border: none; padding: 4px; cursor: pointer; color: #f59e0b; }
 .review-comment { height: 64px; padding: 8px 10px; resize: vertical; font: inherit; }
 .review-thanks { margin: 0 0 12px; font-size: 12px; font-weight: 700; color: var(--olive); }
-.sweets-reviews { max-width: 640px; margin: 8px auto 0; padding: 0 2px; }
+/* Sweets page: the product card and its reviews side by side on wide screens */
+.sweets-layout { display: grid; gap: 18px; margin-top: 14px; align-items: start; }
+.sweets-reviews .pickle-reviews { margin-top: 0; }
+.sweets-reviews .section-heading { margin-top: 0; }
+@media (min-width: 900px) { .sweets-layout { grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 32px; } }
+.product-bottom .preorder-btn:disabled { background: #e8e2d8; color: #8a8172; cursor: not-allowed; box-shadow: none; }

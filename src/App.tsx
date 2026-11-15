@@ -1133,7 +1133,7 @@ function SweetsPage({
       />
       <main className="screen-content pickles-page">
         <section className="screen-intro pickle-intro">
-          <div className="eyebrow">{preorder ? "On preorder now" : "Available now"}</div>
+          <div className="eyebrow">{closed ? "Closed right now" : soldOut ? "Sold out right now" : preorder ? "On preorder now" : "Available now"}</div>
           <h1>
             Sweets &
             <br />
@@ -1142,7 +1142,7 @@ function SweetsPage({
           <p>Traditional sweets for after mess dinner, starting with {POOTHAREKULU_NAME}.</p>
         </section>
         {closedNote ? <StatusNote text={closedNote} /> : soldOut && <StatusNote text={`${POOTHAREKULU_NAME} is sold out right now.`} />}
-        <div className="product-grid">
+        <div className="sweets-layout">
           <article className="product-card sweet-card">
             <button type="button" className="product-image-wrap watch-making" onClick={() => setShowVideo(true)}>
               <img src={pootharekuluImage} alt={`${POOTHAREKULU_NAME} rolls`} />
@@ -1182,9 +1182,9 @@ function SweetsPage({
               </div>
             </div>
           </article>
-        </div>
-        <div className="sweets-reviews">
-          <ProductReviews product={POOTHAREKULU_NAME} reviewRows={reviewRows} onReviewAdded={onReviewAdded} />
+          <div className="sweets-reviews">
+            <ProductReviews product={POOTHAREKULU_NAME} reviewRows={reviewRows} onReviewAdded={onReviewAdded} />
+          </div>
         </div>
       </main>
       {showVideo && <MakingVideo preorder={preorder} onClose={() => setShowVideo(false)} onPreorder={closed || soldOut ? undefined : () => add(pootharekuluCartItem(pack))} />}
