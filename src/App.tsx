@@ -4364,7 +4364,7 @@ function restoreSession() {
 // Back-in-service notice, shown once per visit
 const RESUME_NOTICE_KEY = "ht_resume_notice"
 
-function ResumeNotice({ sweetsSoon = true }: { sweetsSoon?: boolean }) {
+function ResumeNotice({ sweetsSoon = true, sweetsOrderable = true }: { sweetsSoon?: boolean; sweetsOrderable?: boolean }) {
   const [open, setOpen] = useState(() => {
     try {
       return sessionStorage.getItem(RESUME_NOTICE_KEY) !== "seen"
@@ -4410,10 +4410,13 @@ function ResumeNotice({ sweetsSoon = true }: { sweetsSoon?: boolean }) {
             <strong>Pickles</strong>
             <span>Homemade pickles are being delivered {PICKLES_ARRIVAL}</span>
           </li>
-          <li>
-            <strong>Sweets</strong>
-            <span>{sweetsSoon ? `${POOTHAREKULU_NAME} is coming ${SWEETS_ARRIVAL}, and you can preorder it now` : `${POOTHAREKULU_NAME} is available now`}</span>
-          </li>
+          {/* Only while Pootharekhulu can be ordered: hidden when it's sold out or closed in both hostels */}
+          {sweetsOrderable && (
+            <li>
+              <strong>Sweets</strong>
+              <span>{sweetsSoon ? `${POOTHAREKULU_NAME} is coming ${SWEETS_ARRIVAL}, and you can preorder it now` : `${POOTHAREKULU_NAME} is available now`}</span>
+            </li>
+          )}
         </ul>
         <PrimaryButton onClick={close}>Got it</PrimaryButton>
       </div>
@@ -5017,7 +5020,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
-        <ResumeNotice sweetsSoon={sweetsSoon} />
+        <ResumeNotice sweetsSoon={sweetsSoon} sweetsOrderable={kindOpen.sweet && !soldOutItems.has(POOTHAREKULU_NAME)} />
         {/* Live Floating Alert Banner for Ready Orders */}
         {activeReadyOrder && (
           <div className="ready-order-alert-banner">
