@@ -249,10 +249,17 @@ const reviewDate = (iso: string) => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
 }
 
-// Anyone can rate a product, ordered or not; one review per product on each phone
+// Anyone can rate a product, ordered or not, sold out or not. After posting, the form rests until the next visit
+// (sessionStorage), so a double tap doesn't post twice but nobody is locked out for good.
 function ReviewForm({ product, onAdded }: { product: string; onAdded: (row: ReviewRow) => void }) {
   const key = `ht_reviewed_${product}`
-  const [done, setDone] = useState(() => Boolean(safeStorage.getItem(key, "")))
+  const [done, setDone] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem(key))
+    } catch {
+      return false
+    }
+  })
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState("")
   const [sending, setSending] = useState(false)
@@ -269,7 +276,9 @@ function ReviewForm({ product, onAdded }: { product: string; onAdded: (row: Revi
       alert("Couldn't save your review. Please try again.")
       return
     }
-    safeStorage.setItem(key, "1")
+    try {
+      sessionStorage.setItem(key, "1")
+    } catch {}
     onAdded({ rating, rating_feedback: text, items: [{ name: product }], created_at: new Date().toISOString(), verified: false })
     setDone(true)
   }
