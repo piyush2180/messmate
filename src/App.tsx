@@ -1242,7 +1242,8 @@ function PickleList({
                 className={`product-card ${isSoldOut ? "sold-out" : ""}`}
                 key={product.name}
                 onClick={() => {
-                  if (!isSoldOut) selectProduct(product.name)
+                  // A sold-out pickle still opens: ordering is off there, but it can be read about and rated
+                  selectProduct(product.name)
                 }}
               >
                 <div className="product-image-wrap">
@@ -1276,8 +1277,8 @@ function PickleList({
                         {isSoldOut ? "Sold Out" : `₹${product.price}`}
                       </strong>
                     </div>
-                    <button disabled={isSoldOut} aria-label={`View ${product.name}`}>
-                      {isSoldOut ? <Icon name="close" size={14} /> : <Icon name="arrow-right" size={17} />}
+                    <button aria-label={`View ${product.name}`}>
+                      <Icon name="arrow-right" size={17} />
                     </button>
                   </div>
                 </div>

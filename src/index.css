@@ -2258,7 +2258,7 @@ button.fruit-card { width: 100%; text-align: left; cursor: pointer; }
 /* Sold Out State Styles */
 .product-card.sold-out {
   opacity: 0.65;
-  cursor: not-allowed;
+  cursor: pointer;
   position: relative;
 }
 .product-image-wrap {
