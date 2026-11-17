@@ -4374,7 +4374,15 @@ function restoreSession() {
 // Back-in-service notice, shown once per visit
 const RESUME_NOTICE_KEY = "ht_resume_notice"
 
-function ResumeNotice({ sweetsSoon = true, sweetsOrderable = true }: { sweetsSoon?: boolean; sweetsOrderable?: boolean }) {
+function ResumeNotice({
+  sweetsSoon = true,
+  sweetsOrderable = true,
+  picklesLeft = pickleProducts.map((p) => p.name),
+}: {
+  sweetsSoon?: boolean
+  sweetsOrderable?: boolean
+  picklesLeft?: string[]
+}) {
   const [open, setOpen] = useState(() => {
     try {
       return sessionStorage.getItem(RESUME_NOTICE_KEY) !== "seen"
@@ -4418,7 +4426,14 @@ function ResumeNotice({ sweetsSoon = true, sweetsOrderable = true }: { sweetsSoo
         <ul className="notice-hostels">
           <li>
             <strong>Pickles</strong>
-            <span>Homemade pickles are being delivered {PICKLES_ARRIVAL}</span>
+            {/* Follows the admin's Sold Out buttons */}
+            <span>
+              {picklesLeft.length === pickleProducts.length
+                ? `Homemade pickles are being delivered ${PICKLES_ARRIVAL}`
+                : picklesLeft.length === 0
+                  ? "All our pickles are sold out right now"
+                  : `Only ${picklesLeft.length} ${picklesLeft.length === 1 ? "pickle is" : "pickles are"} left: ${picklesLeft.join(" and ")}. The rest are sold out`}
+            </span>
           </li>
           {/* Only while Pootharekhulu can be ordered: hidden when it's sold out or closed in both hostels */}
           {sweetsOrderable && (
@@ -5030,7 +5045,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
-        <ResumeNotice sweetsSoon={sweetsSoon} sweetsOrderable={kindOpen.sweet && !soldOutItems.has(POOTHAREKULU_NAME)} />
+        <ResumeNotice
+          sweetsSoon={sweetsSoon}
+          sweetsOrderable={kindOpen.sweet && !soldOutItems.has(POOTHAREKULU_NAME)}
+          picklesLeft={pickleProducts.filter((p) => !soldOutItems.has(p.name)).map((p) => p.name)}
+        />
         {/* Live Floating Alert Banner for Ready Orders */}
         {activeReadyOrder && (
           <div className="ready-order-alert-banner">
