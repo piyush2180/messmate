@@ -1002,6 +1002,32 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       .sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime())
   }, [supportMessages])
 
+  // Delete a whole conversation: every message saved under any format of this student's number.
+  // Only cleared from the screen once the database confirms (with no delete rule it removes nothing, silently).
+  const handleDeleteThread = async (thread: { phone: string; customerName: string; messages: SupportMessage[] }) => {
+    if (!supabase) return
+    const shown = get10DigitPhone(thread.phone) || thread.phone
+    if (!confirm(`Delete the whole conversation with ${thread.customerName} (${shown})? This removes every message for good.`)) return
+    const phones = [...new Set(thread.messages.map((m) => m.phone).filter(Boolean))]
+    const { data, error } = await supabase.from("support_messages").delete().in("phone", phones).select("id")
+    if (error) {
+      console.error("Conversation not deleted:", error.message)
+      alert("Couldn't delete the conversation. Please check the connection and try again.")
+      return
+    }
+    if (!data || data.length === 0) {
+      alert("Nothing was deleted. Run the latest SQL in Supabase (it lets staff delete conversations), then try again.")
+      return
+    }
+    const key = get10DigitPhone(thread.phone) || thread.phone
+    setSupportMessages((prev) => {
+      const next = prev.filter((m) => (get10DigitPhone(m.phone) || m.phone) !== key)
+      saveAdminSupportToLocal(next)
+      return next
+    })
+    setSelectedPhone(null)
+  }
+
   // Desktop: Auto-select first thread if none selected.
   // Mobile: Keep selectedPhone null so admin sees the full conversation list and can choose any chat.
   useEffect(() => {
@@ -1598,6 +1624,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       </svg>
                       <span>Call {get10DigitPhone(activeThread.phone)}</span>
                     </a>
+                    <button type="button" className="action-btn delete-chat" onClick={() => handleDeleteThread(activeThread)}>
+                      Delete chat
+                    </button>
                   </div>
 
                   <div className="thread-messages" ref={threadMessagesRef}>

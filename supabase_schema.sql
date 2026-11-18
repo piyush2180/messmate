@@ -195,6 +195,13 @@ create policy "Anyone can view support messages"
   on public.support_messages for select
   using (true);
 
+-- Staff can delete a support conversation (all its messages); students can't delete anything
+drop policy if exists "Staff can delete support messages" on public.support_messages;
+create policy "Staff can delete support messages"
+  on public.support_messages for delete to authenticated
+  using (public.is_staff());
+grant delete on public.support_messages to authenticated;
+
 -- ============================================================================
 -- 3. Menu Inventory Table (Real-time Stock / Sold-out Management)
 -- ============================================================================

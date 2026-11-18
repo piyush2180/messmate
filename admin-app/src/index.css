@@ -1951,3 +1951,8 @@ button, input, select, textarea {
 
 /* Analytics: reviews posted on product pages, each with a Delete button */
 .product-review-item .action-btn-small { margin-top: 6px; }
+
+/* Support: delete a whole conversation */
+.thread-header .delete-chat { flex: none; width: auto; margin-left: 8px; border: 1px solid #f3c2c2; background: #fff5f5; color: #b42318; cursor: pointer; }
+.thread-header .delete-chat:hover { background: #fde8e8; }
+@media (max-width: 640px) { .thread-header { flex-wrap: wrap; row-gap: 8px; } .thread-header .delete-chat { margin-left: auto; } }
